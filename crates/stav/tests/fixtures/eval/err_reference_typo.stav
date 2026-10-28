@@ -1,4 +1,4 @@
 struct Service { after: List<Ref<Service>> = [] }
 struct Root { services: Map<Str, Service> = {} block service }
 service network { }
-service sshd { after = [netwrok] }
+service gateway { after = [netwrok] }

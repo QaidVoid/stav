@@ -599,7 +599,7 @@ fn fmt_skips_hidden_entries_unless_named() {
         &[
             ("a.stav", "a=1\n"),
             (".hidden.stav", "a=1\n"),
-            (".git/x.stav", "a=1\n"),
+            (".store/x.stav", "a=1\n"),
             ("lib/.cache/y.stav", "a=1\n"),
         ],
     );
@@ -609,11 +609,11 @@ fn fmt_skips_hidden_entries_unless_named() {
     ./a.stav
     --- stderr
     ");
-    assert_snapshot!(stav(&dir, &["fmt", "--check", ".hidden.stav", ".git"], ""), @r"
+    assert_snapshot!(stav(&dir, &["fmt", "--check", ".hidden.stav", ".store"], ""), @r"
     status: 1
     --- stdout
     .hidden.stav
-    .git/x.stav
+    .store/x.stav
     --- stderr
     ");
 }

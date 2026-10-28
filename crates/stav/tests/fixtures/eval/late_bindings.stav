@@ -14,13 +14,13 @@ struct Root {
 }
 let channel = "#{self.release}-channel"
 banner = "built for #{channel}"
-package zlib {
+package codec {
   let stem = "#{self.name}-#{self.version}"
-  name    = "zlib"
+  name    = "codec"
   version = "1.3"
   files   = ["#{stem}.tar.gz", "#{stem}.sig"]
   summary = "#{self.url} (#{channel})"
 }
 #- file overlay.stav
 release = force("testing")
-package zlib { version = force("1.3.1") }
+package codec { version = force("1.3.1") }

@@ -5,10 +5,10 @@ expression: output
 --- JSON
 {
   "tools": {
-    "jq": {
+    "query": {
       "version": "1.8.0",
       "source": {
-        "url": "https://github.com/jqlang/jq/releases/download/jq-1.8.0/jq-1.8.0.tar.gz",
+        "url": "https://example.org/query/releases/query-1.8.0.tar.gz",
         "sha256": "2be64e7129cecb11d5906290eba10af694fb9e3e7f9fc208a311dc33ca837eb0"
       }
     }

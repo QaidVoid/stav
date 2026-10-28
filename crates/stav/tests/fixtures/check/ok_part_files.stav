@@ -18,8 +18,8 @@ import "./lib/disks.stav" as disks
 
 let root = disks.root_device
 boot {
-  kernel = "linux-lts"
-  modules = ["nvme", "xhci_pci"]
+  kernel = "kernel-lts"
+  modules = ["disk", "usb_host"]
 }
 
 fs "/" { device = root }

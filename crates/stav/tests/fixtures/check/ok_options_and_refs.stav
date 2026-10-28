@@ -5,10 +5,10 @@ struct Root { units: Map<Str, Unit> = {} block unit, first: Option<Ref<Unit>>, n
 fn key_of(t: Option<Tls>) -> Str = t?.key ?? "none"
 fn start(cmd: Str, user: Option<Str>) -> List<Str> = match user {
   none => [cmd]
-  u => ["su", u, "-c", cmd]
+  u => ["run-as", u, "--", cmd]
 }
 
-unit db { exec = start("postgres") }
+unit db { exec = start("database") }
 unit api {
   exec = start("api", user = "www")
   after = ["db", db]

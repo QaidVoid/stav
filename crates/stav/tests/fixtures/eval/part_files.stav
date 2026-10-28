@@ -17,8 +17,8 @@ if len(suffix) == 0 {
 #- file services.stav
 import "./lib.stav" as lib
 let base = "/usr/bin"
-service sshd { exec = ["#{base}/sshd", "-p", toStr(lib.port)] }
+service gateway { exec = ["#{base}/gateway", "-p", toStr(lib.port)] }
 service "#{lib.name}" { exec = ["#{base}/#{lib.name}"], enabled = false }
 #- file lib.stav
 let port = 2222
-let name = "cron"
+let name = "scheduler"

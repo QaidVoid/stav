@@ -1,11 +1,11 @@
 ## Helpers shared by the recipes of this repository.
-type Mirror = gnu | kernel | sourceforge(project: Str)
+type Mirror = primary | archive | community(project: Str)
 
 ## Returns the download URL of `file` on a mirror.
 fn mirror_url(mirror: Mirror, file: Str) -> Str = match mirror {
-  gnu                  => "https://ftpmirror.gnu.org/#{file}"
-  kernel               => "https://cdn.kernel.org/pub/#{file}"
-  sourceforge(project) => "https://downloads.sourceforge.net/#{project}/#{file}"
+  primary            => "https://primary.example.org/#{file}"
+  archive            => "https://archive.example.org/pub/#{file}"
+  community(project) => "https://community.example.org/#{project}/#{file}"
 }
 
 ## Returns the `--with` or `--without` flag for a feature.
@@ -22,7 +22,7 @@ fn describe(major: Int, minor: Int, suffix: Option<Str>) -> Str =
       tail = suffix ?? ""
   in if tail == "" { base } else { "#{base}-#{tail}" }
 
-let default_features = { ssl = true, zlib = true, docs = false }
+let default_features = { ssl = true, compression = true, docs = false }
 
 let configure_args = flags(default_features) ++ [
   "--disable-static",

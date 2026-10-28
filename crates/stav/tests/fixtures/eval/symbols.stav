@@ -4,5 +4,5 @@ struct Root {
   primary:  Pkg = pkg("Default")
   names:    List<Str> = []
 }
-packages = [Neovim, ripgrep:static, llvm@19.1:static, pkg("0AD"), "Zsh", neovim]
+packages = [Editor, finder:static, compiler@19.1:static, pkg("2FA"), "Shell", editor]
 names = [for p in toList(self.packages) -> "#{p}"]

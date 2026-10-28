@@ -1,17 +1,17 @@
 #! render json toml yaml
 type Build =
-  | cargo(features: List<Str> = [], bins: List<Str> = [])
-  | make(target: Str = "all")
+  | native(features: List<Str> = [], bins: List<Str> = [])
+  | script(target: Str = "all")
 
 struct Job { build: Build }
 
 struct Root { jobs: Map<Str, Job> = {} block job }
 
-job a { build cargo { features = ["a"] } }
-job a { build cargo { features = ["b"], bins = ["rg"] } }
+job a { build native { features = ["a"] } }
+job a { build native { features = ["b"], bins = ["finder"] } }
 
 job b {
-  build cargo { features = ["dropped"] }
-  build make { }
-  build = force(make(target = "x"))
+  build native { features = ["dropped"] }
+  build script { }
+  build = force(script(target = "x"))
 }

@@ -56,11 +56,11 @@ fn annotations_have_one_space_after_the_colon() {
 
 #[test]
 fn symbol_words_and_ranges_stay_tight() {
-    let source = "packages = [ripgrep:static, llvm@19.1:static]\nstruct A { n: Int where -5 .. = 5 && 0 ..\n}\n";
+    let source = "packages = [finder:static, compiler@19.1:static]\nstruct A { n: Int where -5 .. = 5 && 0 ..\n}\n";
     let source = source.replace(".. =", "..=");
     assert_eq!(
         fmt(&source),
-        "packages = [ripgrep:static, llvm@19.1:static]\nstruct A {\n  n: Int where -5..=5 && 0..\n}\n"
+        "packages = [finder:static, compiler@19.1:static]\nstruct A {\n  n: Int where -5..=5 && 0..\n}\n"
     );
 }
 
@@ -81,10 +81,11 @@ fn indents_nested_bodies_by_two_spaces() {
 
 #[test]
 fn aligns_equals_in_runs_of_attributes() {
-    let source = "system {\n  hostname = \"forge\"\n  init = runit\n  alternatives.sh = dash\n}\n";
+    let source =
+        "system {\n  hostname = \"forge\"\n  init = supervisor\n  alternatives.sh = small-sh\n}\n";
     assert_eq!(
         fmt(source),
-        "system {\n  hostname        = \"forge\"\n  init            = runit\n  alternatives.sh = dash\n}\n"
+        "system {\n  hostname        = \"forge\"\n  init            = supervisor\n  alternatives.sh = small-sh\n}\n"
     );
 }
 
@@ -119,10 +120,10 @@ fn aligns_field_types_across_doc_comments_but_not_comments() {
 
 #[test]
 fn aligns_match_arms_and_let_bindings() {
-    let source = "fn f(c: C) -> Int = match c { sway => 1, river => 2 }\nfn g() -> Int =\n  let a = 1, long = 2 in a + long + some_function_with_a_long_name(a, long, another_argument_that_is_long)\n";
+    let source = "fn f(c: C) -> Int = match c { tiling => 1, floating => 2 }\nfn g() -> Int =\n  let a = 1, long = 2 in a + long + some_function_with_a_long_name(a, long, another_argument_that_is_long)\n";
     assert_eq!(
         fmt(source),
-        "fn f(c: C) -> Int = match c {\n  sway  => 1\n  river => 2\n}\nfn g() -> Int =\n  let a    = 1,\n      long = 2\n  in a + long + some_function_with_a_long_name(a, long, another_argument_that_is_long)\n"
+        "fn f(c: C) -> Int = match c {\n  tiling   => 1\n  floating => 2\n}\nfn g() -> Int =\n  let a    = 1,\n      long = 2\n  in a + long + some_function_with_a_long_name(a, long, another_argument_that_is_long)\n"
     );
 }
 
@@ -161,8 +162,8 @@ fn commas_between_statements_become_line_breaks() {
 #[test]
 fn empty_bodies_and_literals() {
     assert_eq!(
-        fmt("build make {}\nx = { }\ny = [ ]\nz = f( )\nstruct A {\n}\n"),
-        "build make { }\nx = {}\ny = []\nz = f()\nstruct A {}\n"
+        fmt("build script {}\nx = { }\ny = [ ]\nz = f( )\nstruct A {\n}\n"),
+        "build script { }\nx = {}\ny = []\nz = f()\nstruct A {}\n"
     );
 }
 
@@ -208,8 +209,8 @@ fn broken_maps_align_their_entries() {
 fn sum_types_stay_on_one_line_only_when_written_and_fitting_there() {
     assert_eq!(fmt("type L = | a|b | c | d\n"), "type L = a | b | c | d\n");
     assert_eq!(
-        fmt("type B =\n  | cargo(features: List<Str> = []) | make\n"),
-        "type B =\n  | cargo(features: List<Str> = [])\n  | make\n"
+        fmt("type B =\n  | native(features: List<Str> = []) | script\n"),
+        "type B =\n  | native(features: List<Str> = [])\n  | script\n"
     );
     let long = "type R = immediate | notify(fd: Int where 0..=1023) | check(cmd: List<Str>, interval: Int = 1, timeout: Int = 60)\n";
     assert_eq!(
@@ -249,10 +250,10 @@ fn function_bodies_follow_the_equals_sign_unless_moved() {
 
 #[test]
 fn long_parameter_lists_break_with_trailing_commas() {
-    let source = "fn wayland(user: Ref<User>, compositor: Compositor = niri, terminal: Pkg = foot, fonts: Set<Pkg> = []) -> Part<System> = part {\n  packages = fonts\n}\n";
+    let source = "fn graphical(user: Ref<User>, compositor: Compositor = tiling, terminal: Pkg = term, fonts: Set<Pkg> = []) -> Part<System> = part {\n  packages = fonts\n}\n";
     assert_eq!(
         fmt(source),
-        "fn wayland(\n  user: Ref<User>,\n  compositor: Compositor = niri,\n  terminal: Pkg = foot,\n  fonts: Set<Pkg> = [],\n) -> Part<System> = part {\n  packages = fonts\n}\n"
+        "fn graphical(\n  user: Ref<User>,\n  compositor: Compositor = tiling,\n  terminal: Pkg = term,\n  fonts: Set<Pkg> = [],\n) -> Part<System> = part {\n  packages = fonts\n}\n"
     );
 }
 
@@ -430,7 +431,7 @@ mod program {
             &[
                 "a",
                 "b",
-                "xdg-utils",
+                "app-utils",
                 "port",
                 "a_rather_long_name_for_alignment",
             ][..],
@@ -452,8 +453,8 @@ mod program {
                 "none",
                 "self",
                 "./files/a.conf",
-                "llvm@19.1:static",
-                "ripgrep:static",
+                "compiler@19.1:static",
+                "finder:static",
                 "\"text\"",
                 "\"x #{a + 1} y\"",
                 "r\"^raw$\"",
@@ -566,7 +567,7 @@ mod program {
                 (
                     name(),
                     prop::collection::vec((inner.clone(), gap()), 0..3),
-                    prop::sample::subsequence(&["a", "port", "xdg-utils"][..], 0..3),
+                    prop::sample::subsequence(&["a", "port", "app-utils"][..], 0..3),
                     inner.clone(),
                 )
                     .prop_map(|(callee, positional, named, value)| {

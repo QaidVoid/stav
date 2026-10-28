@@ -57,8 +57,8 @@ fn app() -> Value {
                 "build",
                 Value::Variant {
                     ty: "Build".to_owned(),
-                    name: "cargo".to_owned(),
-                    fields: Some(entries(&[("features", Value::List(vec![s("pcre2")]))])),
+                    name: "native".to_owned(),
+                    fields: Some(entries(&[("features", Value::List(vec![s("simd")]))])),
                 },
             ),
         ],
@@ -82,9 +82,9 @@ fn json_keeps_field_order_and_tags_payload_variants() {
     }
   },
   "build": {
-    "cargo": {
+    "native": {
       "features": [
-        "pcre2"
+        "simd"
       ]
     }
   }
@@ -95,7 +95,7 @@ fn json_keeps_field_order_and_tags_payload_variants() {
 
 #[test]
 fn canonical_json_sorts_keys_and_drops_whitespace() {
-    let expected = r#"{"build":{"cargo":{"features":["pcre2"]}},"listen":"127.0.0.1:8080","log_level":"warn","note":null,"upstreams":{"backup":{"url":"https://b.example.org","weight":10},"primary":{"url":"https://a.example.org","weight":90}}}"#;
+    let expected = r#"{"build":{"native":{"features":["simd"]}},"listen":"127.0.0.1:8080","log_level":"warn","note":null,"upstreams":{"backup":{"url":"https://b.example.org","weight":10},"primary":{"url":"https://a.example.org","weight":90}}}"#;
     assert_eq!(app().to_canonical_json(), expected);
 }
 
@@ -157,8 +157,8 @@ weight = 10
 url = "https://a.example.org"
 weight = 90
 
-[build.cargo]
-features = ["pcre2"]
+[build.native]
+features = ["simd"]
 "#;
     assert_eq!(app().render(Format::Toml).unwrap(), expected);
 }
@@ -239,9 +239,9 @@ upstreams:
     url: https://a.example.org
     weight: 90
 build:
-  cargo:
+  native:
     features:
-      - pcre2
+      - simd
 "#;
     let rendered = app().render(Format::Yaml).unwrap();
     assert_eq!(rendered.replace('"', ""), expected);
@@ -275,7 +275,7 @@ fn yaml_quotes_strings_that_read_as_other_types() {
         let rendered = s(text).render(Format::Yaml).unwrap();
         assert!(rendered.starts_with('"'), "{text:?} rendered as {rendered}");
     }
-    for text in ["forge", "linux-lts", "usr/bin", "hello world"] {
+    for text in ["forge", "kernel-lts", "usr/bin", "hello world"] {
         assert_eq!(s(text).render(Format::Yaml).unwrap(), format!("{text}\n"));
     }
 }

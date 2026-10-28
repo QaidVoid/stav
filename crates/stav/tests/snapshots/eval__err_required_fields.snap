@@ -12,6 +12,6 @@ error[E0801]: the required field `units.db.exec` has no value
 error[E0801]: the required field `units.web.exec` has no value
   --> app/main.stav:12:1
   help: set it, or give the field a default
-error[E0801]: the required field `units.web.build.make.target` has no value
+error[E0801]: the required field `units.web.build.script.target` has no value
   --> app/main.stav:12:12
   help: set it, or give the field a default

@@ -1,6 +1,6 @@
 type Build =
-  | cargo(features: List<Str> = [])
-  | make(target: Str = "all")
+  | native(features: List<Str> = [])
+  | script(target: Str = "all")
 
 struct Job {
   build: Build
@@ -9,11 +9,11 @@ struct Job {
 
 struct Root { jobs: Map<Str, Job> = {} block job }
 
-job rg {
-  build cargo { features = ["pcre2"] }
+job finder {
+  build native { features = ["simd"] }
 }
 
 job hello {
-  build make { }
+  build script { }
   timeout = 60
 }

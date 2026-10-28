@@ -5,7 +5,7 @@ expression: output
 file 0 app/main.stav (entry)
 entries 0
 root Root
-fn neovim_pkg() -> Pkg in app/main.stav
+fn editor_pkg() -> Pkg in app/main.stav
 bodies unit 0
 unit 0 app/main.stav
   6:1 packages: Set<Pkg> (plain)

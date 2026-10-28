@@ -1,5 +1,5 @@
-type Build = cargo(features: List<Str> = []) | make
-type VendorKind = cargo | go
+type Build = native(features: List<Str> = []) | script
+type VendorKind = native | remote
 struct Gc { keep: Int = 10 }
 struct Step { run: Str }
 struct Vendor { hash: Str }
@@ -17,12 +17,12 @@ job a {
   step { run = "x" }
   gc main { keep = 1 }
   env main { A = "b" }
-  build carg { }
+  build nativ { }
   build { }
-  vendor npm { hash = "x" }
+  vendor mirror { hash = "x" }
   servise x { }
   count.value = 1
   gc.kepe = 2
-  build make { x = 1 }
-  vendors.npm = { hash = "y" }
+  build script { x = 1 }
+  vendors.mirror = { hash = "y" }
 }

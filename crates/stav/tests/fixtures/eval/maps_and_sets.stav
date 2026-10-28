@@ -3,7 +3,7 @@ type Level = debug | info | warn
 struct Root {
   limits:  Map<Level, Int> = {}
   levels:  Set<Level> = []
-  sysctl:  Map<Str, Data> = {}
+  tunables:  Map<Str, Data> = {}
   env:     Map<Str, Str> = {}
   kernel:  Kernel = {}
 }
@@ -12,9 +12,9 @@ limits = { warn = 3, debug = 1 }
 limits.info = 2
 levels = [warn, debug]
 levels = [info, warn]
-sysctl."vm.swappiness" = 10
-sysctl { "net.ipv4.ip_forward" = 1 }
-env { RUST_LOG = "info", "WITH SPACE" = "yes" }
-kernel = { modules = ["kvm-amd"] }
-kernel.modules = ["vfio-pci"]
+tunables."mem.reclaim" = 10
+tunables { "net.forwarding" = 1 }
+env { LOG_LEVEL = "info", "WITH SPACE" = "yes" }
+kernel = { modules = ["virt-host"] }
+kernel.modules = ["pci-passthru"]
 kernel { params { quiet = "" } }

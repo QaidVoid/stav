@@ -5,18 +5,18 @@ expression: output
 --- JSON
 {
   "packages": [
-    "0ad",
-    "llvm@19.1:static",
-    "neovim",
-    "ripgrep:static",
-    "zsh"
+    "2fa",
+    "compiler@19.1:static",
+    "editor",
+    "finder:static",
+    "shell"
   ],
   "primary": "default",
   "names": [
-    "0ad",
-    "llvm@19.1:static",
-    "neovim",
-    "ripgrep:static",
-    "zsh"
+    "2fa",
+    "compiler@19.1:static",
+    "editor",
+    "finder:static",
+    "shell"
   ]
 }

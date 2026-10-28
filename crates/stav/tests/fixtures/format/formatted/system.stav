@@ -15,63 +15,63 @@ system {
   locale        = "nb_NO.UTF-8"
   extra_locales = ["en_US.UTF-8"]
 
-  packages = [neovim, git, jujutsu, ripgrep:static, fd, zsh, firefox, llvm@19:static]
+  packages = [editor, vcs, notes, finder:static, lister, shell, browser, compiler@19:static]
 
-  alternatives.sh = dash
+  alternatives.sh = small-sh
 
   users {
     mutable = false
     user ada {
       uid      = 1000
-      groups   = [wheel, video, kvm] # kvm for virtual machines
-      shell    = "/usr/bin/zsh"
+      groups   = [wheel, video, virt] # virt for virtual machines
+      shell    = "/usr/bin/shell"
       ssh_keys = admin_keys
     }
     group media { members = [ada] }
   }
 
   # Desktop and services.
-  include desktop.wayland(
+  include desktop.graphical(
     user = ada,
-    compositor = niri,
-    fonts = [ttf-jetbrains-mono, noto-fonts-cjk, noto-fonts-emoji],
+    compositor = tiling,
+    fonts = [mono-font, cjk-font, emoji-font],
   )
-  include services.sshd(port = 2222)
+  include services.gateway(port = 2222)
 
   service backup {
     kind  = oneshot
-    exec  = ["/usr/bin/restic", "backup", "--one-file-system", "/home"]
+    exec  = ["/usr/bin/archiver", "backup", "--one-file-system", "/home"]
     after = [network]
   }
 
   for name in ["tty1", "tty2"] {
-    getty { ttys = [name] }
+    console { ttys = [name] }
   }
 
   if enable_printing {
-    service cupsd { exec = ["/usr/bin/cupsd", "-f"] }
+    service printd { exec = ["/usr/bin/printd", "-f"] }
   } else {
     packages = []
   }
 
   file "/etc/profile.d/editor.sh" {
     text = """
-      export EDITOR=nvim
+      export EDITOR=editor
       export VISUAL="$EDITOR"
       """
     mode = 0o644
   }
 
-  file "/etc/xdg/foot/foot.ini" { source = ./files/foot.ini }
+  file "/etc/term/term.ini" { source = ./files/term.ini }
 
-  sysctl {
-    "vm.swappiness"       = 10
-    "net.ipv4.ip_forward" = 1
+  tunables {
+    "mem.reclaim"    = 10
+    "net.forwarding" = 1
   }
 
   kernel {
-    modules   = ["kvm-amd", "vfio-pci"]
-    blacklist = ["pcspkr"]
-    options   = { snd_hda_intel = "power_save=1" }
+    modules   = ["virt-host", "pci-passthru"]
+    blacklist = ["beeper"]
+    options   = { sound_card = "power_save=1" }
   }
 }

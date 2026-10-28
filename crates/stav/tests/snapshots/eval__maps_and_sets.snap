@@ -14,18 +14,18 @@ expression: output
     "info",
     "warn"
   ],
-  "sysctl": {
-    "net.ipv4.ip_forward": 1,
-    "vm.swappiness": 10
+  "tunables": {
+    "mem.reclaim": 10,
+    "net.forwarding": 1
   },
   "env": {
-    "RUST_LOG": "info",
+    "LOG_LEVEL": "info",
     "WITH SPACE": "yes"
   },
   "kernel": {
     "modules": [
-      "kvm-amd",
-      "vfio-pci"
+      "virt-host",
+      "pci-passthru"
     ],
     "params": {
       "quiet": ""
@@ -40,16 +40,16 @@ debug = 1
 info = 2
 warn = 3
 
-[sysctl]
-"net.ipv4.ip_forward" = 1
-"vm.swappiness" = 10
+[tunables]
+"mem.reclaim" = 10
+"net.forwarding" = 1
 
 [env]
-RUST_LOG = "info"
+LOG_LEVEL = "info"
 "WITH SPACE" = "yes"
 
 [kernel]
-modules = ["kvm-amd", "vfio-pci"]
+modules = ["virt-host", "pci-passthru"]
 
 [kernel.params]
 quiet = ""
@@ -62,15 +62,15 @@ levels:
   - debug
   - info
   - warn
-sysctl:
-  net.ipv4.ip_forward: 1
-  vm.swappiness: 10
+tunables:
+  mem.reclaim: 10
+  net.forwarding: 1
 env:
-  RUST_LOG: info
+  LOG_LEVEL: info
   WITH SPACE: "yes"
 kernel:
   modules:
-    - kvm-amd
-    - vfio-pci
+    - virt-host
+    - pci-passthru
   params:
     quiet: ""

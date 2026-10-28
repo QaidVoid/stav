@@ -1,4 +1,4 @@
-# /etc/laft/system.stav, written by hand without care for layout
+# /etc/system.stav, written by hand without care for layout
 import "std/services"   as services
 system{
   include "./hardware.stav"
@@ -6,17 +6,17 @@ system{
   locale = "en_GB.UTF-8"
 
 
-  packages=[htop,ripgrep:static,  opendoas,prometheus-node-exporter,  tmux, git, neovim, curl, jq]
+  packages=[monitor,finder:static,  elevate,metrics-exporter,  mux, vcs, editor, fetcher, query]
   users { mutable = false
     user ops { uid = 1001, groups = [wheel], ssh_keys = ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIM2n ops@desk"] } }
-  include services.sshd( port=22 )
+  include services.gateway( port=22 )
   service exporter {
-      exec = ["/usr/bin/node_exporter","--web.listen-address=:9100"] # metrics
+      exec = ["/usr/bin/metrics_exporter","--listen=:9100"] # metrics
       user=nobody
       after = [ network ]
   }
-  service boot-complete { after = [sshd] }
-  sysctl { "net.ipv4.ip_forward"=1 }
+  service boot-complete { after = [gateway] }
+  tunables { "net.forwarding"=1 }
   file "/etc/motd" { text = """
       Welcome to the lab.
         Be nice.

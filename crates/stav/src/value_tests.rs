@@ -7,10 +7,10 @@ fn job() -> Value {
             "build".to_owned(),
             Value::Variant {
                 ty: "Build".to_owned(),
-                name: "cargo".to_owned(),
+                name: "native".to_owned(),
                 fields: Some(vec![(
                     "features".to_owned(),
-                    Value::List(vec![Value::Str("pcre2".to_owned())]),
+                    Value::List(vec![Value::Str("simd".to_owned())]),
                 )]),
             },
         )],
@@ -19,20 +19,23 @@ fn job() -> Value {
 
 #[test]
 fn paths_step_through_fields_keys_and_variants() {
-    let root = Value::Map(vec![("rg".to_owned(), job())]);
-    let features = root.at(&AttrPath::new(["rg", "build", "cargo", "features"]));
+    let root = Value::Map(vec![("finder".to_owned(), job())]);
+    let features = root.at(&AttrPath::new(["finder", "build", "native", "features"]));
     assert_eq!(
         features,
-        Some(&Value::List(vec![Value::Str("pcre2".to_owned())]))
+        Some(&Value::List(vec![Value::Str("simd".to_owned())]))
     );
-    assert!(root.at(&AttrPath::new(["rg", "build", "make"])).is_none());
+    assert!(
+        root.at(&AttrPath::new(["finder", "build", "script"]))
+            .is_none()
+    );
     assert_eq!(root.at(&AttrPath::root()), Some(&root));
 }
 
 #[test]
 fn paths_display_like_attribute_statements() {
-    let path = AttrPath::new(["sysctl", "vm.swappiness"]).join("x");
-    assert_eq!(path.to_string(), "sysctl.\"vm.swappiness\".x");
+    let path = AttrPath::new(["tunables", "mem.reclaim"]).join("x");
+    assert_eq!(path.to_string(), "tunables.\"mem.reclaim\".x");
 }
 
 #[test]
@@ -49,7 +52,7 @@ fn displayed_paths_parse_back() {
     let paths = [
         AttrPath::root(),
         AttrPath::new(["server", "port"]),
-        AttrPath::new(["sysctl", "vm.swappiness", "x-y_z"]),
+        AttrPath::new(["tunables", "mem.reclaim", "x-y_z"]),
         AttrPath::new(["a\"b\\c", "line\n\ttab\r\0", "#{x} #y", "\u{1b}\u{7f}", ""]),
         AttrPath::new(["caf\u{e9}", "with space", "\u{1F600}"]),
     ];

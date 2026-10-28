@@ -7,20 +7,20 @@ expression: output
   "jobs": {
     "a": {
       "build": {
-        "cargo": {
+        "native": {
           "features": [
             "a",
             "b"
           ],
           "bins": [
-            "rg"
+            "finder"
           ]
         }
       }
     },
     "b": {
       "build": {
-        "make": {
+        "script": {
           "target": "x"
         }
       }
@@ -28,23 +28,23 @@ expression: output
   }
 }
 --- TOML
-[jobs.a.build.cargo]
+[jobs.a.build.native]
 features = ["a", "b"]
-bins = ["rg"]
+bins = ["finder"]
 
-[jobs.b.build.make]
+[jobs.b.build.script]
 target = "x"
 --- YAML
 jobs:
   a:
     build:
-      cargo:
+      native:
         features:
           - a
           - b
         bins:
-          - rg
+          - finder
   b:
     build:
-      make:
+      script:
         target: x

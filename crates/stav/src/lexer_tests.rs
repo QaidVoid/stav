@@ -60,10 +60,10 @@ fn assert_lossless(source: &str) {
 
 #[test]
 fn identifiers_absorb_hyphens_and_dotted_digits() {
-    assert_snapshot!(render("xdg-utils openssl1.1 on-failure a.b a-1 a - 1 foo- _x"), @r#"
-    0..9     "xdg-utils" Ident
+    assert_snapshot!(render("app-utils ciphers1.1 on-failure a.b a-1 a - 1 foo- _x"), @r#"
+    0..9     "app-utils" Ident
     9..10    " " Whitespace
-    10..20   "openssl1.1" Ident
+    10..20   "ciphers1.1" Ident
     20..21   " " Whitespace
     21..31   "on-failure" Ident
     31..32   " " Whitespace
@@ -257,10 +257,10 @@ fn number_dots_without_digits_are_punctuation() {
 
 #[test]
 fn number_glued_to_name_is_one_invalid_token() {
-    assert_snapshot!(render("0ad 0ad@0.27 0b102 0x 1e 1_ 0x_1"), @r#"
-    0..3     "0ad" Error
+    assert_snapshot!(render("0ab 0ab@0.27 0b102 0x 1e 1_ 0x_1"), @r#"
+    0..3     "0ab" Error
     3..4     " " Whitespace
-    4..12    "0ad@0.27" Error
+    4..12    "0ab@0.27" Error
     12..13   " " Whitespace
     13..18   "0b102" Error
     18..19   " " Whitespace
@@ -272,9 +272,9 @@ fn number_glued_to_name_is_one_invalid_token() {
     27..28   " " Whitespace
     28..32   "0x_1" Error
     32..32   "" Eof
-    error[E0103] 0..3: `0ad` is not a valid token
+    error[E0103] 0..3: `0ab` is not a valid token
       help: separate the number from the name, or start the name with a letter
-    error[E0103] 4..12: `0ad@0.27` is not a valid token
+    error[E0103] 4..12: `0ab@0.27` is not a valid token
       help: separate the number from the name, or start the name with a letter
     error[E0103] 13..18: `0b102` is not a valid token
       help: separate the number from the name, or start the name with a letter

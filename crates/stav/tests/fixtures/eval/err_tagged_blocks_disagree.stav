@@ -1,7 +1,7 @@
-type Build = cargo(features: List<Str> = []) | make(target: Str = "all")
+type Build = native(features: List<Str> = []) | script(target: Str = "all")
 struct Job { build: Build }
 struct Root { jobs: Map<Str, Job> = {} block job }
 job b {
-  build cargo { }
-  build make { }
+  build native { }
+  build script { }
 }

@@ -1,11 +1,11 @@
-type Init = runit | s6
+type Init = supervisor | minimal
 struct Server { name: Str, port: Int = 80 }
 struct Root {
-  init: Init = runit
+  init: Init = supervisor
   server: Servr
   count: Int = cont
 }
 let cuont = 1
-init = runti
+init = supervisr
 server = Server { nmae = "x" }
 server.prot = 8

@@ -295,8 +295,8 @@ fn compound_expressions_expose_their_parts() {
         "svc Ready{fd=3 \"a b\"=(. self x)}"
     );
     assert_eq!(
-        expr("[llvm@19:static, ripgrep:static, lib@1]"),
-        "[(sym llvm 19 static) (sym ripgrep - static) (sym lib 1 -)]"
+        expr("[compiler@19:static, finder:static, lib@1]"),
+        "[(sym compiler 19 static) (sym finder - static) (sym lib 1 -)]"
     );
 }
 
@@ -476,7 +476,7 @@ let n: Int = 1
 #[test]
 fn statements_expose_their_parts() {
     let source = r#"a."b c".d = 1
-service sshd { user = "root" }
+service gateway { user = "root" }
 fs "/" { }
 include "./hw.stav"
 if x { a = 1 } else if y { } else { }
@@ -509,7 +509,7 @@ for k, v in m { }
     };
     assert_eq!(
         (text(service.kind()), key(service.label())),
-        ("service", "sshd".to_owned())
+        ("service", "gateway".to_owned())
     );
     assert_eq!(service.body().map(|b| b.statements().count()), Some(1));
 

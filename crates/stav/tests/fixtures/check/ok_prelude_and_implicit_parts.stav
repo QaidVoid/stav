@@ -1,7 +1,7 @@
 #! root Root
 system {
   hostname = "forge"
-  service sshd { exec = ["/usr/bin/sshd", "-D"] }
+  service gateway { exec = ["/usr/bin/gateway", "-D"] }
 }
 #- prelude system.stav
 ## A long-running program.
@@ -22,5 +22,5 @@ fn hostname(s: Str) -> Bool = len(s) > 0 && len(s) < 64
 #- part base.stav
 system {
   hostname = default("localhost")
-  service getty { exec = default(["/sbin/getty"]) }
+  service console { exec = default(["/sbin/console"]) }
 }

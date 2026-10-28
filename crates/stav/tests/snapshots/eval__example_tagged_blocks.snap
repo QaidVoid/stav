@@ -5,48 +5,48 @@ expression: output
 --- JSON
 {
   "jobs": {
-    "hello": {
+    "finder": {
       "build": {
-        "make": {
-          "target": "all"
-        }
-      },
-      "timeout": 60
-    },
-    "rg": {
-      "build": {
-        "cargo": {
+        "native": {
           "features": [
-            "pcre2"
+            "simd"
           ]
         }
       },
       "timeout": 600
+    },
+    "hello": {
+      "build": {
+        "script": {
+          "target": "all"
+        }
+      },
+      "timeout": 60
     }
   }
 }
 --- TOML
+[jobs.finder]
+timeout = 600
+
+[jobs.finder.build.native]
+features = ["simd"]
+
 [jobs.hello]
 timeout = 60
 
-[jobs.hello.build.make]
+[jobs.hello.build.script]
 target = "all"
-
-[jobs.rg]
-timeout = 600
-
-[jobs.rg.build.cargo]
-features = ["pcre2"]
 --- YAML
 jobs:
+  finder:
+    build:
+      native:
+        features:
+          - simd
+    timeout: 600
   hello:
     build:
-      make:
+      script:
         target: all
     timeout: 60
-  rg:
-    build:
-      cargo:
-        features:
-          - pcre2
-    timeout: 600

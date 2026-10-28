@@ -6,15 +6,15 @@ expression: output
 {
   "release": "testing",
   "packages": {
-    "zlib": {
-      "name": "zlib",
+    "codec": {
+      "name": "codec",
       "version": "1.3.1",
-      "url": "https://example.org/zlib-1.3.1.tar.gz",
+      "url": "https://example.org/codec-1.3.1.tar.gz",
       "files": [
-        "zlib-1.3.1.tar.gz",
-        "zlib-1.3.1.sig"
+        "codec-1.3.1.tar.gz",
+        "codec-1.3.1.sig"
       ],
-      "summary": "https://example.org/zlib-1.3.1.tar.gz (testing-channel)"
+      "summary": "https://example.org/codec-1.3.1.tar.gz (testing-channel)"
     }
   },
   "banner": "built for testing-channel"

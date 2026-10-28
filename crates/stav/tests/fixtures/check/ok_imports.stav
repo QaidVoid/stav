@@ -5,13 +5,13 @@ import "ns/target" as target
 
 struct Root {
   server:     net.Server
-  compositor: desktop.Compositor = desktop.Compositor.sway
+  compositor: desktop.Compositor = desktop.Compositor.stacking
   level:      net.Level = net.Level.info
   variant:    target.Variant
 }
 
 server = net.server(8080)
-compositor = niri
+compositor = tiling
 level = net.default_level
 variant = target.variant
 #- file lib/net.stav
@@ -27,7 +27,7 @@ let default_level: Level = debug
 #- file lib/util.stav
 let localhost = "127.0.0.1"
 #- std desktop
-type Compositor = sway | niri
+type Compositor = stacking | tiling
 #- host ns/target
 type Variant = dynamic | static
 let variant: Variant = static

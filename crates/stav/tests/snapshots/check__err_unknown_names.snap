@@ -9,9 +9,9 @@ error[E0302]: unknown type `Servr`
 error[E0302]: unknown name `cont`
   --> app/main.stav:6:16
   help: did you mean `cuont`?
-error[E0302]: unknown name `runti`, which is not a variant of `Init`
+error[E0302]: unknown name `supervisr`, which is not a variant of `Init`
   --> app/main.stav:9:8
-  help: did you mean `runit`?
+  help: did you mean `supervisor`?
 error[E0302]: `Server` has no field `nmae`
   --> app/main.stav:10:19
   help: did you mean `name`?

@@ -4,7 +4,7 @@ import "ns/target" as target
 import "std/net" as net
 system {
   hostname = "forge"
-  packages = [vim]
+  packages = [editor]
   port = net.port(target.variant)
 }
 #- prelude prelude/system.stav

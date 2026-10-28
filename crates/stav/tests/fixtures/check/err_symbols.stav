@@ -5,6 +5,6 @@ struct Root {
   license: List<Spdx> = []
   name: Str = ""
 }
-packages = [neovim, llvm@19.1:static, pkg("0ad"), "ripgrep"]
-license = [MIT, "Apache-2.0", spdx("0BSD"), ripgrep:static]
-name = llvm@19
+packages = [editor, compiler@19.1:static, pkg("2fa"), "finder"]
+license = [MIT, "Apache-2.0", spdx("0BSD"), finder:static]
+name = compiler@19

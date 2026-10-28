@@ -1,14 +1,14 @@
 import "std/build" as build
-package jq{
+package query{
   version="1.7.1"
   summary   = "Command-line JSON processor"
   license=[MIT]
   source main {
-    url = "https://github.com/jqlang/jq/releases/download/jq-#{self.version}/jq-#{self.version}.tar.gz"
+    url = "https://example.org/query/releases/query-#{self.version}.tar.gz"
     sha256 = "sha256:478c9ca129fd2e3443fe27314b455e211e0d8c60bc8ff7df703873deeee580c2"
   }
-  build_deps=[autoconf,automake,libtool]
-  link_deps = [oniguruma]
+  build_deps=[autogen,mkgen,libgen]
+  link_deps = [regex-engine]
   build configure { args = ["--disable-docs", "--with-oniguruma=/usr", "--enable-all-static"], autoreconf = true }
   phases { pre_configure = """
     sed -i 's/-Werror//' configure.ac

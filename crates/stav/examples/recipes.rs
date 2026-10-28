@@ -13,8 +13,8 @@ const RECIPES: usize = 2_000;
 
 const PRELUDE: &str = r#"
 type Build =
-  | cargo(features: List<Str> = [], bins: List<Str> = [])
-  | meson(options: List<Str> = [])
+  | native(features: List<Str> = [], bins: List<Str> = [])
+  | configured(options: List<Str> = [])
   | custom(build: Str, install: Str)
 
 struct Source {
@@ -64,7 +64,7 @@ package {base} {{
     {payload}
   }}
   deps  = [{d1}, {d2}, {d3}]
-  tools = [gcc, make@4.4, pkg-config:static]
+  tools = [compiler, builder@4.4, pkgtool:static]
   env {{
     CFLAGS  = "-O2 -pipe"
     LDFLAGS = "-Wl,--as-needed"
@@ -94,11 +94,11 @@ package {base} {{
         minor = i % 13,
         patch = i % 5,
         hash = format_args!("{:064x}", i * 7919),
-        kind = ["cargo", "meson", "custom"][i % 3],
+        kind = ["native", "configured", "custom"][i % 3],
         payload = [
             r#"features = ["a", "b"], bins = ["tool"]"#,
             r#"options = ["-Ddocs=false", "-Dtests=false"]"#,
-            r#"build = "make -j#{4}", install = "make install""#,
+            r#"build = "build -j#{4}", install = "build install""#,
         ][i % 3],
         d1 = dep(i + 1),
         d2 = dep(i + 7),

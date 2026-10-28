@@ -5,7 +5,7 @@ struct Root {
   license: List<Spdx> = []
   names: List<Str> = []
 }
-packages = [neovim, llvm@19.1:static, pkg("0ad"), ripgrep:static]
+packages = [editor, compiler@19.1:static, pkg("2fa"), finder:static]
 license = [MIT, "Apache-2.0", spdx("0BSD")]
-names = ["#{neovim_pkg()}"]
-fn neovim_pkg() -> Pkg = neovim
+names = ["#{editor_pkg()}"]
+fn editor_pkg() -> Pkg = editor

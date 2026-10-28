@@ -9,20 +9,20 @@ uses Job defaults -> Gc defaults
 bodies unit 0
 unit 0 app/main.stav
   21:1 block job "lint" (clause jobs) -> Job
-  22:3   block build "cargo" (tagged build) -> Build.cargo
-  22:17     features: List<Str> (plain)
+  22:3   block build "native" (tagged build) -> Build.native
+  22:18     features: List<Str> (plain)
   23:3   block gc (field gc) -> Gc
   23:8     keep: Int (plain)
   24:3   block env (map env) -> Map<Str, Str>
-  24:9     RUST_LOG: Str (plain)
-  24:28     "A.B": Str (plain)
+  24:9     LOG_LEVEL: Str (plain)
+  24:29     "A.B": Str (plain)
   25:3   block step "lint" (clause steps) -> Step
   25:15     run: Str (plain)
-  26:3   block vendor "cargo" (clause vendors) -> Vendor
-  26:18     hash: Str (plain)
+  26:3   block vendor "native" (clause vendors) -> Vendor
+  26:19     hash: Str (plain)
   27:3   block tls (field tls) -> Tls
   27:9     cert: Str (plain)
-  28:3   limits.go: Int (plain)
+  28:3   limits.remote: Int (plain)
   29:3   env."PATH": Str (plain)
   32:1 block job <dynamic> (clause jobs) -> Job
   33:3   build: Build (force)

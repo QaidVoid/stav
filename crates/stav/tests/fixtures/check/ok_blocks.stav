@@ -1,8 +1,8 @@
 type Build =
-  | cargo(features: List<Str> = [], bins: List<Str> = [])
-  | meson(options: List<Str> = [])
+  | native(features: List<Str> = [], bins: List<Str> = [])
+  | configured(options: List<Str> = [])
   | custom(build: Str, install: Str)
-type VendorKind = cargo | go
+type VendorKind = native | remote
 struct Gc { keep: Int where 2.. = 10 }
 struct Step { run: Str }
 struct Vendor { hash: Str }
@@ -19,18 +19,18 @@ struct Job {
 struct Root { jobs: Map<Str, Job> = {} block job, flags: Map<Str, Bool> = {} }
 
 job lint {
-  build cargo { features = ["x"] }
+  build native { features = ["x"] }
   gc { keep = 5 }
-  env { RUST_LOG = "info", "A.B" = "c" }
-  step lint { run = "cargo clippy" }
-  vendor cargo { hash = "abc" }
+  env { LOG_LEVEL = "info", "A.B" = "c" }
+  step lint { run = "tool lint" }
+  vendor native { hash = "abc" }
   tls { cert = "x.pem" }
-  limits.go = 3
+  limits.remote = 3
   env."PATH" = "/bin"
 }
 
 job "build-#{1 + 1}" {
-  build = force(meson(options = []))
+  build = force(configured(options = []))
   for name in ["a", "b"] {
     step "#{name}" { run = name }
   }

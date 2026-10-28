@@ -5,7 +5,7 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc d384443351e755d0adccb9787f41c11deb15975216b6a864a002c70fbdcab26b # shrinks to source = "a {a = # note\n(1 + # note\n1)}\n"
-cc d8718170aacb7a16e341964dd413ddbd711115abe9c8c56923358ace76a0ed3c # shrinks to source = "type Gen = a(xdg-utils: List<List<Str, Str>>, a: Option<Option<Upstream>>) | a(a: Fn() -> Option<Str>)\n"
+cc d8718170aacb7a16e341964dd413ddbd711115abe9c8c56923358ace76a0ed3c # shrinks to source = "type Gen = a(app-utils: List<List<Str, Str>>, a: Option<Option<Upstream>>) | a(a: Fn() -> Option<Str>)\n"
 cc e72a36907c1a9791b9b82b51b882547e54f69eb9aa9df58296c1762b821df17e # shrinks to source = "a {a = # note\n(let a = 1, # note\na = 1\nin 1)}\n"
 cc aefee0b7393126ade39bd86652ed257df4354dedf84f9236aa9089cd02ac5d7a # shrinks to source = "for k, v in (1) {a.a = # note\n1, # note\na =1}\n"
 cc 7e2eb21a69b27e0715ae863f5145066418a50acf8df1183ee45a7346ffc236f4 # shrinks to source = "for k, v in (1) {if (1) {a =(let a = 1,\n\n  a: Str = 1\nin (\"a string that is long enough to push lists over the line width\")[1])}}\n"

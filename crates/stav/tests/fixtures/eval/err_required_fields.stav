@@ -1,12 +1,12 @@
-type Build = make(target: Str) | cargo(features: List<Str> = [])
+type Build = script(target: Str) | native(features: List<Str> = [])
 struct Unit {
   exec:  List<Str>
   user:  Option<Str>
-  build: Build = cargo()
+  build: Build = native()
 }
 struct Root {
   name:  Str
   units: Map<Str, Unit> = {} block unit
 }
-unit db { user = "postgres" }
-unit web { build make { } }
+unit db { user = "database" }
+unit web { build script { } }

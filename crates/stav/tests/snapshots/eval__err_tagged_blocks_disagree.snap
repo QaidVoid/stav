@@ -5,6 +5,6 @@ expression: output
 --- errors
 error[E0502]: tagged blocks select different variants of `jobs.b.build`
   --> app/main.stav:5:3
-  label: app/main.stav:5:3: `cargo` (plain)
-  label: app/main.stav:6:3: `make` (plain)
+  label: app/main.stav:5:3: `native` (plain)
+  label: app/main.stav:6:3: `script` (plain)
   help: keep the blocks of one variant, or select the variant with `force(...)`

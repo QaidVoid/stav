@@ -26,11 +26,11 @@ fn tag(name: Str, n: Int) -> Str =
   let prefix = if n > 0 { "v" } else { "dev-" },
       padded = if n < 10 { "0#{n}" } else { "#{n}" }
   in "#{prefix}#{name}-#{padded}"
-job lint { kind = test, steps = [shell("cargo clippy -- -D warnings")] }
+job lint { kind = test, steps = [shell("tool lint --strict")] }
 job release {
   kind  = deploy
   steps = [
-    shell("cargo build --release"),
+    shell("tool build --release"),
     Step.upload(path = ./target/release/tool, bucket = "artifacts"),
     Step.notify(channel = "#releases"),
   ]

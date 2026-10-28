@@ -366,8 +366,8 @@ fn values_convert_to_host_types_through_serde() {
     #[derive(Debug, PartialEq, Deserialize)]
     #[serde(rename_all = "lowercase")]
     enum Build {
-        Cargo { features: Vec<String> },
-        Make { target: String },
+        Native { features: Vec<String> },
+        Script { target: String },
     }
 
     #[derive(Debug, PartialEq, Deserialize)]
@@ -383,22 +383,22 @@ fn values_convert_to_host_types_through_serde() {
         .get(&stav::AttrPath::new(["jobs"]))
         .expect("the jobs convert");
     assert_eq!(
-        jobs["rg"],
+        jobs["finder"],
         Job {
-            build: Build::Cargo {
-                features: vec!["pcre2".to_owned()]
+            build: Build::Native {
+                features: vec!["simd".to_owned()]
             },
             timeout: 600
         }
     );
     assert_eq!(
         jobs["hello"].build,
-        Build::Make {
+        Build::Script {
             target: "all".to_owned()
         }
     );
     let error = evaluated
-        .get::<u8>(&stav::AttrPath::new(["jobs", "rg", "timeout"]))
+        .get::<u8>(&stav::AttrPath::new(["jobs", "finder", "timeout"]))
         .expect_err("600 does not fit a byte");
     assert_eq!(
         error.iter().next().map(|d| d.diagnostic.code),
@@ -444,7 +444,7 @@ fn attributes_render_alone_and_errors_name_their_whole_path() {
 fn spans_and_symbols_point_at_the_source() {
     let text = "#! symbol Pkg pkg words\n#! entries a.stav b.stav\n#- file a.stav\n\
                 struct Root { port: Int = 80, packages: List<Pkg> = [] }\nport = default(8080)\n\
-                packages = [Vim]\n#- file b.stav\nport = 443\n";
+                packages = [Editor]\n#- file b.stav\nport = 443\n";
     let evaluated = evaluate(text);
     let spans = evaluated.spans(&stav::AttrPath::new(["port"]));
     let texts: Vec<(usize, Span)> = spans.iter().map(|s| (s.file.index(), s.span)).collect();
@@ -458,7 +458,7 @@ fn spans_and_symbols_point_at_the_source() {
         Some("443")
     );
     let symbols: Vec<&str> = evaluated.symbols("Pkg").map(|(text, _)| text).collect();
-    assert_eq!(symbols, ["vim"]);
+    assert_eq!(symbols, ["editor"]);
 }
 
 /// Asserts that a program evaluates within a few seconds, far above what

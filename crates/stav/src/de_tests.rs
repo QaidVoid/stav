@@ -8,8 +8,8 @@ use crate::value::Value;
 #[derive(Debug, PartialEq, Deserialize)]
 #[serde(rename_all = "lowercase")]
 enum Build {
-    Cargo { features: Vec<String> },
-    Make { target: String },
+    Native { features: Vec<String> },
+    Script { target: String },
 }
 
 #[derive(Debug, PartialEq, Deserialize)]
@@ -70,31 +70,28 @@ fn structs_maps_and_tagged_variants_deserialize() {
         (
             "hello".to_owned(),
             job(variant(
-                "make",
+                "script",
                 vec![("target", Value::Str("all".to_owned()))],
             )),
         ),
         (
-            "rg".to_owned(),
+            "finder".to_owned(),
             job(variant(
-                "cargo",
-                vec![(
-                    "features",
-                    Value::List(vec![Value::Str("pcre2".to_owned())]),
-                )],
+                "native",
+                vec![("features", Value::List(vec![Value::Str("simd".to_owned())]))],
             )),
         ),
     ]);
     let found = BTreeMap::<String, Job>::deserialize(&jobs).unwrap();
     assert_eq!(
-        found["rg"].build,
-        Build::Cargo {
-            features: vec!["pcre2".to_owned()]
+        found["finder"].build,
+        Build::Native {
+            features: vec!["simd".to_owned()]
         }
     );
     assert_eq!(
         found["hello"].build,
-        Build::Make {
+        Build::Script {
             target: "all".to_owned()
         }
     );
@@ -131,11 +128,11 @@ fn values_deserialize_like_their_json_rendering() {
             name: "info".to_owned(),
             fields: None,
         },
-        variant("make", vec![("target", Value::Str("x".to_owned()))]),
+        variant("script", vec![("target", Value::Str("x".to_owned()))]),
     ]);
     let found = Any::deserialize(&value).unwrap();
-    let make = BTreeMap::from([(
-        "make".to_owned(),
+    let script = BTreeMap::from([(
+        "script".to_owned(),
         Any::Map(BTreeMap::from([(
             "target".to_owned(),
             Any::Text("x".to_owned()),
@@ -148,7 +145,7 @@ fn values_deserialize_like_their_json_rendering() {
             Any::Int(1),
             Any::Text("db".to_owned()),
             Any::Text("info".to_owned()),
-            Any::Map(make),
+            Any::Map(script),
         ])
     );
 }

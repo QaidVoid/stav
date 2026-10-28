@@ -148,13 +148,13 @@ fn check_node(
 fn attributes_and_blocks_form_a_body() {
     assert_snapshot!(render(r##"port = 8080
 a.b."c d" = 1
-service sshd { exec = ["/usr/bin/sshd"], user = "root" }
+service gateway { exec = ["/usr/bin/gateway"], user = "root" }
 fs "/" {}
 server "#{name}" {
-  boot { kernel = linux-lts }
+  boot { kernel = kernel-lts }
 }
 "##), @r##"
-    File@0..144
+    File@0..151
       Attr@0..11
         AttrPath@0..4
           Ident "port"
@@ -176,66 +176,66 @@ server "#{name}" {
         Literal@24..25
           Int "1"
       Newline "\n"
-      Block@26..82
+      Block@26..88
         Ident "service"
-        Ident "sshd"
-        Body@39..82
+        Ident "gateway"
+        Body@42..88
           LBrace "{"
-          Attr@41..65
-            AttrPath@41..45
+          Attr@44..71
+            AttrPath@44..48
               Ident "exec"
             Eq "="
-            List@48..65
+            List@51..71
               LBracket "["
-              Str@49..64
+              Str@52..70
                 StrStart "\""
-                StrText "/usr/bin/sshd"
+                StrText "/usr/bin/gateway"
                 StrEnd "\""
               RBracket "]"
           Comma ","
-          Attr@67..80
-            AttrPath@67..71
+          Attr@73..86
+            AttrPath@73..77
               Ident "user"
             Eq "="
-            Str@74..80
+            Str@80..86
               StrStart "\""
               StrText "root"
               StrEnd "\""
           RBrace "}"
       Newline "\n"
-      Block@83..92
+      Block@89..98
         Ident "fs"
-        Str@86..89
+        Str@92..95
           StrStart "\""
           StrText "/"
           StrEnd "\""
-        Body@90..92
+        Body@96..98
           LBrace "{"
           RBrace "}"
       Newline "\n"
-      Block@93..143
+      Block@99..150
         Ident "server"
-        Str@100..109
+        Str@106..115
           StrStart "\""
-          Interp@101..108
+          Interp@107..114
             InterpStart "#{"
-            Name@103..107
+            Name@109..113
               Ident "name"
             InterpEnd "}"
           StrEnd "\""
-        Body@110..143
+        Body@116..150
           LBrace "{"
           Newline "\n"
-          Block@114..141
+          Block@120..148
             Ident "boot"
-            Body@119..141
+            Body@125..148
               LBrace "{"
-              Attr@121..139
-                AttrPath@121..127
+              Attr@127..146
+                AttrPath@127..133
                   Ident "kernel"
                 Eq "="
-                Name@130..139
-                  Ident "linux-lts"
+                Name@136..146
+                  Ident "kernel-lts"
               RBrace "}"
           Newline "\n"
           RBrace "}"
@@ -257,12 +257,12 @@ type Ready =
   | immediate
   | notify(fd: Int where 0..=1023)
   | check(cmd: List<Str>, interval: Int = 1)
-fn sshd(port: Int = 22) -> Part<System> = part {
-  packages = [openssh]
+fn gateway(port: Int = 22) -> Part<System> = part {
+  packages = [gatewayd]
 }
 let hosts: List<Str> = ["a"]
 "##), @r###"
-    File@0..401
+    File@0..405
       Import@0..31
         ImportKw "import"
         Str@7..20
@@ -403,66 +403,66 @@ let hosts: List<Str> = ["a"]
                 Int "1"
             RParen ")"
       Newline "\n"
-      FnDecl@298..371
+      FnDecl@298..375
         FnKw "fn"
-        Ident "sshd"
-        ParamList@305..321
+        Ident "gateway"
+        ParamList@308..324
           LParen "("
-          Param@306..320
+          Param@309..323
             Ident "port"
             Colon ":"
-            NamedType@312..315
-              TypePath@312..315
+            NamedType@315..318
+              TypePath@315..318
                 TypeIdent "Int"
             Eq "="
-            Literal@318..320
+            Literal@321..323
               Int "22"
           RParen ")"
         Arrow "->"
-        NamedType@325..337
-          TypePath@325..329
+        NamedType@328..340
+          TypePath@328..332
             TypeIdent "Part"
-          TypeArgList@329..337
+          TypeArgList@332..340
             Lt "<"
-            NamedType@330..336
-              TypePath@330..336
+            NamedType@333..339
+              TypePath@333..339
                 TypeIdent "System"
             Gt ">"
         Eq "="
-        PartExpr@340..371
+        PartExpr@343..375
           PartKw "part"
-          Body@345..371
+          Body@348..375
             LBrace "{"
             Newline "\n"
-            Attr@349..369
-              AttrPath@349..357
+            Attr@352..373
+              AttrPath@352..360
                 Ident "packages"
               Eq "="
-              List@360..369
+              List@363..373
                 LBracket "["
-                Name@361..368
-                  Ident "openssh"
+                Name@364..372
+                  Ident "gatewayd"
                 RBracket "]"
             Newline "\n"
             RBrace "}"
       Newline "\n"
-      Let@372..400
+      Let@376..404
         LetKw "let"
         Ident "hosts"
         Colon ":"
-        NamedType@383..392
-          TypePath@383..387
+        NamedType@387..396
+          TypePath@387..391
             TypeIdent "List"
-          TypeArgList@387..392
+          TypeArgList@391..396
             Lt "<"
-            NamedType@388..391
-              TypePath@388..391
+            NamedType@392..395
+              TypePath@392..395
                 TypeIdent "Str"
             Gt ">"
         Eq "="
-        List@395..400
+        List@399..404
           LBracket "["
-          Str@396..399
+          Str@400..403
             StrStart "\""
             StrText "a"
             StrEnd "\""
@@ -476,7 +476,7 @@ fn statements_include_branch_and_repeat() {
     assert_snapshot!(render(r##"system {
   let base = 1
   include "./hardware.stav"
-  include desktop.wayland(compositor = niri)
+  include desktop.graphical(compositor = tiling)
   if tls {
     port = 443
   } else if plain { port = 80 }
@@ -484,10 +484,10 @@ fn statements_include_branch_and_repeat() {
   for k, v in env { vars = [k, v] }
 }
 "##), @r#"
-    File@0..216
-      Block@0..215
+    File@0..220
+      Block@0..219
         Ident "system"
-        Body@7..215
+        Body@7..219
           LBrace "{"
           Newline "\n"
           Let@11..23
@@ -504,84 +504,84 @@ fn statements_include_branch_and_repeat() {
               StrText "./hardware.stav"
               StrEnd "\""
           Newline "\n"
-          Include@54..96
+          Include@54..100
             IncludeKw "include"
-            Call@62..96
-              FieldExpr@62..77
+            Call@62..100
+              FieldExpr@62..79
                 Name@62..69
                   Ident "desktop"
                 Dot "."
-                Ident "wayland"
-              ArgList@77..96
+                Ident "graphical"
+              ArgList@79..100
                 LParen "("
-                Arg@78..95
+                Arg@80..99
                   Ident "compositor"
                   Eq "="
-                  Name@91..95
-                    Ident "niri"
+                  Name@93..99
+                    Ident "tiling"
                 RParen ")"
           Newline "\n"
-          IfStmt@99..177
+          IfStmt@103..181
             IfKw "if"
-            Name@102..105
+            Name@106..109
               Ident "tls"
-            Body@106..126
+            Body@110..130
               LBrace "{"
               Newline "\n"
-              Attr@112..122
-                AttrPath@112..116
+              Attr@116..126
+                AttrPath@116..120
                   Ident "port"
                 Eq "="
-                Literal@119..122
+                Literal@123..126
                   Int "443"
               Newline "\n"
               RBrace "}"
             ElseKw "else"
-            IfStmt@132..177
+            IfStmt@136..181
               IfKw "if"
-              Name@135..140
+              Name@139..144
                 Ident "plain"
-              Body@141..154
+              Body@145..158
                 LBrace "{"
-                Attr@143..152
-                  AttrPath@143..147
+                Attr@147..156
+                  AttrPath@147..151
                     Ident "port"
                   Eq "="
-                  Literal@150..152
+                  Literal@154..156
                     Int "80"
                 RBrace "}"
               Newline "\n"
               ElseKw "else"
-              Body@162..177
+              Body@166..181
                 LBrace "{"
-                Attr@164..175
-                  AttrPath@164..168
+                Attr@168..179
+                  AttrPath@168..172
                     Ident "port"
                   Eq "="
-                  Literal@171..175
+                  Literal@175..179
                     Int "8080"
                 RBrace "}"
           Newline "\n"
-          ForStmt@180..213
+          ForStmt@184..217
             ForKw "for"
             Ident "k"
             Comma ","
             Ident "v"
             InKw "in"
-            Name@192..195
+            Name@196..199
               Ident "env"
-            Body@196..213
+            Body@200..217
               LBrace "{"
-              Attr@198..211
-                AttrPath@198..202
+              Attr@202..215
+                AttrPath@202..206
                   Ident "vars"
                 Eq "="
-                List@205..211
+                List@209..215
                   LBracket "["
-                  Name@206..207
+                  Name@210..211
                     Ident "k"
                   Comma ","
-                  Name@209..210
+                  Name@213..214
                     Ident "v"
                   RBracket "]"
               RBrace "}"
@@ -686,14 +686,14 @@ fn strings_in_every_form() {
 #[test]
 fn literals_names_and_symbol_words() {
     assert_snapshot!(
-        render("a = [1, 0x1f, 2.5, ./fix.patch, true, false, none, self.x, llvm@19.1:static, MIT, Level.info, xdg-utils]\n"),
+        render("a = [1, 0x1f, 2.5, ./fix.patch, true, false, none, self.x, compiler@19.1:static, MIT, Level.info, app-utils]\n"),
         @r#"
-    File@0..105
-      Attr@0..104
+    File@0..109
+      Attr@0..108
         AttrPath@0..1
           Ident "a"
         Eq "="
-        List@4..104
+        List@4..108
           LBracket "["
           Literal@5..6
             Int "1"
@@ -722,20 +722,20 @@ fn literals_names_and_symbol_words() {
             Dot "."
             Ident "x"
           Comma ","
-          Symbol@59..75
-            SymWord "llvm@19.1:static"
+          Symbol@59..79
+            SymWord "compiler@19.1:static"
           Comma ","
-          Name@77..80
+          Name@81..84
             TypeIdent "MIT"
           Comma ","
-          FieldExpr@82..92
-            Name@82..87
+          FieldExpr@86..96
+            Name@86..91
               TypeIdent "Level"
             Dot "."
             Ident "info"
           Comma ","
-          Name@94..103
-            Ident "xdg-utils"
+          Name@98..107
+            Ident "app-utils"
           RBracket "]"
       Newline "\n"
     "#
@@ -746,7 +746,7 @@ fn literals_names_and_symbol_words() {
 fn collections_and_struct_literals() {
     assert_snapshot!(render(r##"a = []
 b = {}
-c = { port = 80, "vm.swappiness" = 10, tls = { enabled = true } }
+c = { port = 80, "mem.reclaim" = 10, tls = { enabled = true } }
 d = Model { id = "x", provider = local }
 e = svc.Ready { fd = 3 }
 f = [for x in xs if x > 0 -> x * 2]
@@ -756,7 +756,7 @@ h = [
   2
 ]
 "##), @r##"
-    File@0..233
+    File@0..231
       Attr@0..6
         AttrPath@0..1
           Ident "a"
@@ -773,11 +773,11 @@ h = [
           LBrace "{"
           RBrace "}"
       Newline "\n"
-      Attr@14..79
+      Attr@14..77
         AttrPath@14..15
           Ident "c"
         Eq "="
-        Map@18..79
+        Map@18..77
           LBrace "{"
           MapEntry@20..29
             Ident "port"
@@ -785,136 +785,136 @@ h = [
             Literal@27..29
               Int "80"
           Comma ","
-          MapEntry@31..51
-            Str@31..46
+          MapEntry@31..49
+            Str@31..44
               StrStart "\""
-              StrText "vm.swappiness"
+              StrText "mem.reclaim"
               StrEnd "\""
             Eq "="
-            Literal@49..51
+            Literal@47..49
               Int "10"
           Comma ","
-          MapEntry@53..77
+          MapEntry@51..75
             Ident "tls"
             Eq "="
-            Map@59..77
+            Map@57..75
               LBrace "{"
-              MapEntry@61..75
+              MapEntry@59..73
                 Ident "enabled"
                 Eq "="
-                Literal@71..75
+                Literal@69..73
                   TrueKw "true"
               RBrace "}"
           RBrace "}"
       Newline "\n"
-      Attr@80..120
-        AttrPath@80..81
+      Attr@78..118
+        AttrPath@78..79
           Ident "d"
         Eq "="
-        StructLit@84..120
-          TypePath@84..89
+        StructLit@82..118
+          TypePath@82..87
             TypeIdent "Model"
-          Map@90..120
+          Map@88..118
             LBrace "{"
-            MapEntry@92..100
+            MapEntry@90..98
               Ident "id"
               Eq "="
-              Str@97..100
+              Str@95..98
                 StrStart "\""
                 StrText "x"
                 StrEnd "\""
             Comma ","
-            MapEntry@102..118
+            MapEntry@100..116
               Ident "provider"
               Eq "="
-              Name@113..118
+              Name@111..116
                 Ident "local"
             RBrace "}"
       Newline "\n"
-      Attr@121..145
-        AttrPath@121..122
+      Attr@119..143
+        AttrPath@119..120
           Ident "e"
         Eq "="
-        StructLit@125..145
-          TypePath@125..134
+        StructLit@123..143
+          TypePath@123..132
             Ident "svc"
             Dot "."
             TypeIdent "Ready"
-          Map@135..145
+          Map@133..143
             LBrace "{"
-            MapEntry@137..143
+            MapEntry@135..141
               Ident "fd"
               Eq "="
-              Literal@142..143
+              Literal@140..141
                 Int "3"
             RBrace "}"
       Newline "\n"
-      Attr@146..181
-        AttrPath@146..147
+      Attr@144..179
+        AttrPath@144..145
           Ident "f"
         Eq "="
-        ListComp@150..181
+        ListComp@148..179
           LBracket "["
           ForKw "for"
           Ident "x"
           InKw "in"
-          Name@160..162
+          Name@158..160
             Ident "xs"
           IfKw "if"
-          BinaryExpr@166..171
-            Name@166..167
+          BinaryExpr@164..169
+            Name@164..165
               Ident "x"
             Gt ">"
-            Literal@170..171
+            Literal@168..169
               Int "0"
           Arrow "->"
-          BinaryExpr@175..180
-            Name@175..176
+          BinaryExpr@173..178
+            Name@173..174
               Ident "x"
             Star "*"
-            Literal@179..180
+            Literal@177..178
               Int "2"
           RBracket "]"
       Newline "\n"
-      Attr@182..215
-        AttrPath@182..183
+      Attr@180..213
+        AttrPath@180..181
           Ident "g"
         Eq "="
-        MapComp@186..215
+        MapComp@184..213
           LBrace "{"
           ForKw "for"
           Ident "k"
           Comma ","
           Ident "v"
           InKw "in"
-          Name@199..200
+          Name@197..198
             Ident "m"
           Arrow "->"
-          Str@204..210
+          Str@202..208
             StrStart "\""
-            Interp@205..209
+            Interp@203..207
               InterpStart "#{"
-              Name@207..208
+              Name@205..206
                 Ident "k"
               InterpEnd "}"
             StrEnd "\""
           Eq "="
-          Name@213..214
+          Name@211..212
             Ident "v"
           RBrace "}"
       Newline "\n"
-      Attr@216..232
-        AttrPath@216..217
+      Attr@214..230
+        AttrPath@214..215
           Ident "h"
         Eq "="
-        List@220..232
+        List@218..230
           LBracket "["
           Newline "\n"
-          Literal@224..225
+          Literal@222..223
             Int "1"
           Comma ","
           Newline "\n"
-          Literal@229..230
+          Literal@227..228
             Int "2"
           Newline "\n"
           RBracket "]"
@@ -1700,35 +1700,35 @@ fn stray_commas_are_reported_once_per_run() {
 
 #[test]
 fn statement_needs_equals_or_brace_after_identifier() {
-    assert_snapshot!(errors("system {\n  hostname \"forge\"\n  service sshd\n  \"key\" { }\n}\n"), @"
+    assert_snapshot!(errors("system {\n  hostname \"forge\"\n  service gateway\n  \"key\" { }\n}\n"), @"
     error[E0201] 27..28: expected `{` after the block label, found a line break
       help: add a body in braces, or write `hostname = ...` to set an attribute
-    error[E0201] 42..43: expected `{` after the block label, found a line break
+    error[E0201] 45..46: expected `{` after the block label, found a line break
       help: add a body in braces, or write `service = ...` to set an attribute
-    error[E0201] 51..52: expected `=` after the attribute key, found `{`
+    error[E0201] 54..55: expected `=` after the attribute key, found `{`
     ");
 }
 
 #[test]
 fn blocks_are_rejected_inside_literals() {
-    assert_snapshot!(render("a = { service sshd { exec = [] } }\n"), @r#"
-    File@0..35
-      Attr@0..34
+    assert_snapshot!(render("a = { service gateway { exec = [] } }\n"), @r#"
+    File@0..38
+      Attr@0..37
         AttrPath@0..1
           Ident "a"
         Eq "="
-        Map@4..34
+        Map@4..37
           LBrace "{"
-          Block@6..32
+          Block@6..35
             Ident "service"
-            Ident "sshd"
-            Body@19..32
+            Ident "gateway"
+            Body@22..35
               LBrace "{"
-              Attr@21..30
-                AttrPath@21..25
+              Attr@24..33
+                AttrPath@24..28
                   Ident "exec"
                 Eq "="
-                List@28..30
+                List@31..33
                   LBracket "["
                   RBracket "]"
               RBrace "}"
@@ -1784,9 +1784,9 @@ fn annotations_need_a_space_after_the_colon() {
 
 #[test]
 fn import_alias_must_be_a_name() {
-    assert_snapshot!(errors("import \"a\" as llvm@19:static\nimport \"b\" as 1\n"), @"
-    error[E0206] 14..28: expected a name, found symbol word `llvm@19:static`
-    error[E0210] 43..44: expected an alias, found `1`
+    assert_snapshot!(errors("import \"a\" as compiler@19:static\nimport \"b\" as 1\n"), @"
+    error[E0206] 14..32: expected a name, found symbol word `compiler@19:static`
+    error[E0210] 47..48: expected an alias, found `1`
     ");
 }
 

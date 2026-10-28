@@ -5,19 +5,19 @@ expression: output
 --- JSON
 {
   "services": {
-    "cron": {
+    "gateway": {
       "exec": [
-        "/usr/bin/cron"
-      ],
-      "enabled": false
-    },
-    "sshd": {
-      "exec": [
-        "/usr/bin/sshd",
+        "/usr/bin/gateway",
         "-p",
         "2222"
       ],
       "enabled": true
+    },
+    "scheduler": {
+      "exec": [
+        "/usr/bin/scheduler"
+      ],
+      "enabled": false
     }
   },
   "hosts": [

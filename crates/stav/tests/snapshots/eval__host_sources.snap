@@ -8,7 +8,7 @@ expression: output
     "hostname": "forge",
     "packages": [
       "base",
-      "vim"
+      "editor"
     ],
     "accounts": [
       "root"

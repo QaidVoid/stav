@@ -12,13 +12,13 @@ error[E0438]: the `gc` block takes no label
 error[E0438]: the `env` block takes no label
   --> app/main.stav:19:7
   help: write `env { ... }`
-error[E0439]: `carg` is not a variant of `Build`
+error[E0439]: `nativ` is not a variant of `Build`
   --> app/main.stav:20:9
-  help: did you mean `cargo`?
+  help: did you mean `native`?
 error[E0437]: the `build` block needs a label
   --> app/main.stav:21:3
   help: write `build <label> { ... }`
-error[E0439]: `npm` is not a variant of `VendorKind`
+error[E0439]: `mirror` is not a variant of `VendorKind`
   --> app/main.stav:22:10
 error[E0440]: `Job` has no block `servise`
   --> app/main.stav:23:3
@@ -28,7 +28,7 @@ error[E0436]: `count` is a value of type `Int`, which has no attribute `value`
 error[E0302]: `Gc` has no field `kepe`
   --> app/main.stav:25:6
   help: did you mean `keep`?
-error[E0302]: `Build.make` has no field `x`
-  --> app/main.stav:26:16
-error[E0302]: `npm` is not a variant of `VendorKind`
+error[E0302]: `Build.script` has no field `x`
+  --> app/main.stav:26:18
+error[E0302]: `mirror` is not a variant of `VendorKind`
   --> app/main.stav:27:11

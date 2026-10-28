@@ -5,5 +5,5 @@ struct Unit {
 
 struct Root { units: Map<Str, Unit> = {} block unit }
 
-unit db  { exec = ["/usr/bin/postgres"] }
+unit db  { exec = ["/usr/bin/database"] }
 unit api { exec = ["/usr/bin/api"], after = [db, cache] }
