@@ -4,6 +4,9 @@ description = "A statically typed, eager and total configuration language"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+readme.workspace = true
+keywords = ["configuration", "language", "config", "typed", "serde"]
+categories = ["config", "parser-implementations"]
 repository.workspace = true
 version.workspace = true
 

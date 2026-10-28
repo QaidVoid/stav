@@ -4,12 +4,17 @@ description = "The stav command: format, check and evaluate Stav programs"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+readme.workspace = true
+keywords = ["configuration", "language", "config", "formatter", "cli"]
+categories = ["config", "command-line-utilities", "development-tools"]
 repository.workspace = true
 version.workspace = true
 
 [[bin]]
 name = "stav"
 path = "src/main.rs"
+# The library of the same name owns the `stav` documentation page.
+doc = false
 
 [lints]
 workspace = true
