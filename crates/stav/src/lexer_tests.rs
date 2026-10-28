@@ -735,11 +735,62 @@ fn single_line_string_ends_at_line_feed_inside_nested_multi_line_string() {
     error[E0108] 4..5: unterminated string
       help: close the string with `"` before the end of the line
     error[E0108] 8..11: unterminated string
-      help: close the string with `"""` on a line of its own
+      help: close the string with `"` before the end of the line
     error[E0110] 18..24: the opening `"""` must be followed directly by a line break
       help: start the content of the string on the next line
     error[E0108] 18..21: unterminated string
       help: close the string with `"""` on a line of its own
+    "##);
+}
+
+#[test]
+fn line_feed_in_multi_line_string_inside_single_line_string_ends_both() {
+    assert_snapshot!(render("x = \"#{ \"\"\"a\nb = 1"), @r##"
+    0..1     "x" Ident
+    1..2     " " Whitespace
+    2..3     "=" Eq
+    3..4     " " Whitespace
+    4..5     "\"" StrStart
+    5..7     "#{" InterpStart
+    7..8     " " Whitespace
+    8..11    "\"\"\"" MStrStart
+    11..12   "a" StrText
+    12..13   "\n" Newline
+    13..14   "b" Ident
+    14..15   " " Whitespace
+    15..16   "=" Eq
+    16..17   " " Whitespace
+    17..18   "1" Int
+    18..18   "" Eof
+    error[E0108] 4..5: unterminated string
+      help: close the string with `"` before the end of the line
+    error[E0110] 8..11: the opening `"""` must be followed directly by a line break
+      help: start the content of the string on the next line
+    error[E0108] 8..11: unterminated string
+      help: close the string with `"` before the end of the line
+    "##);
+}
+
+#[test]
+fn multi_line_string_inside_single_line_string_reports_its_opener() {
+    assert_snapshot!(render("x = \"a #{ \"\"\"x\"\"\" }\""), @r##"
+    0..1     "x" Ident
+    1..2     " " Whitespace
+    2..3     "=" Eq
+    3..4     " " Whitespace
+    4..5     "\"" StrStart
+    5..7     "a " StrText
+    7..9     "#{" InterpStart
+    9..10    " " Whitespace
+    10..13   "\"\"\"" MStrStart
+    13..14   "x" StrText
+    14..17   "\"\"\"" MStrEnd
+    17..18   " " Whitespace
+    18..19   "}" InterpEnd
+    19..20   "\"" StrEnd
+    20..20   "" Eof
+    error[E0110] 10..13: the opening `"""` must be followed directly by a line break
+      help: start the content of the string on the next line
     "##);
 }
 

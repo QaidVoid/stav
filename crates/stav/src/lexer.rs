@@ -109,10 +109,12 @@ struct Lexer<'a> {
     /// The index in `modes` of the outermost open single-line string. Every
     /// mode from there on ends at the next line feed.
     single_line_from: Option<usize>,
-    /// Layout tokens of multi-line strings whose start must become literal
-    /// text, given as the token start and the length of the layout that
-    /// stays. They are applied in one pass at the end, because rewriting
-    /// tokens when each string closes is quadratic in the nesting depth.
+    /// Indentation tokens of multi-line strings that are deeper than the
+    /// indentation of the closing `"""`, given as the token start and the
+    /// length of the closing indentation. That length stays layout, and only
+    /// the excess indentation beyond it becomes literal text. The splits are
+    /// applied in one pass at the end, because rewriting tokens when each
+    /// string closes is quadratic in the nesting depth.
     layout_splits: Vec<(usize, usize)>,
 }
 
@@ -206,7 +208,7 @@ impl<'a> Lexer<'a> {
         }
         while let Some(mode) = self.pop_mode() {
             if let Mode::Str(frame) = mode {
-                self.unterminated(&frame);
+                self.unterminated(&frame, false);
             }
         }
         self.apply_layout_splits();
@@ -537,7 +539,7 @@ impl<'a> Lexer<'a> {
         };
         while self.modes.len() > from {
             if let Some(Mode::Str(frame)) = self.pop_mode() {
-                self.unterminated(&frame);
+                self.unterminated(&frame, true);
             }
         }
     }
@@ -559,7 +561,14 @@ impl<'a> Lexer<'a> {
         };
         self.push(kind, start);
         // Inside a single-line string, the line feed after the opener ends
-        // the enclosing string instead of starting the content.
+        // the enclosing string instead of starting the content, so a
+        // multi-line string there can never be valid. Text after the opener
+        // is reported at the opener and lexed as content, so that a closing
+        // `"""` on the same line still ends the string.
+        if form.is_multi() && self.single_line_from.is_some() && self.peek(0) != Some(b'\n') {
+            frame.bad_opener = true;
+            self.bad_opener(start);
+        }
         if form.is_multi() && self.single_line_from.is_none() {
             if self.peek(0) != Some(b'\n') {
                 frame.bad_opener = true;
@@ -570,13 +579,7 @@ impl<'a> Lexer<'a> {
                 if self.pos > rest {
                     self.push(TokenKind::Error, rest);
                 }
-                self.error(
-                    "E0110",
-                    start,
-                    self.pos,
-                    "the opening `\"\"\"` must be followed directly by a line break".to_owned(),
-                    Some("start the content of the string on the next line".to_owned()),
-                );
+                self.bad_opener(start);
             }
             if self.peek(0) == Some(b'\n') {
                 let line_feed = self.pos;
@@ -586,6 +589,16 @@ impl<'a> Lexer<'a> {
             }
         }
         self.push_mode(Mode::Str(frame));
+    }
+
+    fn bad_opener(&mut self, start: usize) {
+        self.error(
+            "E0110",
+            start,
+            self.pos,
+            "the opening `\"\"\"` must be followed directly by a line break".to_owned(),
+            Some("start the content of the string on the next line".to_owned()),
+        );
     }
 
     fn open_interp(&mut self) {
@@ -606,7 +619,6 @@ impl<'a> Lexer<'a> {
                 self.push(TokenKind::StrEnd, start);
                 self.pop_mode();
             }
-            Some(b'\n') => self.end_single_line_strings(),
             Some(b'\\') if plain => self.lex_escape(),
             Some(b'#') if plain && interp_follows(self) => self.open_interp(),
             Some(_) => {
@@ -689,6 +701,11 @@ impl<'a> Lexer<'a> {
         }
         let mut line_ended = false;
         while let Some(b) = self.peek(0) {
+            // Inside a single-line string, the line feed ends that string
+            // and everything nested in it, which `run` takes care of.
+            if b == b'\n' && self.single_line_from.is_some() {
+                break;
+            }
             if b == b'\n' {
                 self.pos += 1;
                 line_ended = true;
@@ -699,7 +716,9 @@ impl<'a> Lexer<'a> {
             }
             self.bump_char();
         }
-        self.push(TokenKind::StrText, start);
+        if self.pos > start {
+            self.push(TokenKind::StrText, start);
+        }
         if line_ended {
             let line = self.begin_line();
             if let Some(Mode::Str(frame)) = self.modes.last_mut() {
@@ -806,10 +825,18 @@ impl<'a> Lexer<'a> {
                 span: Span { start: mid, end },
             });
         }
+        debug_assert!(
+            splits.next().is_none(),
+            "every layout split starts at a layout token"
+        );
     }
 
-    fn unterminated(&mut self, frame: &StrFrame) {
-        let help = if frame.form.is_multi() {
+    /// Reports `frame` as unterminated. `at_line_feed` tells whether the
+    /// line feed that ends a single-line string ended it, in which case the
+    /// fix is to close that single-line string, whatever the form of
+    /// `frame`.
+    fn unterminated(&mut self, frame: &StrFrame, at_line_feed: bool) {
+        let help = if frame.form.is_multi() && !at_line_feed {
             "close the string with `\"\"\"` on a line of its own"
         } else {
             "close the string with `\"` before the end of the line"
