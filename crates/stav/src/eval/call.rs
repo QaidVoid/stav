@@ -9,8 +9,8 @@ use super::{Eval, R};
 use crate::ast;
 use crate::check::decls::GlobalKind;
 use crate::check::model::{CallFact, Callee, Fact, Meaning};
-use crate::check::types::{GlobalId, ParamDef, StructId, SumId};
-use crate::diagnostic::Diagnostic;
+use crate::check::types::{GlobalId, ParamDef, StructId, SumId, Type, TypeId};
+use crate::diagnostic::{Diagnostic, Label};
 use crate::span::SourceSpan;
 
 /// A struct value being built, whose defaults may read its other fields
@@ -164,7 +164,28 @@ impl<'c> Eval<'c> {
         };
         let result = self.expr(&cx, body);
         self.calls.pop();
-        result
+        let value = result?;
+        self.refine_result(sig.ret, &value, cx.at(body.syntax().span()), at)?;
+        Ok(value)
+    }
+
+    /// Checks the result of a call against the refinements of the return
+    /// type, pointing at the body that produced it and at the call.
+    fn refine_result(
+        &mut self,
+        ret: TypeId,
+        value: &Val,
+        body: SourceSpan,
+        call: SourceSpan,
+    ) -> R<()> {
+        self.refine(ret, value, body).map_err(|mut stop| {
+            stop.0.diagnostic.labels.push(Label {
+                file: Some(call.file),
+                span: call.span,
+                message: "the result of this call".to_owned(),
+            });
+            stop
+        })
     }
 
     /// Calls a function value with every argument positional.
@@ -204,7 +225,11 @@ impl<'c> Eval<'c> {
                 };
                 let result = self.expr(&cx, body);
                 self.calls.pop();
-                result
+                let value = result?;
+                if let Type::Fn(_, ret) = self.c.types.get(fact.ty) {
+                    self.refine_result(*ret, &value, cx.at(body.syntax().span()), at)?;
+                }
+                Ok(value)
             }
         }
     }
@@ -233,11 +258,18 @@ impl<'c> Eval<'c> {
                     "a struct literal names an unknown field",
                 ));
             };
-            fields[index] = Field::Ready(self.expr(cx, value)?);
+            let ty = self.c.types.structure(id).fields[index].ty;
+            let value_at = cx.at(value.syntax().span());
+            let value = self.expr(cx, value)?;
+            self.refine(ty, &value, value_at)?;
+            fields[index] = Field::Ready(value);
         }
         self.build(id, fields, at)
     }
 
+    /// Builds a struct value from the fields a literal sets, evaluating
+    /// the defaults of the others and checking them against the
+    /// refinements of their fields.
     fn build(&mut self, id: StructId, fields: Vec<Field>, at: SourceSpan) -> R<Val> {
         let count = fields.len();
         let set: Vec<bool> = fields
@@ -247,8 +279,15 @@ impl<'c> Eval<'c> {
         let index = self.caches.building.len();
         self.caches.building.push(Building { id, fields });
         let mut values = Vec::with_capacity(count);
-        for i in 0..count {
-            match self.building_field(index, i, at) {
+        for (i, &given) in set.iter().enumerate() {
+            let value = self.building_field(index, i, at).and_then(|v| {
+                if !given {
+                    let ty = self.c.types.structure(id).fields[i].ty;
+                    self.refine(ty, &v, at)?;
+                }
+                Ok(v)
+            });
+            match value {
                 Ok(v) => values.push(v),
                 Err(e) => {
                     self.caches.building.truncate(index);

@@ -1,0 +1,3 @@
+struct Root { a: Int = 0 }
+let clamp = fn(x: Int) -> Int where 0..=100 = x
+a = clamp(700)

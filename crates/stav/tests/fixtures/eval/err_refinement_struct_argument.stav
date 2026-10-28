@@ -1,0 +1,4 @@
+struct Point { x: Int where 0..=10 = 0 }
+struct Root { a: Int = 0 }
+fn getx(p: Point) -> Int = p.x
+a = getx(Point { x = 50 })

@@ -1,0 +1,9 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- errors
+error[E0803]: value violates a refinement
+  --> app/main.stav:3:22
+  label: app/main.stav:3:22: 70 is not in 0..=10
+  label: app/main.stav:1:19: constraint declared here

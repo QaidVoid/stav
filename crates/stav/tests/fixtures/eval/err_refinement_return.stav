@@ -1,0 +1,3 @@
+struct Root { a: Int = 0 }
+fn percent() -> Int where 0..=100 = 500
+a = percent()

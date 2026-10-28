@@ -1,0 +1,10 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- errors
+error[E0803]: value violates a refinement
+  --> app/main.stav:2:47
+  label: app/main.stav:2:47: 700 is not in 0..=100
+  label: app/main.stav:2:27: constraint declared here
+  label: app/main.stav:3:5: the result of this call
