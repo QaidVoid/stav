@@ -1,24 +1,39 @@
 //! Stav, a statically typed, eager and total configuration language.
 //!
-//! A Stav program is a set of `.stav` files written in block syntax. The
-//! library type checks the whole program before evaluating it, merges the
-//! contributions of every file by priority, and produces a value that can be
-//! rendered or converted to Rust types.
+//! A Stav program is a set of `.stav` files written in block syntax. This
+//! crate is the whole language: it parses, formats, type checks and
+//! evaluates programs, merges the contributions of every file by priority,
+//! and turns the result into a [`Value`] that renders to JSON, TOML or YAML
+//! or converts to Rust types through serde.
 //!
-//! The entry points are [`lex`], which splits source text into tokens,
-//! [`parse`], which builds a lossless [`SyntaxTree`] with a typed view in
-//! [`ast`], [`format()`], which lays source text out in its canonical form,
-//! [`check`], which loads the files of a root through a host's [`Loader`]
-//! and type checks the whole program, and [`Checked::eval`], which
-//! evaluates a checked program into an [`Evaluated`] value.
+//! Evaluation always terminates, reads nothing except the files the host
+//! serves, and gives the same value for the same inputs. The whole program
+//! is type checked before any of it is evaluated. The crate performs no
+//! I/O of its own.
 //!
-//! # Examples
+//! # Embedding
+//!
+//! A [`Host`] is what the embedding program contributes: a [`Loader`] that
+//! serves source files, and optionally a prelude, standard modules, symbol
+//! types and host modules. A [`RootSpec`] names the root struct, the entry
+//! files and the import roots. [`check`] loads and type checks the program,
+//! [`Checked::eval`] evaluates it into an [`Evaluated`] value, and
+//! [`Evaluated::get`] converts an attribute into any type that implements
+//! [`serde::Deserialize`]. Every failure is reported as [`Diagnostics`].
 //!
 //! ```
-//! use stav::{Format, Host, ImportRoot, Limits, MemoryLoader, RootSpec};
+//! use serde::Deserialize;
+//! use stav::{AttrPath, Format, Host, ImportRoot, Limits, MemoryLoader, RootSpec};
 //!
-//! let source = "struct Root {\n  name: Str\n  port: Int where 1..=65535 = 80\n}\n\
-//!               name = \"web\"\nport = 8080\n";
+//! #[derive(Deserialize)]
+//! struct Server {
+//!     name: String,
+//!     port: u16,
+//! }
+//!
+//! let source = "struct Server {\n  name: Str\n  port: Int where 1..=65535 = 80\n}\n\
+//!               struct Root { server: Server }\n\
+//!               server { name = \"web\", port = 8080 }\n";
 //! let host = Host::new(MemoryLoader::new().with_file("app/main.stav", source));
 //! let root = RootSpec {
 //!     root_struct: "Root".to_owned(),
@@ -26,12 +41,21 @@
 //!     import_roots: vec![ImportRoot::new("app")],
 //! };
 //! let evaluated = stav::check(&host, &root)?.eval(&Limits::default())?;
+//!
+//! let server: Server = evaluated.get(&AttrPath::new(["server"]))?;
+//! assert_eq!((server.name.as_str(), server.port), ("web", 8080));
 //! assert_eq!(
 //!     evaluated.render(Format::Toml)?,
-//!     "name = \"web\"\nport = 8080\n"
+//!     "[server]\nname = \"web\"\nport = 8080\n"
 //! );
 //! # Ok::<(), stav::Diagnostics>(())
 //! ```
+//!
+//! # Other entry points
+//!
+//! [`lex`] splits source text into tokens, [`parse`] builds a lossless
+//! [`SyntaxTree`] with a typed view in [`ast`], and [`format()`] lays source
+//! text out in its canonical form.
 
 #![forbid(unsafe_code)]
 
@@ -65,3 +89,8 @@ pub use span::{SourceSpan, Span};
 pub use syntax::{NodeKind, SyntaxElement, SyntaxNode, SyntaxToken, SyntaxTree};
 pub use token::{Token, TokenKind};
 pub use value::{AttrPath, AttrPathError, Value};
+
+/// Compiles the Rust examples of the repository's README as doctests.
+#[cfg(doctest)]
+#[doc = include_str!("../../../README.md")]
+struct ReadmeDoctests;
