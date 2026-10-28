@@ -17,6 +17,7 @@ pub mod ast;
 mod check;
 mod diagnostic;
 mod format;
+mod hash;
 mod lexer;
 mod parser;
 mod span;

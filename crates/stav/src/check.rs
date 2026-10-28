@@ -23,6 +23,7 @@ mod totality;
 mod types;
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::path::PathBuf;
 
 pub use host::{
     Host, HostModule, ImportRoot, LoadError, Loader, MemoryLoader, RelPath, RootSpec, Source,
@@ -32,7 +33,7 @@ pub use load::FileId;
 pub use schema::{SchemaField, SchemaIndex, SchemaStruct, SchemaSum, SchemaVariant};
 
 use self::decls::{FileScope, Global};
-use self::load::{Program, Role, file_kind};
+use self::load::{Origin, Program, Role, file_kind};
 use self::model::{Fact, LocalId, SelfRead, Target, Unit, UnitId};
 use self::totality::{CallGraph, Node};
 use self::types::{StructId, Types};
@@ -58,6 +59,7 @@ pub struct Checked {
     calls: CallGraph,
     ref_targets: BTreeMap<StructId, Vec<model::Step>>,
     warnings: Diagnostics,
+    inputs: Vec<(PathBuf, [u8; 32])>,
 }
 
 impl Checked {
@@ -83,6 +85,39 @@ impl Checked {
             .get(file.index())
             .map(|f| f.parsed.tree.root().text())
     }
+
+    /// Returns every source file the program was read from, with the
+    /// BLAKE3 hash of its text, in the order the files were loaded.
+    ///
+    /// A file inside an import root is named by the import root joined with
+    /// its relative path, a standard module by `std/<name>`, a host module
+    /// by its import path such as `ns/target`, and a prelude file or
+    /// implicit part by the name the host gave it. A cache keyed by these
+    /// inputs tells apart every evaluation whose sources differ.
+    pub fn inputs(&self) -> &[(PathBuf, [u8; 32])] {
+        &self.inputs
+    }
+}
+
+/// Returns every distinct source file of the program with the hash of its
+/// text.
+fn inputs(program: &Program, spec: &RootSpec) -> Vec<(PathBuf, [u8; 32])> {
+    let mut seen = BTreeSet::new();
+    let mut out = Vec::new();
+    for file in &program.files {
+        let path = match &file.origin {
+            Origin::Path { root, rel } => spec
+                .import_roots
+                .get(*root)
+                .map_or_else(|| rel.to_path(), |r| r.path().join(rel.to_path())),
+            _ => PathBuf::from(&file.name),
+        };
+        if seen.insert(path.clone()) {
+            let text = file.parsed.tree.root().text();
+            out.push((path, crate::hash::blake3(text.as_bytes())));
+        }
+    }
+    out
 }
 
 /// Loads and type checks the root `root` of `host`.
@@ -145,6 +180,7 @@ pub fn check(host: &Host, root: &RootSpec) -> Result<Checked, Diagnostics> {
     match parts {
         Some(parts) => {
             let warnings = diagnostics(&program, found);
+            let inputs = inputs(&program, root);
             Ok(Checked {
                 program,
                 types: parts.types,
@@ -157,6 +193,7 @@ pub fn check(host: &Host, root: &RootSpec) -> Result<Checked, Diagnostics> {
                 calls: parts.calls,
                 ref_targets: parts.ref_targets,
                 warnings,
+                inputs,
             })
         }
         None => Err(diagnostics(&program, found)),
