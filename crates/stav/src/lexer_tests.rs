@@ -428,17 +428,27 @@ fn every_line_feed_is_a_token() {
 
 #[test]
 fn relative_paths_are_literals() {
-    assert_snapshot!(render("./fix.patch ../files/a.conf ./a+b@c=d,e x/y"), @r#"
+    assert_snapshot!(render("./fix.patch ../files/a.conf ./a+b@c-d_e [./a,./b] p=./c x/y"), @r#"
     0..11    "./fix.patch" Path
     11..12   " " Whitespace
     12..27   "../files/a.conf" Path
     27..28   " " Whitespace
-    28..39   "./a+b@c=d,e" Path
+    28..39   "./a+b@c-d_e" Path
     39..40   " " Whitespace
-    40..41   "x" Ident
-    41..42   "/" Slash
-    42..43   "y" Ident
-    43..43   "" Eof
+    40..41   "[" LBracket
+    41..44   "./a" Path
+    44..45   "," Comma
+    45..48   "./b" Path
+    48..49   "]" RBracket
+    49..50   " " Whitespace
+    50..51   "p" Ident
+    51..52   "=" Eq
+    52..55   "./c" Path
+    55..56   " " Whitespace
+    56..57   "x" Ident
+    57..58   "/" Slash
+    58..59   "y" Ident
+    59..59   "" Eof
     "#);
 }
 

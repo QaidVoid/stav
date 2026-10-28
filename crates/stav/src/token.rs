@@ -70,6 +70,10 @@ pub enum TokenKind {
     /// A `_` may separate two digits, as in an [`TokenKind::Int`].
     Float,
     /// A relative path such as `./fix.patch` or `../files/a.conf`.
+    ///
+    /// After `./` or `../`, a path continues with ASCII letters, digits and
+    /// `.`, `_`, `-`, `+`, `@` and `/`. It ends at any other character, so
+    /// `[./a,./b]` holds two paths.
     Path,
 
     /// `"`, opening a single-line string.

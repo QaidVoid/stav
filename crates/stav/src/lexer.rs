@@ -925,7 +925,7 @@ fn separators_between_digits(text: &str, radix: u32) -> bool {
 }
 
 fn is_path_char(b: u8) -> bool {
-    b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-' | b'+' | b'@' | b'=' | b',' | b'/')
+    b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-' | b'+' | b'@' | b'/')
 }
 
 fn describe_indent(indent: &str) -> String {
