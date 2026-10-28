@@ -117,6 +117,17 @@ impl Evaluated {
         &self.value
     }
 
+    /// Returns the value of the attribute at `path`.
+    ///
+    /// # Errors
+    ///
+    /// Returns `E0805` when `path` names no attribute of the value.
+    pub fn value_at(&self, path: &AttrPath) -> Result<&Value, Diagnostics> {
+        self.value
+            .at(path)
+            .ok_or_else(|| self.error(path, "E0805", format!("there is no attribute `{path}`")))
+    }
+
     /// Converts the value at `path` to `T`, as if `T` were deserialized
     /// from the JSON rendering of that value.
     ///
@@ -144,10 +155,7 @@ impl Evaluated {
     /// # Ok::<(), stav::Diagnostics>(())
     /// ```
     pub fn get<T: DeserializeOwned>(&self, path: &AttrPath) -> Result<T, Diagnostics> {
-        let Some(value) = self.value.at(path) else {
-            return Err(self.error(path, "E0805", format!("there is no attribute `{path}`")));
-        };
-        T::deserialize(value).map_err(|e| {
+        T::deserialize(self.value_at(path)?).map_err(|e| {
             self.error(
                 path,
                 "E0805",
@@ -182,18 +190,32 @@ impl Evaluated {
     /// Returns `E0804` when the value cannot be expressed in `format`,
     /// pointing at the source of the attribute that cannot be rendered.
     pub fn render(&self, format: Format) -> Result<String, Diagnostics> {
-        self.value.render(format).map_err(|e| {
+        self.render_at(&AttrPath::root(), format)
+    }
+
+    /// Renders the value of the attribute at `path` in `format`, as
+    /// [`Value::render`] describes.
+    ///
+    /// # Errors
+    ///
+    /// Returns `E0805` when `path` names no attribute of the value, and
+    /// `E0804` when the attribute cannot be expressed in `format`, pointing
+    /// at the source of the attribute that cannot be rendered. Its path is
+    /// written from the root of the value.
+    pub fn render_at(&self, path: &AttrPath, format: Format) -> Result<String, Diagnostics> {
+        self.value_at(path)?.render(format).map_err(|e| {
+            let full = AttrPath::new(path.keys().iter().chain(e.path.keys()).cloned());
             self.error(
-                &e.path,
+                &full,
                 "E0804",
-                format!("cannot render `{}` as {format}: {}", e.path, e.message),
+                format!("cannot render `{full}` as {format}: {}", e.message),
             )
         })
     }
 
     /// Returns the value as canonical JSON, as
     /// [`Value::to_canonical_json`] describes.
-    pub fn to_canonical_json(&self) -> Vec<u8> {
+    pub fn to_canonical_json(&self) -> String {
         self.value.to_canonical_json()
     }
 
@@ -253,7 +275,7 @@ impl Checked {
     ///     import_roots: vec![ImportRoot::new("app")],
     /// };
     /// let evaluated = stav::check(&Host::new(loader), &root)?.eval(&Limits::default())?;
-    /// assert_eq!(evaluated.to_canonical_json(), br#"{"port":443}"#);
+    /// assert_eq!(evaluated.to_canonical_json(), r#"{"port":443}"#);
     /// # Ok::<(), stav::Diagnostics>(())
     /// ```
     pub fn eval(&self, limits: &Limits) -> Result<Evaluated, Diagnostics> {

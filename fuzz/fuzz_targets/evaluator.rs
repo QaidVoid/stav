@@ -59,8 +59,7 @@ fn host(input: &str) -> Host {
 fn run(checked: &Checked, limits: &Limits) -> String {
     match checked.eval(limits) {
         Ok(evaluated) => {
-            let mut out = String::from_utf8(evaluated.to_canonical_json())
-                .expect("canonical JSON is UTF-8");
+            let mut out = evaluated.to_canonical_json();
             for format in [Format::Json, Format::Toml, Format::Yaml] {
                 match evaluated.render(format) {
                     Ok(text) => out.push_str(&text),

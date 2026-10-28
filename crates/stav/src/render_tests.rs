@@ -96,10 +96,7 @@ fn json_keeps_field_order_and_tags_payload_variants() {
 #[test]
 fn canonical_json_sorts_keys_and_drops_whitespace() {
     let expected = r#"{"build":{"cargo":{"features":["pcre2"]}},"listen":"127.0.0.1:8080","log_level":"warn","note":null,"upstreams":{"backup":{"url":"https://b.example.org","weight":10},"primary":{"url":"https://a.example.org","weight":90}}}"#;
-    assert_eq!(
-        String::from_utf8(app().to_canonical_json()).unwrap(),
-        expected
-    );
+    assert_eq!(app().to_canonical_json(), expected);
 }
 
 #[test]
@@ -109,7 +106,7 @@ fn canonical_json_sorts_keys_by_utf16_code_units() {
         ("\u{1f600}", Value::Int(2)),
         ("\u{ff61}", Value::Int(3)),
     ]));
-    let text = String::from_utf8(value.to_canonical_json()).unwrap();
+    let text = value.to_canonical_json();
     let keys: Vec<usize> = ["\u{e9}", "\u{1f600}", "\u{ff61}"]
         .iter()
         .map(|k| text.find(k).unwrap())
@@ -122,10 +119,7 @@ fn json_escapes_control_characters() {
     let bell = char::from(7).to_string();
     let value = s(&format!("a\"b\\c\nd{bell}"));
     let escaped = format!("\"a\\\"b\\\\c\\nd{}u0007\"", '\\');
-    assert_eq!(
-        String::from_utf8(value.to_canonical_json()).unwrap(),
-        escaped
-    );
+    assert_eq!(value.to_canonical_json(), escaped);
 }
 
 #[test]

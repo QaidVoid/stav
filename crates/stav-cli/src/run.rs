@@ -5,10 +5,7 @@ use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
-use stav::{
-    AttrPath, Checked, Diagnostic, Diagnostics, Evaluated, FileDiagnostic, Format, Host,
-    ImportRoot, Limits, RootSpec, Span,
-};
+use stav::{AttrPath, Checked, Diagnostics, Evaluated, Format, Host, ImportRoot, Limits, RootSpec};
 
 use crate::loader::DiskLoader;
 use crate::report::Emitter;
@@ -172,18 +169,12 @@ fn entry_in(dir: &Path, entry: &Path) -> io::Result<PathBuf> {
     })
 }
 
+/// Returns the text `eval` prints: the value at the selected path in the
+/// selected format.
 fn render(evaluated: &Evaluated, args: &EvalArgs) -> Result<String, Diagnostics> {
     let path = args.path.clone().unwrap_or_default();
-    let Some(value) = evaluated.value().at(&path) else {
-        return Err(error(
-            evaluated,
-            &path,
-            "E0805",
-            format!("there is no attribute `{path}`"),
-        ));
-    };
     if args.canonical {
-        let mut text = String::from_utf8_lossy(&value.to_canonical_json()).into_owned();
+        let mut text = evaluated.value_at(&path)?.to_canonical_json();
         text.push('\n');
         return Ok(text);
     }
@@ -192,32 +183,5 @@ fn render(evaluated: &Evaluated, args: &EvalArgs) -> Result<String, Diagnostics>
         Output::Toml => Format::Toml,
         Output::Yaml => Format::Yaml,
     };
-    if path.keys().is_empty() {
-        return evaluated.render(format);
-    }
-    value.render(format).map_err(|e| {
-        let full = AttrPath::new(path.keys().iter().chain(e.path.keys()).cloned());
-        error(
-            evaluated,
-            &full,
-            "E0804",
-            format!("cannot render `{full}` as {format}: {}", e.message),
-        )
-    })
-}
-
-/// Returns an error about the attribute at `path`, pointing at its first
-/// source when it has one.
-fn error(
-    evaluated: &Evaluated,
-    path: &AttrPath,
-    code: &'static str,
-    message: String,
-) -> Diagnostics {
-    let source = evaluated.spans(path).first().copied();
-    let span = source.map_or(Span { start: 0, end: 0 }, |s| s.span);
-    evaluated.diagnostics([FileDiagnostic {
-        file: source.map(|s| s.file),
-        diagnostic: Diagnostic::error(code, span, message),
-    }])
+    evaluated.render_at(&path, format)
 }

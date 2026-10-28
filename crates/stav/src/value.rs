@@ -156,9 +156,10 @@ impl Value {
     /// floats written the way ECMAScript writes numbers. Integers are
     /// written exactly, even beyond the range a double holds without loss.
     ///
-    /// The same value always gives the same bytes, so hosts can hash them.
-    pub fn to_canonical_json(&self) -> Vec<u8> {
-        render::json::canonical(self).into_bytes()
+    /// The same value always gives the same text, so hosts can hash its
+    /// bytes.
+    pub fn to_canonical_json(&self) -> String {
+        render::json::canonical(self)
     }
 
     /// Returns a short description of the value for diagnostics, cut off

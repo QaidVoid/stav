@@ -245,7 +245,7 @@ fn evaluating_twice_gives_identical_canonical_json() {
     }
 }
 
-fn canonical(text: &str) -> Result<Vec<u8>, String> {
+fn canonical(text: &str) -> Result<String, String> {
     let fixture = fixture(text);
     let checked = check(&fixture.host, &fixture.root).map_err(|d| d.to_string())?;
     checked
@@ -330,7 +330,7 @@ fn renderings_parse_back_to_the_same_data() {
         let text = fs::read_to_string(&path).expect("the fixture is readable");
         let evaluated = evaluate(&text);
         let expected = numeric(
-            serde_json::from_slice(&evaluated.to_canonical_json()).expect("canonical JSON parses"),
+            serde_json::from_str(&evaluated.to_canonical_json()).expect("canonical JSON parses"),
         );
         let json = numeric(
             serde_json::from_str(&evaluated.render(Format::Json).expect("JSON renders"))
@@ -408,6 +408,35 @@ fn values_convert_to_host_types_through_serde() {
         evaluated
             .get::<u32>(&stav::AttrPath::new(["jobs", "missing"]))
             .is_err()
+    );
+}
+
+#[test]
+fn attributes_render_alone_and_errors_name_their_whole_path() {
+    let evaluated =
+        evaluate("struct Server { port: Int = 80 }\nstruct Root { server: Server = Server {} }\n");
+    let server = stav::AttrPath::new(["server"]);
+    assert_eq!(
+        evaluated
+            .render_at(&server, Format::Toml)
+            .expect("a table renders as TOML"),
+        "port = 80\n"
+    );
+    let errors = |diagnostics: stav::Diagnostics| -> Vec<String> {
+        diagnostics
+            .iter()
+            .map(|d| format!("{} {}", d.diagnostic.code, d.diagnostic.message))
+            .collect()
+    };
+    let scalar = evaluated.render_at(&server.join("port"), Format::Toml);
+    assert_eq!(
+        errors(scalar.expect_err("a scalar is not a TOML table")),
+        ["E0804 cannot render `server.port` as TOML: TOML needs a table at the top"]
+    );
+    let missing = evaluated.render_at(&server.join("host"), Format::Json);
+    assert_eq!(
+        errors(missing.expect_err("there is no host")),
+        ["E0805 there is no attribute `server.host`"]
     );
 }
 
@@ -583,7 +612,7 @@ mod random {
         let fixture = fixture(text);
         let checked = check(&fixture.host, &fixture.root).ok()?;
         Some(match checked.eval(&fixture.limits) {
-            Ok(evaluated) => String::from_utf8_lossy(&evaluated.to_canonical_json()).into_owned(),
+            Ok(evaluated) => evaluated.to_canonical_json(),
             Err(diagnostics) => diagnostics.to_string(),
         })
     }
