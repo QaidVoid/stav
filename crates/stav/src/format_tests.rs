@@ -322,6 +322,46 @@ fn comments_inside_expressions_keep_their_line_break() {
 }
 
 #[test]
+fn comments_before_a_brace_or_body_stay_before_it() {
+    assert_eq!(
+        fmt("a = if a { 1 } else # c\n{ 2 }\n"),
+        "a = if a {\n  1\n} else # c\n{\n  2\n}\n"
+    );
+    assert_eq!(
+        fmt("a = f(if # c\n a { 1 } else { 2 })\n"),
+        "a = f(\n  if # c\n  a {\n    1\n  } else {\n    2\n  },\n)\n"
+    );
+    assert_eq!(
+        fmt("a = f(if a # c\n{ 1 } # d\n else { 2 })\n"),
+        "a = f(\n  if a # c\n  {\n    1\n  } # d\n  else {\n    2\n  },\n)\n"
+    );
+    assert_eq!(
+        fmt("a = f(match x # c\n{ _ => 1 })\n"),
+        "a = f(\n  match x # c\n    {\n      _ => 1\n    },\n)\n"
+    );
+    assert_eq!(
+        fmt("a = f(let # c\n x = 1, y = 2 in x)\n"),
+        "a = f(\n  let # c\n      x = 1,\n      y = 2\n  in x,\n)\n"
+    );
+}
+
+#[test]
+fn comments_on_their_own_line_stay_before_a_function_body() {
+    assert_eq!(
+        fmt("fn f() -> Int =\n  # why\n  1\n"),
+        "fn f() -> Int =\n  # why\n  1\n"
+    );
+    assert_eq!(
+        fmt("fn f() -> Int =\n  # why\n  match x { _ => 1 }\n"),
+        "fn f() -> Int =\n  # why\n  match x {\n    _ => 1\n  }\n"
+    );
+    assert_eq!(
+        fmt("fn f() -> Part<A> = # why\n  part { a = 1 }\n"),
+        "fn f() -> Part<A> = # why\n  part { a = 1 }\n"
+    );
+}
+
+#[test]
 fn doc_comments_stay_before_what_they_document() {
     let source = "## A level.\ntype Level =\n  ## Verbose.\n  | debug\n  ## Quiet.\n  | quiet\n";
     assert_eq!(fmt(source), source);

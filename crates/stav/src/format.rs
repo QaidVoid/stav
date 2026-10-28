@@ -136,6 +136,12 @@ fn inline(node: SyntaxNode<'_>) -> Doc<'_> {
 /// source had a line feed after the comment too, so the line break is valid
 /// there.
 fn inline_docs<'a>(parent: N, parts: &[Part<'a>]) -> Vec<Doc<'a>> {
+    inline_docs_then(parent, parts, None)
+}
+
+/// Formats `parts` like [`inline_docs`], followed by `tail` after a space,
+/// or at the start of the continuation line when a comment comes last.
+fn inline_docs_then<'a>(parent: N, parts: &[Part<'a>], tail: Option<Doc<'a>>) -> Vec<Doc<'a>> {
     let mut docs = Vec::new();
     let mut continuation: Option<Vec<Doc<'a>>> = None;
     let mut previous = None;
@@ -166,6 +172,13 @@ fn inline_docs<'a>(parent: N, parts: &[Part<'a>]) -> Vec<Doc<'a>> {
         }
         out.push(doc);
         previous = Some(part);
+    }
+    if let Some(tail) = tail {
+        let out = continuation.as_mut().unwrap_or(&mut docs);
+        if previous.is_some() {
+            out.push(Doc::Spaces(1));
+        }
+        out.push(tail);
     }
     docs.extend(continuation.map(indent));
     docs
@@ -486,13 +499,9 @@ fn braced<'a>(node: SyntaxNode<'a>, empty: &'a str, always_break: bool, fields: 
     else {
         return inline(node);
     };
-    let mut docs = inline_docs(node.kind(), &parts_of(before));
-    if !docs.is_empty() {
-        docs.push(Doc::Spaces(1));
-    }
     let seq = scan(inner, true);
-    if seq.head.is_none() && seq.entries.is_empty() {
-        docs.push(Doc::Text(empty));
+    let braces = if seq.head.is_none() && seq.entries.is_empty() {
+        Doc::Text(empty)
     } else {
         let pads = pads(&seq.entries, fields);
         let last = last_item(&seq.entries);
@@ -523,8 +532,9 @@ fn braced<'a>(node: SyntaxNode<'a>, empty: &'a str, always_break: bool, fields: 
         if always_break || seq.broken {
             inner.push(Doc::BreakParent);
         }
-        docs.push(group(inner));
-    }
+        group(inner)
+    };
+    let mut docs = inline_docs_then(node.kind(), &parts_of(before), Some(braces));
     docs.extend(inline_docs(node.kind(), &parts_of(after)));
     Doc::Concat(docs)
 }
@@ -629,32 +639,55 @@ fn type_decl(node: SyntaxNode<'_>) -> Doc<'_> {
 }
 
 /// Formats a function declaration. A `match` or `part` body starts on the
-/// line of `=`. Any other body moves to the next line when the declaration
-/// does not fit or when the source put it there.
+/// line of `=` unless a comment comes before it. Any other body moves to the
+/// next line when the declaration does not fit, when the source put it
+/// there or when a comment on its own line comes before it.
 fn fn_decl(node: SyntaxNode<'_>) -> Doc<'_> {
     let parts = parts(node);
     let Some(eq) = parts.iter().position(|&part| is_token(part, T::Eq)) else {
         return inline(node);
     };
     let mut docs = inline_docs(N::FnDecl, &parts[..=eq]);
+    let mut commented = false;
+    let mut lines = vec![Doc::Line];
+    let mut own_line = false;
     let mut body = Vec::new();
-    for &part in &parts[eq + 1..] {
-        match part {
-            Part::Comment(text) => docs.push(Doc::LineSuffix(text)),
-            part => body.push(part),
+    let after_eq = node
+        .children_with_tokens()
+        .skip_while(
+            |element| !matches!(element, SyntaxElement::Token(token) if token.kind() == T::Eq),
+        )
+        .skip(1);
+    for element in after_eq {
+        match element {
+            SyntaxElement::Token(token) if body.is_empty() => match token.kind() {
+                T::Whitespace => {}
+                T::Newline => own_line = true,
+                T::Comment | T::DocComment => {
+                    commented = true;
+                    if own_line {
+                        lines.push(Doc::Text(comment(token)));
+                        lines.push(Doc::HardLine);
+                    } else {
+                        docs.push(Doc::LineSuffix(comment(token)));
+                    }
+                }
+                _ => body.push(Part::Token(token)),
+            },
+            element => body.extend(parts_of([element])),
         }
     }
-    let hugs = matches!(
-        body.as_slice(),
-        [Part::Node(node)] if matches!(node.kind(), N::MatchExpr | N::PartExpr)
-    );
+    let hugs = !commented
+        && matches!(
+            body.as_slice(),
+            [Part::Node(node)] if matches!(node.kind(), N::MatchExpr | N::PartExpr)
+        );
     let body = inline_docs(N::FnDecl, &body);
     if hugs {
         docs.push(Doc::Spaces(1));
         docs.extend(body);
         return Doc::Concat(docs);
     }
-    let mut lines = vec![Doc::Line];
     lines.extend(body);
     docs.push(indent(lines));
     if line_feed_after(node, T::Eq) {
@@ -679,13 +712,23 @@ fn line_feed_after(node: SyntaxNode<'_>, kind: T) -> bool {
 }
 
 /// Formats an `if` expression and the `else if` expressions chained to it
-/// into `docs`, as one group.
+/// into `docs`, as one group. A comment between the parts of the chain ends
+/// its line, and the next part starts the following line.
 fn if_chain<'a>(node: SyntaxNode<'a>, docs: &mut Vec<Doc<'a>>) {
     let mut branch: Option<Vec<Doc<'a>>> = None;
+    let mut after_comment = false;
+    let gap = |docs: &mut Vec<Doc<'a>>, after_comment: &mut bool| {
+        docs.push(if std::mem::take(after_comment) {
+            Doc::HardLine
+        } else {
+            Doc::Spaces(1)
+        });
+    };
     for part in parts(node) {
         match (part, &mut branch) {
             (Part::Token(token), None) if token.kind() == T::LBrace => {
-                docs.push(Doc::Text(" {"));
+                gap(docs, &mut after_comment);
+                docs.push(Doc::Text("{"));
                 branch = Some(vec![Doc::Line]);
             }
             (Part::Token(token), Some(_)) if token.kind() == T::RBrace => {
@@ -694,10 +737,11 @@ fn if_chain<'a>(node: SyntaxNode<'a>, docs: &mut Vec<Doc<'a>>) {
                 docs.push(Doc::Text("}"));
             }
             (Part::Token(token), None) if token.kind() == T::ElseKw => {
-                docs.push(Doc::Text(" else"));
+                gap(docs, &mut after_comment);
+                docs.push(Doc::Text("else"));
             }
             (Part::Node(child), None) => {
-                docs.push(Doc::Spaces(1));
+                gap(docs, &mut after_comment);
                 if child.kind() == N::IfExpr {
                     if_chain(child, docs);
                 } else {
@@ -707,11 +751,15 @@ fn if_chain<'a>(node: SyntaxNode<'a>, docs: &mut Vec<Doc<'a>>) {
             (Part::Node(child), Some(inner)) => inner.push(any(child)),
             (Part::Token(token), None) => docs.push(Doc::Text(token.text())),
             (Part::Token(token), Some(inner)) => inner.push(Doc::Text(token.text())),
-            // A comment before the value of a branch stays on the line of `{`.
             (Part::Comment(text), Some(inner)) if inner.len() > 1 => {
                 inner.push(Doc::LineSuffix(text));
             }
-            (Part::Comment(text), _) => docs.push(Doc::LineSuffix(text)),
+            // A comment before the value of a branch stays on the line of `{`.
+            (Part::Comment(text), Some(_)) => docs.push(Doc::LineSuffix(text)),
+            (Part::Comment(text), None) => {
+                docs.push(Doc::LineSuffix(text));
+                after_comment = true;
+            }
         }
     }
 }
@@ -739,8 +787,12 @@ fn let_expr(node: SyntaxNode<'_>) -> Doc<'_> {
     for entry in &mut seq.entries {
         entry.blank = false;
     }
+    // A comment after `let` ends its line, and the bindings start below,
+    // where they would have started after `let `.
     if let Some(text) = seq.head {
         docs.push(Doc::LineSuffix(text));
+        docs.push(Doc::HardLine);
+        docs.push(Doc::Spaces("let ".len()));
     }
     let pads = pads(&seq.entries, false);
     let last = last_item(&seq.entries);
