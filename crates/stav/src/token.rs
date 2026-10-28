@@ -67,6 +67,34 @@ pub enum TokenKind {
     /// A relative path such as `./fix.patch` or `../files/a.conf`.
     Path,
 
+    /// `"`, opening a single-line string.
+    StrStart,
+    /// `"""`, opening a multi-line string.
+    MStrStart,
+    /// `r"`, opening a raw single-line string.
+    RawStrStart,
+    /// `r"""`, opening a raw multi-line string.
+    RawMStrStart,
+    /// Literal text inside a string. Its bytes are part of the string value
+    /// exactly as written.
+    StrText,
+    /// A backslash escape inside a string, such as `\n` or `\u{1F600}`. It
+    /// stands for the one character it denotes. In multi-line strings the
+    /// only escape is `\#` directly before `{`, standing for `#`.
+    StrEscape,
+    /// Layout of a multi-line string that is not part of its value: the line
+    /// feed after the opening delimiter, the common indentation at the start
+    /// of each line, and the whitespace of lines that hold only whitespace.
+    StrLayout,
+    /// `#{`, starting an interpolated expression inside a string.
+    InterpStart,
+    /// `}`, ending an interpolated expression.
+    InterpEnd,
+    /// `"`, closing a single-line or raw single-line string.
+    StrEnd,
+    /// `"""`, closing a multi-line or raw multi-line string.
+    MStrEnd,
+
     /// The keyword `let`.
     LetKw,
     /// The keyword `fn`.

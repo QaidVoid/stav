@@ -481,6 +481,409 @@ fn empty_source_is_only_eof() {
     assert_snapshot!(render(""), @r#"Eof              0..0     """#);
 }
 
+/// Builds the value of the only string in `source` from its literal parts,
+/// writing each interpolation as `{}` and each escape as `<escape>`.
+fn string_value(source: &str) -> String {
+    let mut value = String::new();
+    let mut depth = 0;
+    for token in lex(source).tokens {
+        match token.kind {
+            TokenKind::InterpStart => {
+                depth += 1;
+                if depth == 1 {
+                    value.push_str("{}");
+                }
+            }
+            TokenKind::InterpEnd => depth -= 1,
+            TokenKind::StrText if depth == 0 => value.push_str(token.text(source)),
+            TokenKind::StrEscape if depth == 0 => {
+                write!(value, "<{}>", token.text(source)).unwrap();
+            }
+            _ => {}
+        }
+    }
+    value
+}
+
+#[test]
+fn plain_string_escapes_are_tokens() {
+    assert_snapshot!(render(r#""a\n\t\\\"\#{x}\u{1F600}\0\r""#), @r#"
+    StrStart         0..1     "\""
+    StrText          1..2     "a"
+    StrEscape        2..4     "\\n"
+    StrEscape        4..6     "\\t"
+    StrEscape        6..8     "\\\\"
+    StrEscape        8..10    "\\\""
+    StrEscape        10..12   "\\#"
+    StrText          12..15   "{x}"
+    StrEscape        15..24   "\\u{1F600}"
+    StrEscape        24..26   "\\0"
+    StrEscape        26..28   "\\r"
+    StrEnd           28..29   "\""
+    Eof              29..29   ""
+    "#);
+}
+
+#[test]
+fn unknown_and_invalid_escapes_are_reported() {
+    assert_snapshot!(
+        render(r#""\q \u{} \u{110000} \u{D800} \u{1234567} \u12 \u{41""#),
+        @r#"
+    StrStart         0..1     "\""
+    StrEscape        1..3     "\\q"
+    StrText          3..4     " "
+    StrEscape        4..8     "\\u{}"
+    StrText          8..9     " "
+    StrEscape        9..19    "\\u{110000}"
+    StrText          19..20   " "
+    StrEscape        20..28   "\\u{D800}"
+    StrText          28..29   " "
+    StrEscape        29..40   "\\u{1234567}"
+    StrText          40..41   " "
+    StrEscape        41..43   "\\u"
+    StrText          43..46   "12 "
+    StrEscape        46..51   "\\u{41"
+    StrEnd           51..52   "\""
+    Eof              52..52   ""
+    error[E0109] 1..3: unknown escape `\q`
+      help: write `\\` for a literal backslash
+    error[E0109] 4..8: invalid unicode escape `\u{}`
+      help: write `\u{` followed by 1 to 6 hex digits of a unicode scalar value and `}`
+    error[E0109] 9..19: invalid unicode escape `\u{110000}`
+      help: write `\u{` followed by 1 to 6 hex digits of a unicode scalar value and `}`
+    error[E0109] 20..28: invalid unicode escape `\u{D800}`
+      help: write `\u{` followed by 1 to 6 hex digits of a unicode scalar value and `}`
+    error[E0109] 29..40: invalid unicode escape `\u{1234567}`
+      help: write `\u{` followed by 1 to 6 hex digits of a unicode scalar value and `}`
+    error[E0109] 41..43: invalid unicode escape `\u`
+      help: write `\u{` followed by 1 to 6 hex digits of a unicode scalar value and `}`
+    error[E0109] 46..51: invalid unicode escape `\u{41`
+      help: write `\u{` followed by 1 to 6 hex digits of a unicode scalar value and `}`
+    "#
+    );
+}
+
+#[test]
+fn interpolation_exposes_inner_tokens() {
+    assert_snapshot!(render(r#""http://#{host}:#{port + 1}/${PATH} #x""#), @r##"
+    StrStart         0..1     "\""
+    StrText          1..8     "http://"
+    InterpStart      8..10    "#{"
+    Ident            10..14   "host"
+    InterpEnd        14..15   "}"
+    StrText          15..16   ":"
+    InterpStart      16..18   "#{"
+    Ident            18..22   "port"
+    Whitespace       22..23   " "
+    Plus             23..24   "+"
+    Whitespace       24..25   " "
+    Int              25..26   "1"
+    InterpEnd        26..27   "}"
+    StrText          27..38   "/${PATH} #x"
+    StrEnd           38..39   "\""
+    Eof              39..39   ""
+    "##);
+}
+
+#[test]
+fn interpolation_tracks_nested_braces_and_strings() {
+    assert_snapshot!(render(r##""#{ { a = "#{b}" }.a }!""##), @r##"
+    StrStart         0..1     "\""
+    InterpStart      1..3     "#{"
+    Whitespace       3..4     " "
+    LBrace           4..5     "{"
+    Whitespace       5..6     " "
+    Ident            6..7     "a"
+    Whitespace       7..8     " "
+    Eq               8..9     "="
+    Whitespace       9..10    " "
+    StrStart         10..11   "\""
+    InterpStart      11..13   "#{"
+    Ident            13..14   "b"
+    InterpEnd        14..15   "}"
+    StrEnd           15..16   "\""
+    Whitespace       16..17   " "
+    RBrace           17..18   "}"
+    Dot              18..19   "."
+    Ident            19..20   "a"
+    Whitespace       20..21   " "
+    InterpEnd        21..22   "}"
+    StrText          22..23   "!"
+    StrEnd           23..24   "\""
+    Eof              24..24   ""
+    "##);
+}
+
+#[test]
+fn single_line_string_ends_at_line_feed() {
+    assert_snapshot!(render("x = \"abc\ny = \"d\\\n"), @r#"
+    Ident            0..1     "x"
+    Whitespace       1..2     " "
+    Eq               2..3     "="
+    Whitespace       3..4     " "
+    StrStart         4..5     "\""
+    StrText          5..8     "abc"
+    Newline          8..9     "\n"
+    Ident            9..10    "y"
+    Whitespace       10..11   " "
+    Eq               11..12   "="
+    Whitespace       12..13   " "
+    StrStart         13..14   "\""
+    StrText          14..15   "d"
+    StrText          15..16   "\\"
+    Newline          16..17   "\n"
+    Eof              17..17   ""
+    error[E0108] 4..5: unterminated string
+      help: close the string with `"` before the end of the line
+    error[E0108] 13..14: unterminated string
+      help: close the string with `"` before the end of the line
+    "#);
+}
+
+#[test]
+fn single_line_interpolation_ends_at_line_feed() {
+    assert_snapshot!(render("x = \"a #{ b\ny = 1"), @r##"
+    Ident            0..1     "x"
+    Whitespace       1..2     " "
+    Eq               2..3     "="
+    Whitespace       3..4     " "
+    StrStart         4..5     "\""
+    StrText          5..7     "a "
+    InterpStart      7..9     "#{"
+    Whitespace       9..10    " "
+    Ident            10..11   "b"
+    Newline          11..12   "\n"
+    Ident            12..13   "y"
+    Whitespace       13..14   " "
+    Eq               14..15   "="
+    Whitespace       15..16   " "
+    Int              16..17   "1"
+    Eof              17..17   ""
+    error[E0108] 4..5: unterminated string
+      help: close the string with `"` before the end of the line
+    "##);
+}
+
+#[test]
+fn strings_unterminated_at_end_of_input_are_reported() {
+    assert_snapshot!(render("\"a #{ \"b"), @r##"
+    StrStart         0..1     "\""
+    StrText          1..3     "a "
+    InterpStart      3..5     "#{"
+    Whitespace       5..6     " "
+    StrStart         6..7     "\""
+    StrText          7..8     "b"
+    Eof              8..8     ""
+    error[E0108] 0..1: unterminated string
+      help: close the string with `"` before the end of the line
+    error[E0108] 6..7: unterminated string
+      help: close the string with `"` before the end of the line
+    "##);
+}
+
+#[test]
+fn multi_line_string_strips_closing_indentation() {
+    let source = "text = \"\"\"\n    line one\n      indented\n    \n    line three\n    \"\"\"\n";
+    assert_eq!(string_value(source), "line one\n  indented\n\nline three\n");
+    assert_snapshot!(render(source), @r#"
+    Ident            0..4     "text"
+    Whitespace       4..5     " "
+    Eq               5..6     "="
+    Whitespace       6..7     " "
+    MStrStart        7..10    "\"\"\""
+    StrLayout        10..11   "\n"
+    StrLayout        11..15   "    "
+    StrText          15..24   "line one\n"
+    StrLayout        24..28   "    "
+    StrText          28..30   "  "
+    StrText          30..39   "indented\n"
+    StrLayout        39..43   "    "
+    StrText          43..44   "\n"
+    StrLayout        44..48   "    "
+    StrText          48..59   "line three\n"
+    StrLayout        59..63   "    "
+    MStrEnd          63..66   "\"\"\""
+    Newline          66..67   "\n"
+    Eof              67..67   ""
+    "#);
+}
+
+#[test]
+fn whitespace_only_lines_become_empty_lines() {
+    let source = "\"\"\"\n  a\n\n \n\t\t\t\n  b\n  \"\"\"";
+    assert_eq!(string_value(source), "a\n\n\n\nb\n");
+    assert!(lex(source).diagnostics.is_empty());
+}
+
+#[test]
+fn multi_line_string_without_content_is_empty() {
+    assert_eq!(string_value("\"\"\"\n  \"\"\""), "");
+    assert_eq!(string_value("\"\"\"\n\"\"\""), "");
+    assert!(codes("\"\"\"\n  \"\"\"").is_empty());
+}
+
+#[test]
+fn unindented_closing_keeps_all_indentation() {
+    assert_eq!(string_value("\"\"\"\n  a\n b\n\"\"\""), "  a\n b\n");
+}
+
+#[test]
+fn multi_line_string_keeps_backslashes_except_before_interpolation() {
+    let source = "\"\"\"\n  a\\n \\\n  \\#{x} \\#y ${y} #{z}\n  \"\"\"";
+    assert_eq!(string_value(source), "a\\n \\\n<\\#>{x} \\#y ${y} {}\n");
+    assert_snapshot!(render(source), @r##"
+    MStrStart        0..3     "\"\"\""
+    StrLayout        3..4     "\n"
+    StrLayout        4..6     "  "
+    StrText          6..12    "a\\n \\\n"
+    StrLayout        12..14   "  "
+    StrEscape        14..16   "\\#"
+    StrText          16..29   "{x} \\#y ${y} "
+    InterpStart      29..31   "#{"
+    Ident            31..32   "z"
+    InterpEnd        32..33   "}"
+    StrText          33..34   "\n"
+    StrLayout        34..36   "  "
+    MStrEnd          36..39   "\"\"\""
+    Eof              39..39   ""
+    "##);
+}
+
+#[test]
+fn multi_line_interpolation_may_span_lines() {
+    let source = "\"\"\"\n  a #{f(\n    x,\n  )} b\n  c\n  \"\"\"";
+    assert_eq!(string_value(source), "a {} b\nc\n");
+    assert!(lex(source).diagnostics.is_empty());
+}
+
+#[test]
+fn opening_delimiter_must_end_its_line() {
+    assert_snapshot!(render("\"\"\"abc\n  x\n  \"\"\" \"\"\"abc\"\"\""), @r#"
+    MStrStart        0..3     "\"\"\""
+    Error            3..6     "abc"
+    StrLayout        6..7     "\n"
+    StrLayout        7..9     "  "
+    StrText          9..11    "x\n"
+    StrLayout        11..13   "  "
+    MStrEnd          13..16   "\"\"\""
+    Whitespace       16..17   " "
+    MStrStart        17..20   "\"\"\""
+    Error            20..23   "abc"
+    MStrEnd          23..26   "\"\"\""
+    Eof              26..26   ""
+    error[E0110] 0..3: the opening `"""` must be followed directly by a line break
+      help: start the content of the string on the next line
+    error[E0110] 17..20: the opening `"""` must be followed directly by a line break
+      help: start the content of the string on the next line
+    "#);
+}
+
+#[test]
+fn closing_delimiter_must_start_its_line() {
+    assert_snapshot!(render("\"\"\"\n  abc\"\"\""), @r#"
+    MStrStart        0..3     "\"\"\""
+    StrLayout        3..4     "\n"
+    StrLayout        4..6     "  "
+    StrText          6..9     "abc"
+    MStrEnd          9..12    "\"\"\""
+    Eof              12..12   ""
+    error[E0111] 9..12: the closing `"""` must be the first text on its line
+      help: move the closing `"""` to a line of its own
+    "#);
+}
+
+#[test]
+fn lines_must_start_with_the_closing_indentation() {
+    let source = "\"\"\"\n    one\n   two\n\tthree\n     \"\"\"";
+    assert_snapshot!(render(source), @r#"
+    MStrStart        0..3     "\"\"\""
+    StrLayout        3..4     "\n"
+    StrLayout        4..8     "    "
+    StrText          8..12    "one\n"
+    StrLayout        12..15   "   "
+    StrText          15..19   "two\n"
+    StrLayout        19..20   "\t"
+    StrText          20..26   "three\n"
+    StrLayout        26..31   "     "
+    MStrEnd          31..34   "\"\"\""
+    Eof              34..34   ""
+    error[E0112] 4..9: line does not start with the indentation of the closing `"""`
+      help: start every line of the string with 5 spaces
+    error[E0112] 12..16: line does not start with the indentation of the closing `"""`
+      help: start every line of the string with 5 spaces
+    error[E0112] 19..21: line does not start with the indentation of the closing `"""`
+      help: start every line of the string with 5 spaces
+    "#);
+}
+
+#[test]
+fn mixed_indentation_is_compared_byte_for_byte() {
+    let source = "\"\"\"\n\t  ok\n  \tbad\n\t  \"\"\"";
+    assert_eq!(codes(source), ["E0112"]);
+    assert_eq!(
+        lex(source).diagnostics[0].help.as_deref(),
+        Some(
+            "start every line of the string with the same spaces and tabs as the line of the closing `\"\"\"`"
+        )
+    );
+}
+
+#[test]
+fn raw_strings_have_no_escapes_or_interpolation() {
+    assert_snapshot!(render(r#"r"a\d+#{x}" r"open"#), @r#"
+    RawStrStart      0..2     "r\""
+    StrText          2..10    "a\\d+#{x}"
+    StrEnd           10..11   "\""
+    Whitespace       11..12   " "
+    RawStrStart      12..14   "r\""
+    StrText          14..18   "open"
+    Eof              18..18   ""
+    error[E0108] 12..14: unterminated string
+      help: close the string with `"` before the end of the line
+    "#);
+}
+
+#[test]
+fn raw_multi_line_strings_strip_indentation() {
+    let source = "r\"\"\"\n  \\d #{x}\n    y\n  \"\"\"";
+    assert_eq!(string_value(source), "\\d #{x}\n  y\n");
+    assert_snapshot!(render(source), @r#"
+    RawMStrStart     0..4     "r\"\"\""
+    StrLayout        4..5     "\n"
+    StrLayout        5..7     "  "
+    StrText          7..15    "\\d #{x}\n"
+    StrLayout        15..17   "  "
+    StrText          17..19   "  "
+    StrText          19..21   "y\n"
+    StrLayout        21..23   "  "
+    MStrEnd          23..26   "\"\"\""
+    Eof              26..26   ""
+    "#);
+}
+
+#[test]
+fn only_a_lone_r_before_a_quote_starts_a_raw_string() {
+    assert_snapshot!(render("r rx\"\" r\"\""), @r#"
+    Ident            0..1     "r"
+    Whitespace       1..2     " "
+    Ident            2..4     "rx"
+    StrStart         4..5     "\""
+    StrEnd           5..6     "\""
+    Whitespace       6..7     " "
+    RawStrStart      7..9     "r\""
+    StrEnd           9..10    "\""
+    Eof              10..10   ""
+    "#);
+}
+
+#[test]
+fn deeply_nested_interpolations_do_not_overflow() {
+    let source = "\"\"\"\n#{".repeat(100_000);
+    let lexed = lex(&source);
+    assert_eq!(lexed.diagnostics.len(), 100_000);
+    assert_lossless(&source);
+}
+
 const FRAGMENTS: &[&str] = &[
     " ", "\t", "\n", "\r", "#", "## ", "\"", "\"\"\"", "r\"", "\\", "\\u{", "#{", "}", "{", "a",
     "Z", "-", ".", "@", ":", "0", "9", "x", "e", "_", "./", "../", "\u{a0}", "\u{feff}",

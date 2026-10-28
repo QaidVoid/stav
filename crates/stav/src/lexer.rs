@@ -3,6 +3,33 @@
 //! The lexer is lossless. Every byte of the source belongs to exactly one
 //! token, including whitespace, comments and line feeds, so concatenating the
 //! text of all tokens reproduces the source.
+//!
+//! # Strings
+//!
+//! A string is a sequence of tokens rather than a single token, so that a
+//! parser can see its parts:
+//!
+//! ```text
+//! string = start { StrText | StrEscape | StrLayout | Error | interpolation } [ end ]
+//! interpolation = InterpStart { token } [ InterpEnd ]
+//! ```
+//!
+//! The start is one of [`TokenKind::StrStart`], [`TokenKind::MStrStart`],
+//! [`TokenKind::RawStrStart`] and [`TokenKind::RawMStrStart`], and the end is
+//! [`TokenKind::StrEnd`] or [`TokenKind::MStrEnd`]. The tokens of an
+//! interpolation are ordinary tokens and may contain further strings. The
+//! end tokens are missing only when the string is unterminated, which is
+//! always reported.
+//!
+//! The value of a string is the concatenation of its [`TokenKind::StrText`]
+//! tokens, the characters its [`TokenKind::StrEscape`] tokens stand for and
+//! the values of its interpolations. [`TokenKind::StrLayout`] tokens are
+//! skipped. For multi-line strings, the lexer has already split off the
+//! indentation of the closing delimiter from every line, so the value needs
+//! no further processing.
+//!
+//! A single-line string and its interpolations end at the end of the line.
+//! An interpolation inside a multi-line string may span several lines.
 
 use crate::diagnostic::Diagnostic;
 use crate::span::Span;
@@ -56,6 +83,7 @@ pub fn lex(source: &str) -> Lexed {
         pos: 0,
         tokens: Vec::new(),
         diagnostics: Vec::new(),
+        modes: Vec::new(),
     };
     lexer.run();
     let mut diagnostics = lexer.diagnostics;
@@ -72,6 +100,62 @@ struct Lexer<'a> {
     pos: usize,
     tokens: Vec<Token>,
     diagnostics: Vec<Diagnostic>,
+    /// The strings and interpolations the lexer is inside of, innermost
+    /// last. Nesting is tracked here rather than by recursion so that deeply
+    /// nested input cannot overflow the stack.
+    modes: Vec<Mode>,
+}
+
+enum Mode {
+    /// Inside `#{ }`, counting the `{` that are still open within it.
+    Interp {
+        open_braces: u32,
+    },
+    Str(StrFrame),
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum StrForm {
+    Plain,
+    Multi,
+    Raw,
+    RawMulti,
+}
+
+impl StrForm {
+    fn opener_len(self) -> usize {
+        match self {
+            Self::Plain => 1,
+            Self::Raw => 2,
+            Self::Multi => 3,
+            Self::RawMulti => 4,
+        }
+    }
+
+    fn is_multi(self) -> bool {
+        matches!(self, Self::Multi | Self::RawMulti)
+    }
+
+    fn is_raw(self) -> bool {
+        matches!(self, Self::Raw | Self::RawMulti)
+    }
+}
+
+struct StrFrame {
+    form: StrForm,
+    start: usize,
+    first_token: usize,
+    /// The lines of a multi-line string that started inside its literal
+    /// text, in order.
+    lines: Vec<Line>,
+    bad_opener: bool,
+}
+
+/// A line of a multi-line string and the end of its leading whitespace.
+#[derive(Clone, Copy)]
+struct Line {
+    start: usize,
+    indent_end: usize,
 }
 
 impl<'a> Lexer<'a> {
@@ -97,7 +181,18 @@ impl<'a> Lexer<'a> {
             );
         }
         while self.pos < self.bytes.len() {
-            self.lex_code();
+            match self.modes.last() {
+                Some(Mode::Str(frame)) => match frame.form {
+                    StrForm::Plain | StrForm::Raw => self.lex_single_line(frame.form),
+                    StrForm::Multi | StrForm::RawMulti => self.lex_multi_line(frame.form),
+                },
+                _ => self.lex_code(),
+            }
+        }
+        while let Some(mode) = self.modes.pop() {
+            if let Mode::Str(frame) = mode {
+                self.unterminated(&frame);
+            }
         }
         let end = self.bytes.len();
         self.tokens.push(Token {
@@ -117,8 +212,18 @@ impl<'a> Lexer<'a> {
                 self.eat_while(|b| b == b' ' || b == b'\t');
                 return self.push(T::Whitespace, start);
             }
+            '\n' if self.in_single_line_interp() => {
+                if let (Some(_), Some(Mode::Str(frame))) = (self.modes.pop(), self.modes.pop()) {
+                    self.unterminated(&frame);
+                }
+                return;
+            }
             '\n' => (T::Newline, 1),
             '#' => return self.lex_comment(),
+            '"' if self.at("\"\"\"") => return self.open_string(StrForm::Multi),
+            '"' => return self.open_string(StrForm::Plain),
+            'r' if self.at("r\"\"\"") => return self.open_string(StrForm::RawMulti),
+            'r' if next == Some(b'"') => return self.open_string(StrForm::Raw),
             '0'..='9' => return self.lex_number(),
             c if is_ident_start(c) => return self.lex_word(),
             '.' if self.at("./") || self.at("../") => return self.lex_path(),
@@ -127,8 +232,23 @@ impl<'a> Lexer<'a> {
             '.' => (T::Dot, 1),
             '?' if next == Some(b'.') => (T::QuestionDot, 2),
             '?' if next == Some(b'?') => (T::QuestionQuestion, 2),
-            '{' => (T::LBrace, 1),
-            '}' => (T::RBrace, 1),
+            '{' => {
+                if let Some(Mode::Interp { open_braces }) = self.modes.last_mut() {
+                    *open_braces += 1;
+                }
+                (T::LBrace, 1)
+            }
+            '}' => match self.modes.last_mut() {
+                Some(Mode::Interp { open_braces: 0 }) => {
+                    self.modes.pop();
+                    (T::InterpEnd, 1)
+                }
+                Some(Mode::Interp { open_braces }) => {
+                    *open_braces -= 1;
+                    (T::RBrace, 1)
+                }
+                _ => (T::RBrace, 1),
+            },
             '[' => (T::LBracket, 1),
             ']' => (T::RBracket, 1),
             '(' => (T::LParen, 1),
@@ -372,6 +492,294 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    fn in_single_line_interp(&self) -> bool {
+        matches!(
+            self.modes.as_slice(),
+            [
+                ..,
+                Mode::Str(StrFrame {
+                    form: StrForm::Plain,
+                    ..
+                }),
+                Mode::Interp { .. }
+            ]
+        )
+    }
+
+    fn open_string(&mut self, form: StrForm) {
+        let start = self.pos;
+        self.pos += form.opener_len();
+        let kind = match form {
+            StrForm::Plain => TokenKind::StrStart,
+            StrForm::Multi => TokenKind::MStrStart,
+            StrForm::Raw => TokenKind::RawStrStart,
+            StrForm::RawMulti => TokenKind::RawMStrStart,
+        };
+        let mut frame = StrFrame {
+            form,
+            start,
+            first_token: self.tokens.len(),
+            lines: Vec::new(),
+            bad_opener: false,
+        };
+        self.push(kind, start);
+        if form.is_multi() {
+            if self.peek(0) != Some(b'\n') {
+                frame.bad_opener = true;
+                self.error(
+                    "E0110",
+                    start,
+                    self.pos,
+                    "the opening `\"\"\"` must be followed directly by a line break".to_owned(),
+                    Some("start the content of the string on the next line".to_owned()),
+                );
+                let rest = self.pos;
+                while self.peek(0).is_some_and(|b| b != b'\n') && !self.at("\"\"\"") {
+                    self.bump_char();
+                }
+                if self.pos > rest {
+                    self.push(TokenKind::Error, rest);
+                }
+            }
+            if self.peek(0) == Some(b'\n') {
+                let line_feed = self.pos;
+                self.pos += 1;
+                self.push(TokenKind::StrLayout, line_feed);
+                frame.lines.push(self.begin_line());
+            }
+        }
+        self.modes.push(Mode::Str(frame));
+    }
+
+    fn open_interp(&mut self) {
+        let start = self.pos;
+        self.pos += 2;
+        self.push(TokenKind::InterpStart, start);
+        self.modes.push(Mode::Interp { open_braces: 0 });
+    }
+
+    fn lex_single_line(&mut self, form: StrForm) {
+        let start = self.pos;
+        let plain = form == StrForm::Plain;
+        let interp_follows = |lexer: &Self| lexer.at("#{");
+        match self.peek(0) {
+            None => {}
+            Some(b'"') => {
+                self.pos += 1;
+                self.push(TokenKind::StrEnd, start);
+                self.modes.pop();
+            }
+            Some(b'\n') => {
+                if let Some(Mode::Str(frame)) = self.modes.pop() {
+                    self.unterminated(&frame);
+                }
+            }
+            Some(b'\\') if plain => self.lex_escape(),
+            Some(b'#') if plain && interp_follows(self) => self.open_interp(),
+            Some(_) => {
+                while let Some(b) = self.peek(0) {
+                    let special = b == b'\\' || interp_follows(self);
+                    if b == b'"' || b == b'\n' || (plain && special) {
+                        break;
+                    }
+                    self.bump_char();
+                }
+                self.push(TokenKind::StrText, start);
+            }
+        }
+    }
+
+    fn lex_escape(&mut self) {
+        let start = self.pos;
+        self.pos += 1;
+        if matches!(self.peek(0), None | Some(b'\n')) {
+            // The string is reported as unterminated, so the lone backslash
+            // gets no error of its own.
+            return self.push(TokenKind::StrText, start);
+        }
+        let c = self.current();
+        self.pos += c.len_utf8();
+        let valid = match c {
+            '\\' | '"' | 'n' | 't' | 'r' | '0' | '#' => true,
+            'u' => self.eat_unicode_escape(),
+            _ => false,
+        };
+        self.push(TokenKind::StrEscape, start);
+        if !valid {
+            let text = self.slice(start, self.pos);
+            let (message, help) = if c == 'u' {
+                (
+                    format!("invalid unicode escape `{text}`"),
+                    "write `\\u{` followed by 1 to 6 hex digits of a unicode scalar value and `}`",
+                )
+            } else {
+                (
+                    format!("unknown escape `{text}`"),
+                    "write `\\\\` for a literal backslash",
+                )
+            };
+            self.error("E0109", start, self.pos, message, Some(help.to_owned()));
+        }
+    }
+
+    fn eat_unicode_escape(&mut self) -> bool {
+        if self.peek(0) != Some(b'{') {
+            return false;
+        }
+        self.pos += 1;
+        let digits_start = self.pos;
+        self.eat_while(|b| b.is_ascii_hexdigit());
+        let digits = self.slice(digits_start, self.pos);
+        if self.peek(0) != Some(b'}') {
+            return false;
+        }
+        self.pos += 1;
+        digits.len() <= 6
+            && u32::from_str_radix(digits, 16)
+                .ok()
+                .and_then(char::from_u32)
+                .is_some()
+    }
+
+    fn lex_multi_line(&mut self, form: StrForm) {
+        let start = self.pos;
+        let raw = form.is_raw();
+        if self.at("\"\"\"") {
+            return self.close_multi_line();
+        }
+        if !raw && self.at("#{") {
+            return self.open_interp();
+        }
+        if !raw && self.at("\\#{") {
+            self.pos += 2;
+            return self.push(TokenKind::StrEscape, start);
+        }
+        let mut line_ended = false;
+        while let Some(b) = self.peek(0) {
+            if b == b'\n' {
+                self.pos += 1;
+                line_ended = true;
+                break;
+            }
+            if self.at("\"\"\"") || (!raw && (self.at("#{") || self.at("\\#{"))) {
+                break;
+            }
+            self.bump_char();
+        }
+        self.push(TokenKind::StrText, start);
+        if line_ended {
+            let line = self.begin_line();
+            if let Some(Mode::Str(frame)) = self.modes.last_mut() {
+                frame.lines.push(line);
+            }
+        }
+    }
+
+    fn begin_line(&mut self) -> Line {
+        let start = self.pos;
+        self.eat_while(|b| b == b' ' || b == b'\t');
+        if self.pos > start {
+            self.push(TokenKind::StrLayout, start);
+        }
+        Line {
+            start,
+            indent_end: self.pos,
+        }
+    }
+
+    fn close_multi_line(&mut self) {
+        let start = self.pos;
+        self.pos += 3;
+        self.push(TokenKind::MStrEnd, start);
+        let Some(Mode::Str(mut frame)) = self.modes.pop() else {
+            return;
+        };
+        match frame.lines.last().copied() {
+            Some(closing) if closing.indent_end == start => {
+                frame.lines.pop();
+                self.strip_indentation(&frame, closing);
+            }
+            _ if frame.bad_opener => {}
+            _ => self.error(
+                "E0111",
+                start,
+                self.pos,
+                "the closing `\"\"\"` must be the first text on its line".to_owned(),
+                Some("move the closing `\"\"\"` to a line of its own".to_owned()),
+            ),
+        }
+    }
+
+    /// Checks that every line of a multi-line string starts with the
+    /// indentation of the closing line, and splits that indentation off as
+    /// layout so that only the deeper indentation remains literal text.
+    fn strip_indentation(&mut self, frame: &StrFrame, closing: Line) {
+        let prefix = self.slice(closing.start, closing.indent_end);
+        let mut splits = Vec::new();
+        for line in &frame.lines {
+            if self.bytes.get(line.indent_end) == Some(&b'\n') {
+                continue;
+            }
+            let indent = self.slice(line.start, line.indent_end);
+            if !indent.starts_with(prefix) {
+                let first_char = self
+                    .src
+                    .get(line.indent_end..)
+                    .and_then(|rest| rest.chars().next())
+                    .map_or(0, char::len_utf8);
+                self.error(
+                    "E0112",
+                    line.start,
+                    line.indent_end + first_char,
+                    "line does not start with the indentation of the closing `\"\"\"`".to_owned(),
+                    Some(format!(
+                        "start every line of the string with {}",
+                        describe_indent(prefix)
+                    )),
+                );
+            } else if indent.len() > prefix.len() {
+                splits.push(line.start);
+            }
+        }
+        if splits.is_empty() {
+            return;
+        }
+        let tail = self.tokens.split_off(frame.first_token);
+        for token in tail {
+            let Span { start, end } = token.span;
+            if token.kind != TokenKind::StrLayout || splits.binary_search(&start).is_err() {
+                self.tokens.push(token);
+                continue;
+            }
+            let mid = start + prefix.len();
+            if mid > start {
+                self.tokens.push(Token {
+                    kind: TokenKind::StrLayout,
+                    span: Span { start, end: mid },
+                });
+            }
+            self.tokens.push(Token {
+                kind: TokenKind::StrText,
+                span: Span { start: mid, end },
+            });
+        }
+    }
+
+    fn unterminated(&mut self, frame: &StrFrame) {
+        let help = if frame.form.is_multi() {
+            "close the string with `\"\"\"` on a line of its own"
+        } else {
+            "close the string with `\"` before the end of the line"
+        };
+        self.error(
+            "E0108",
+            frame.start,
+            frame.start + frame.form.opener_len(),
+            "unterminated string".to_owned(),
+            Some(help.to_owned()),
+        );
+    }
+
     fn lex_path(&mut self) {
         let start = self.pos;
         self.pos += if self.at("./") { 2 } else { 3 };
@@ -467,6 +875,22 @@ fn is_digit_in(b: u8, radix: u32) -> bool {
 
 fn is_path_char(b: u8) -> bool {
     b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-' | b'+' | b'@' | b'=' | b',' | b'/')
+}
+
+fn describe_indent(indent: &str) -> String {
+    let count = |b: u8| indent.bytes().filter(|&x| x == b).count();
+    let plural = |n: usize, word: &str| {
+        if n == 1 {
+            format!("1 {word}")
+        } else {
+            format!("{n} {word}s")
+        }
+    };
+    match (count(b' '), count(b'\t')) {
+        (spaces, 0) => plural(spaces, "space"),
+        (0, tabs) => plural(tabs, "tab"),
+        _ => "the same spaces and tabs as the line of the closing `\"\"\"`".to_owned(),
+    }
 }
 
 fn describe_char(c: char) -> String {
