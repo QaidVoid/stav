@@ -29,7 +29,7 @@ pub use host::{
     Host, HostModule, ImplicitRefs, ImportRoot, LoadError, Loader, MemoryLoader, RelPath, RootSpec,
     Source, SymbolType,
 };
-pub use load::FileId;
+pub use load::{FileId, MAX_SOURCE_LEN};
 pub use schema::{SchemaField, SchemaIndex, SchemaStruct, SchemaSum, SchemaVariant};
 
 use self::decls::{FileScope, Global};

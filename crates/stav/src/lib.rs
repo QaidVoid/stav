@@ -50,9 +50,9 @@ mod token;
 mod value;
 
 pub use check::{
-    Checked, FileId, Host, HostModule, ImplicitRefs, ImportRoot, LoadError, Loader, MemoryLoader,
-    RelPath, RootSpec, SchemaField, SchemaIndex, SchemaStruct, SchemaSum, SchemaVariant, Source,
-    SymbolType, check,
+    Checked, FileId, Host, HostModule, ImplicitRefs, ImportRoot, LoadError, Loader, MAX_SOURCE_LEN,
+    MemoryLoader, RelPath, RootSpec, SchemaField, SchemaIndex, SchemaStruct, SchemaSum,
+    SchemaVariant, Source, SymbolType, check,
 };
 pub use de::ConvertError;
 pub use diagnostic::{Diagnostic, Diagnostics, FileDiagnostic, Label, Severity};

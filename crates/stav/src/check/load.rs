@@ -12,8 +12,9 @@ use crate::parser::{Parsed, parse};
 use crate::span::Span;
 use crate::syntax::{NodeKind, SyntaxNode};
 
-/// The largest source file the checker accepts, in bytes.
-pub(crate) const MAX_SOURCE_LEN: usize = 4 * 1024 * 1024;
+/// The largest source file the checker accepts, in bytes. A larger file
+/// is reported as `E0706`.
+pub const MAX_SOURCE_LEN: usize = 4 * 1024 * 1024;
 
 /// Identifies one file of a checked program.
 ///

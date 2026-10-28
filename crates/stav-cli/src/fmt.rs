@@ -1,8 +1,10 @@
 //! The `fmt` command: formatting files in place or checking their layout.
 
-use std::fs;
+use std::fs::{self, File};
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
+
+use stav::MAX_SOURCE_LEN;
 
 use crate::report::Emitter;
 use crate::{Status, io_error, read_error};
@@ -20,7 +22,8 @@ const STDIN_NAME: &str = "<stdin>";
 ///
 /// # Errors
 ///
-/// Returns an error when a file cannot be read or written.
+/// Returns an error when a file cannot be read or written, or is larger
+/// than [`MAX_SOURCE_LEN`].
 pub(crate) fn run(paths: &[PathBuf], check: bool, emitter: &Emitter) -> io::Result<Status> {
     let mut status = Status::Success;
     for path in paths {
@@ -71,7 +74,8 @@ fn collect(path: &Path, files: &mut Vec<PathBuf>) -> io::Result<()> {
 }
 
 fn file_in_place(path: &Path, check: bool, emitter: &Emitter) -> io::Result<Status> {
-    let text = fs::read_to_string(path).map_err(|e| read_error(path, &e))?;
+    let file = File::open(path).map_err(|e| read_error(path, &e))?;
+    let text = read_source(file, path)?;
     let name = path.display().to_string();
     let Some(formatted) = format(&name, &text, emitter)? else {
         return Ok(Status::Failure);
@@ -88,10 +92,7 @@ fn file_in_place(path: &Path, check: bool, emitter: &Emitter) -> io::Result<Stat
 }
 
 fn stdin(check: bool, emitter: &Emitter) -> io::Result<Status> {
-    let mut text = String::new();
-    io::stdin()
-        .read_to_string(&mut text)
-        .map_err(|e| read_error(Path::new(STDIN_NAME), &e))?;
+    let text = read_source(io::stdin(), Path::new(STDIN_NAME))?;
     let Some(formatted) = format(STDIN_NAME, &text, emitter)? else {
         return Ok(Status::Failure);
     };
@@ -105,6 +106,27 @@ fn stdin(check: bool, emitter: &Emitter) -> io::Result<Status> {
     }
     writeln!(out, "{STDIN_NAME}")?;
     Ok(Status::Failure)
+}
+
+/// Reads the source text of `path` from `reader`, refusing text longer
+/// than the checker accepts.
+fn read_source(reader: impl Read, path: &Path) -> io::Result<String> {
+    let mut bytes = Vec::new();
+    reader
+        .take(MAX_SOURCE_LEN as u64 + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|e| read_error(path, &e))?;
+    if bytes.len() > MAX_SOURCE_LEN {
+        return Err(io::Error::new(
+            io::ErrorKind::FileTooLarge,
+            format!(
+                "cannot read `{}`: it is larger than {} MiB",
+                path.display(),
+                MAX_SOURCE_LEN >> 20
+            ),
+        ));
+    }
+    String::from_utf8(bytes).map_err(|_| read_error(path, &io::ErrorKind::InvalidData.into()))
 }
 
 /// Returns the formatted text, or `None` after reporting the syntax errors

@@ -656,3 +656,19 @@ fn eval_path_takes_keys_as_diagnostics_print_them() {
     assert!(malformed.starts_with("status: 2\n"), "{malformed}");
     assert!(malformed.contains(r"unknown escape `\q`"), "{malformed}");
 }
+
+#[test]
+fn fmt_refuses_files_larger_than_the_checker_accepts() {
+    let big = "\n".repeat(stav::MAX_SOURCE_LEN + 1);
+    let dir = fixture(
+        "fmt_refuses_files_larger_than_the_checker_accepts",
+        &[("big.stav", &big)],
+    );
+    assert_snapshot!(stav(&dir, &["fmt", "big.stav"], ""), @r"
+    status: 3
+    --- stdout
+    --- stderr
+    error: cannot read `big.stav`: it is larger than 4 MiB
+    ");
+    assert_eq!(fs::read_to_string(dir.join("big.stav")).unwrap(), big);
+}

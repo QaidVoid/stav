@@ -5,11 +5,7 @@ use std::fs::{self, File};
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 
-use stav::{ImportRoot, LoadError, Loader, RelPath};
-
-/// The largest source file that is read, in bytes. The checker refuses
-/// larger files, so reading stops there.
-const MAX_SOURCE_LEN: u64 = 4 * 1024 * 1024;
+use stav::{ImportRoot, LoadError, Loader, MAX_SOURCE_LEN, RelPath};
 
 /// A [`Loader`] that reads files from disk.
 ///
@@ -51,14 +47,14 @@ fn read(root: &Path, rel: &RelPath) -> Result<String, LoadError> {
     if !metadata.is_file() {
         return Err(LoadError::NotAFile);
     }
-    if metadata.len() > MAX_SOURCE_LEN {
+    if metadata.len() > MAX_SOURCE_LEN as u64 {
         return Err(LoadError::TooLarge);
     }
     let mut bytes = Vec::new();
     File::open(&real)
-        .and_then(|file| file.take(MAX_SOURCE_LEN + 1).read_to_end(&mut bytes))
+        .and_then(|file| file.take(MAX_SOURCE_LEN as u64 + 1).read_to_end(&mut bytes))
         .map_err(load_error)?;
-    if bytes.len() as u64 > MAX_SOURCE_LEN {
+    if bytes.len() > MAX_SOURCE_LEN {
         return Err(LoadError::TooLarge);
     }
     String::from_utf8(bytes).map_err(|_| LoadError::Other("not valid UTF-8".to_owned()))
