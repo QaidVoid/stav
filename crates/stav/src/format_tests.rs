@@ -374,6 +374,14 @@ fn blank_lines_collapse_to_one_and_vanish_at_the_edges() {
 }
 
 #[test]
+fn blank_lines_between_let_bindings_are_kept_and_split_alignment() {
+    assert_eq!(
+        fmt("a = let x = 1,\n\n\n  yyyyy = 2,\n  z = 3\nin x\n"),
+        "a = let x = 1,\n\n        yyyyy = 2,\n        z     = 3\n    in x\n"
+    );
+}
+
+#[test]
 fn removes_trailing_whitespace_and_ends_with_one_line_feed() {
     assert_eq!(fmt("a = 1   # note   \t\nb = 2"), "a = 1 # note\nb = 2\n");
     assert_eq!(fmt(""), "");

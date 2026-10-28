@@ -764,9 +764,9 @@ fn if_chain<'a>(node: SyntaxNode<'a>, docs: &mut Vec<Doc<'a>>) {
     }
 }
 
-/// Formats a `let ... in` expression. It stays on one line when it fits.
-/// Otherwise each binding gets its own line, aligned after `let`, and `in`
-/// starts a line below `let`.
+/// Formats a `let ... in` expression. It stays on one line when it fits and
+/// has no blank line between its bindings. Otherwise each binding gets its
+/// own line, aligned after `let`, and `in` starts a line below `let`.
 fn let_expr(node: SyntaxNode<'_>) -> Doc<'_> {
     let children: Vec<_> = node.children_with_tokens().collect();
     let position = |kind| {
@@ -782,11 +782,7 @@ fn let_expr(node: SyntaxNode<'_>) -> Doc<'_> {
     }
     let mut docs = inline_docs(N::LetExpr, &parts_of(children[..=let_at].iter().copied()));
     docs.push(Doc::Spaces(1));
-    let mut seq = scan(children[let_at + 1..in_at].iter().copied(), true);
-    // Blank lines between bindings are dropped, so they split no run.
-    for entry in &mut seq.entries {
-        entry.blank = false;
-    }
+    let seq = scan(children[let_at + 1..in_at].iter().copied(), true);
     // A comment after `let` ends its line, and the bindings start below,
     // where they would have started after `let `.
     if let Some(text) = seq.head {
@@ -799,6 +795,10 @@ fn let_expr(node: SyntaxNode<'_>) -> Doc<'_> {
     let mut bindings = Vec::new();
     for (index, (entry, pad)) in seq.entries.into_iter().zip(pads).enumerate() {
         if index > 0 {
+            if entry.blank {
+                bindings.push(Doc::BreakParent);
+                bindings.push(Doc::Line);
+            }
             bindings.push(Doc::Line);
         }
         match entry.kind {
