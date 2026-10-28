@@ -155,6 +155,7 @@ pub struct SyntaxTree {
     token_parents: Vec<usize>,
     nodes: Vec<NodeData>,
     elements: Vec<Element>,
+    root: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -177,7 +178,7 @@ impl SyntaxTree {
     pub fn root(&self) -> SyntaxNode<'_> {
         SyntaxNode {
             tree: self,
-            index: self.nodes.len() - 1,
+            index: self.root,
         }
     }
 
@@ -442,14 +443,22 @@ impl Builder {
 
     /// Returns the tree. The last finished node becomes the root, and it
     /// spans the whole source.
+    ///
+    /// # Panics
+    ///
+    /// Panics if no node was finished, because every tree has a root.
     pub(crate) fn finish(mut self, source: &str, tokens: Vec<Token>) -> SyntaxTree {
-        if let Some(root) = self.nodes.last_mut() {
-            root.span = Span {
-                start: 0,
-                end: source.len(),
-            };
-        }
+        let root = self
+            .nodes
+            .len()
+            .checked_sub(1)
+            .expect("the root node is finished before the tree");
+        self.nodes[root].span = Span {
+            start: 0,
+            end: source.len(),
+        };
         SyntaxTree {
+            root,
             source: source.into(),
             tokens,
             token_parents: self.token_parents,

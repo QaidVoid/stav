@@ -163,8 +163,10 @@ impl<'s> Parser<'s> {
         index
     }
 
-    /// Returns the index one past the last token of the string or
-    /// interpolation that starts at `pos`, within the limit.
+    /// Returns where the string or interpolation that starts at `pos` ends,
+    /// capped at the limit. For a string start, that is the index one past
+    /// its last token. For `#{`, it is the index of its `}`, or of the token
+    /// that cut it off at the end of the line or file.
     fn end_of_string(&self) -> usize {
         self.layout.ends[self.pos].max(self.pos + 1).min(self.limit)
     }
