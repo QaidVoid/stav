@@ -1,0 +1,4 @@
+type Shape = dot(size: Int where 1..=5 = 9)
+struct Root { a: Int = 0 }
+fn count(shapes: List<Shape>) -> Int = len(shapes)
+a = count([dot()])
