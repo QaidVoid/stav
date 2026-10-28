@@ -408,6 +408,10 @@ struct Checker<'p> {
     ref_targets: BTreeMap<StructId, Vec<model::Step>>,
     ref_uses: Vec<(FileId, Span, StructId)>,
     pending_predicates: Vec<decls::PendingPredicate<'p>>,
+    /// The part file units created but not checked yet, with the file and
+    /// the struct they are a body of. Checking them from a queue instead of
+    /// at their `include` keeps long chains of part files off the stack.
+    parts: Vec<(UnitId, FileId, StructId)>,
 }
 
 impl<'p> Checker<'p> {
@@ -435,6 +439,7 @@ impl<'p> Checker<'p> {
             ref_targets: BTreeMap::new(),
             ref_uses: Vec::new(),
             pending_predicates: Vec::new(),
+            parts: Vec::new(),
         }
     }
 
@@ -454,6 +459,7 @@ impl<'p> Checker<'p> {
                 self.entries.push(unit);
             }
         }
+        self.check_parts();
         self.check_totality();
     }
 

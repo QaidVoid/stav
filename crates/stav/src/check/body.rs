@@ -774,10 +774,21 @@ impl<'p> Checker<'p> {
     }
 
     /// Returns the unit of the part file `file` included into a body of
-    /// `s`, checking it on first use.
+    /// `s`, queueing it to be checked on first use.
     pub(super) fn part_unit(&mut self, file: FileId, s: StructId) -> UnitId {
         let (unit, new) = self.unit(file, Some(s));
         if new {
+            self.parts.push((unit, file, s));
+        }
+        unit
+    }
+
+    /// Checks the queued part file units, including the ones they queue in
+    /// turn.
+    pub(super) fn check_parts(&mut self) {
+        let mut next = 0;
+        while let Some(&(unit, file, s)) = self.parts.get(next) {
+            next += 1;
             let mut cx = Cx::new(unit, file, SelfMode::Forbidden("a part file"), None);
             let statements = self
                 .program
@@ -791,7 +802,7 @@ impl<'p> Checker<'p> {
                 });
             self.top_body(&mut cx, statements, s);
         }
-        unit
+        self.parts.clear();
     }
 
     /// Checks the statements of an entry file as a body of the root struct.
@@ -827,76 +838,118 @@ impl<'p> Checker<'p> {
 
     /// Checks the defaults, function bodies and top-level `let` values of
     /// every file that may declare them.
+    ///
+    /// Prelude files come first, and every other file after the modules it
+    /// imports. Within a file, `let` values come first and in source order.
+    /// A `let` value can only use earlier declarations of its file, the
+    /// prelude and imported modules, so each is checked before it is used
+    /// and checking never recurses through a chain of `let` values.
     pub(super) fn check_declaration_bodies(&mut self) {
         let program = self.program;
-        for (i, file) in program.files.iter().enumerate() {
-            if file.role == super::Role::Part {
+        let adj: Vec<Vec<usize>> = program
+            .files
+            .iter()
+            .map(|file| {
+                let mut targets: Vec<usize> = file
+                    .imports
+                    .iter()
+                    .filter_map(|link| link.target.map(FileId::index))
+                    .collect();
+                targets.sort_unstable();
+                targets.dedup();
+                targets
+            })
+            .collect();
+        let others = graph::components(&adj)
+            .into_iter()
+            .flatten()
+            .map(FileId::new)
+            .filter(|&id| !matches!(self.role(id), super::Role::Part | super::Role::Prelude));
+        let order: Vec<FileId> = program.prelude.iter().copied().chain(others).collect();
+        for id in order {
+            self.file_declarations(id);
+        }
+    }
+
+    fn file_declarations(&mut self, id: FileId) {
+        let file = self.program.file(id);
+        let unit = self.file_unit(id);
+        let items: Vec<Item<'p>> = file.parsed.file().items().collect();
+        for item in &items {
+            if let Item::Stmt(Stmt::Let(decl)) = item
+                && let Some(g) = self.declared_global(id, decl.name(), decl.syntax().index())
+            {
+                self.let_type(g);
+            }
+        }
+        for s in 0..self.types.structs.len() {
+            if self.types.structs[s].file != id {
                 continue;
             }
-            let id = FileId::new(i);
-            let unit = self.file_unit(id);
-            for s in 0..self.types.structs.len() {
-                if self.types.structs[s].file != id {
-                    continue;
-                }
-                let sid = StructId::new(s);
-                let fields = self.types.structs[s].fields.clone();
-                let mut cx = Cx::new(
-                    unit,
-                    id,
-                    SelfMode::Default(sid),
-                    Some(super::totality::Node::StructDefaults(sid)),
-                );
-                for field in fields {
-                    let Some(e) = field
-                        .default
-                        .and_then(|n| file.parsed.tree.node(n))
-                        .and_then(Expr::cast)
-                    else {
-                        continue;
-                    };
-                    cx.partial = true;
-                    self.expr(&mut cx, e, Some(field.ty));
-                    cx.reads.clear();
-                }
-            }
-            for s in 0..self.types.sums.len() {
-                if self.types.sums[s].file != id {
-                    continue;
-                }
-                let sid = super::types::SumId::new(s);
-                let variants = self.types.sums[s].variants.clone();
-                let mut cx = Cx::new(
-                    unit,
-                    id,
-                    SelfMode::Forbidden("a payload default"),
-                    Some(super::totality::Node::SumDefaults(sid)),
-                );
-                for param in variants.iter().flat_map(|v| v.fields.iter().flatten()) {
-                    if let Some(e) = param
-                        .default
-                        .and_then(|n| file.parsed.tree.node(n))
-                        .and_then(Expr::cast)
-                    {
-                        self.expr(&mut cx, e, Some(param.ty));
-                    }
-                }
-            }
-            let scope = self.scopes[i].clone();
-            for item in scope.values.values() {
-                let ValueItem::Global(g) = *item else {
+            let sid = StructId::new(s);
+            let fields = self.types.structs[s].fields.clone();
+            let mut cx = Cx::new(
+                unit,
+                id,
+                SelfMode::Default(sid),
+                Some(super::totality::Node::StructDefaults(sid)),
+            );
+            for field in fields {
+                let Some(e) = field
+                    .default
+                    .and_then(|n| file.parsed.tree.node(n))
+                    .and_then(Expr::cast)
+                else {
                     continue;
                 };
-                if self.globals[g.index()].file != id {
-                    continue;
-                }
-                match &self.globals[g.index()].kind {
-                    GlobalKind::Fn(_) => self.fn_body(g),
-                    GlobalKind::Let(_) => {
-                        self.let_type(g);
-                    }
+                cx.partial = true;
+                self.expr(&mut cx, e, Some(field.ty));
+                cx.reads.clear();
+            }
+        }
+        for s in 0..self.types.sums.len() {
+            if self.types.sums[s].file != id {
+                continue;
+            }
+            let sid = super::types::SumId::new(s);
+            let variants = self.types.sums[s].variants.clone();
+            let mut cx = Cx::new(
+                unit,
+                id,
+                SelfMode::Forbidden("a payload default"),
+                Some(super::totality::Node::SumDefaults(sid)),
+            );
+            for param in variants.iter().flat_map(|v| v.fields.iter().flatten()) {
+                if let Some(e) = param
+                    .default
+                    .and_then(|n| file.parsed.tree.node(n))
+                    .and_then(Expr::cast)
+                {
+                    self.expr(&mut cx, e, Some(param.ty));
                 }
             }
+        }
+        for item in &items {
+            if let Item::Fn(decl) = item
+                && let Some(g) = self.declared_global(id, decl.name(), decl.syntax().index())
+            {
+                self.fn_body(g);
+            }
+        }
+    }
+
+    /// Returns the top-level function or `let` that the declaration at
+    /// node `node` of `file` declares, unless the name is declared twice
+    /// and another declaration owns it.
+    fn declared_global(
+        &self,
+        file: FileId,
+        name: Option<crate::syntax::SyntaxToken<'_>>,
+        node: usize,
+    ) -> Option<super::types::GlobalId> {
+        match self.scopes[file.index()].values.get(name?.text()) {
+            Some(&ValueItem::Global(g)) if self.globals[g.index()].node == node => Some(g),
+            _ => None,
         }
     }
 

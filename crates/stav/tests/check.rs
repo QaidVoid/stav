@@ -352,6 +352,63 @@ fn deeply_nested_programs_check_without_overflowing_the_stack() {
     }
 }
 
+/// Checks the program of `loader` on a thread with a small stack and
+/// returns the codes of its errors.
+fn codes_on_small_stack(loader: MemoryLoader) -> Vec<&'static str> {
+    std::thread::Builder::new()
+        .stack_size(2 * 1024 * 1024)
+        .spawn(move || codes(&Host::new(loader), &app_root()))
+        .expect("the thread starts")
+        .join()
+        .expect("checking does not overflow the stack")
+}
+
+const CHAIN: usize = 3000;
+
+#[test]
+fn long_include_chains_check_without_overflowing_the_stack() {
+    let mut loader = MemoryLoader::new().with_file(
+        "app/main.stav",
+        "struct Root { a: Int = 0 }\ninclude \"./p0.stav\"\n",
+    );
+    for i in 0..CHAIN {
+        let text = if i + 1 < CHAIN {
+            format!("include \"./p{}.stav\"\n", i + 1)
+        } else {
+            "a = \"x\"\n".to_owned()
+        };
+        loader = loader.with_file(format!("app/p{i}.stav"), text);
+    }
+    assert_eq!(codes_on_small_stack(loader), ["E0401"]);
+}
+
+#[test]
+fn long_import_chains_check_without_overflowing_the_stack() {
+    let mut loader = MemoryLoader::new().with_file(
+        "app/main.stav",
+        "import \"./m0.stav\" as m\nstruct Root { a: Int = m.x }\n",
+    );
+    for i in 0..CHAIN {
+        let text = if i + 1 < CHAIN {
+            format!("import \"./m{}.stav\" as n\nlet x = n.x\n", i + 1)
+        } else {
+            "let x = \"x\"\n".to_owned()
+        };
+        loader = loader.with_file(format!("app/m{i}.stav"), text);
+    }
+    assert_eq!(codes_on_small_stack(loader), ["E0401"]);
+}
+
+#[test]
+fn long_let_chains_check_without_overflowing_the_stack() {
+    let mut source = format!("struct Root {{ a: Int = v00001 }}\nlet v{CHAIN:05} = \"x\"\n");
+    for i in (1..CHAIN).rev() {
+        source.push_str(&format!("let v{i:05} = v{:05}\n", i + 1));
+    }
+    let loader = MemoryLoader::new().with_file("app/main.stav", source);
+    assert_eq!(codes_on_small_stack(loader), ["E0401"]);
+}
+
 mod random {
     use proptest::prelude::*;
     use proptest::sample::select;
