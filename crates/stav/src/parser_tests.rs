@@ -1679,6 +1679,26 @@ fn one_mistake_gives_one_error() {
 }
 
 #[test]
+fn stray_commas_are_reported_once_per_run() {
+    assert_snapshot!(errors("a = [,]\nb = [1,,2]\nc = { , }\nd = [1,\n,\n2]\ne = [1,,,2]\n"), @"
+    error[E0210] 5..6: expected an expression, found `,`
+    error[E0210] 15..16: expected an expression, found `,`
+    error[E0210] 25..26: expected a map entry, found `,`
+    error[E0210] 37..38: expected an expression, found `,`
+    error[E0210] 49..50: expected an expression, found `,`
+    ");
+    assert_snapshot!(errors(",,,\na = 1,\nb = 2,,\n"), @"
+    error[E0210] 0..1: expected a declaration or a statement, found `,`
+    error[E0210] 17..18: expected a declaration or a statement, found `,`
+    ");
+    assert!(
+        parse("a = [1,\n  2,\n]\nb = { x = 1, y = 2, }\nc = 1,\n")
+            .diagnostics
+            .is_empty()
+    );
+}
+
+#[test]
 fn statement_needs_equals_or_brace_after_identifier() {
     assert_snapshot!(errors("system {\n  hostname \"forge\"\n  service sshd\n  \"key\" { }\n}\n"), @"
     error[E0201] 27..28: expected `{` after the block label, found a line break

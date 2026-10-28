@@ -17,12 +17,14 @@ pub(super) enum Keyed {
 impl Parser<'_> {
     pub(super) fn file(&mut self) {
         self.builder.start_node(NodeKind::File);
+        let mut after_item = false;
         loop {
-            self.eat_separators();
+            self.separators(after_item, "a declaration or a statement");
             let kind = self.current();
             if kind == T::Eof {
                 break;
             }
+            after_item = true;
             if is_closer(kind) {
                 self.expected("a declaration or a statement");
                 self.bump_error();

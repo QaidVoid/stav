@@ -394,12 +394,14 @@ impl<'s> Parser<'s> {
         what: &str,
         mut element: impl FnMut(&mut Self),
     ) {
+        let mut after_element = false;
         loop {
-            self.eat_separators();
+            self.separators(after_element, what);
             let kind = self.current();
             if kind == closer || kind == TokenKind::Eof || self.closes_outer(kind) {
                 break;
             }
+            after_element = true;
             if is_closer(kind) {
                 self.expected(what);
                 self.bump_error();
@@ -458,11 +460,24 @@ impl<'s> Parser<'s> {
         }
     }
 
-    /// Bumps line feeds and commas. Passing one ends error recovery.
-    fn eat_separators(&mut self) {
-        while matches!(self.current(), TokenKind::Newline | TokenKind::Comma) {
-            self.bump();
-            self.recovering = false;
+    /// Bumps the line feeds and the single `,` that separate elements.
+    /// Passing one ends error recovery. A `,` before the first element, or
+    /// a second `,` in a row, is reported as a missing `what`.
+    fn separators(&mut self, after_element: bool, what: &str) {
+        let mut comma = !after_element;
+        loop {
+            match self.current() {
+                TokenKind::Comma if comma => {
+                    self.expected(what);
+                    self.bump_error();
+                }
+                TokenKind::Newline | TokenKind::Comma => {
+                    comma |= self.at(TokenKind::Comma);
+                    self.bump();
+                    self.recovering = false;
+                }
+                _ => break,
+            }
         }
     }
 
