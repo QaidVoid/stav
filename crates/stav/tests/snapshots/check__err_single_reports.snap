@@ -1,0 +1,9 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0444]: `one` takes 1 argument, found 4
+  --> app/main.stav:3:12
+error[E0444]: `default` takes one positional argument
+  --> app/main.stav:4:5

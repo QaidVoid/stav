@@ -346,6 +346,7 @@ impl<'p> Checker<'p> {
             let value = arg.value();
             let index = match arg.name() {
                 None if i < params.len() => Some(i),
+                None if i > params.len() => None,
                 None => {
                     let plural = if params.len() == 1 { "" } else { "s" };
                     self.error(

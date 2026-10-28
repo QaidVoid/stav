@@ -1,0 +1,19 @@
+struct Root { x: Int = 1 }
+let flag = true
+include "./part.stav"
+if flag {
+  include "./part.stav"
+}
+for i in [1, 2] {
+  include "./other.stav"
+}
+if flag {
+  include "./branch.stav"
+} else {
+  include "./branch.stav"
+}
+include "./branch.stav"
+#- file part.stav
+x = 2
+#- file other.stav
+#- file branch.stav

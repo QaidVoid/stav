@@ -1,0 +1,4 @@
+struct Root { a: Int = 0, b: Int = 0 }
+fn one(x: Int) -> Int = x
+a = one(1, 2, 3, 4)
+b = default(1, 2)

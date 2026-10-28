@@ -111,9 +111,21 @@ impl<'p> Checker<'p> {
         statements: impl Iterator<Item = Stmt<'p>>,
         target: Target,
     ) {
-        let mut included = BTreeMap::new();
+        self.nested_statements(cx, statements, target, &mut BTreeMap::new());
+    }
+
+    /// Checks statements that contribute to the same body as the
+    /// statements around them, such as those of an `if` or `for` body.
+    /// `included` holds the part files the body already includes.
+    fn nested_statements(
+        &mut self,
+        cx: &mut Cx,
+        statements: impl Iterator<Item = Stmt<'p>>,
+        target: Target,
+        included: &mut BTreeMap<FileId, Span>,
+    ) {
         for statement in statements {
-            self.statement(cx, statement, target, &mut included);
+            self.statement(cx, statement, target, included);
         }
     }
 
@@ -129,7 +141,7 @@ impl<'p> Checker<'p> {
             Stmt::Attr(attr) => self.attr(cx, attr, target),
             Stmt::Block(block) => self.block(cx, block, target),
             Stmt::Include(include) => self.include(cx, include, target, included),
-            Stmt::If(branch) => self.if_statement(cx, branch, target),
+            Stmt::If(branch) => self.if_statement(cx, branch, target, included),
             Stmt::For(each) => {
                 let span = each.syntax().span();
                 let source = match each.collection() {
@@ -141,30 +153,46 @@ impl<'p> Checker<'p> {
                 let binds = self.iterate(cx, source, &names, span);
                 self.fact(cx, each.syntax(), Fact::For(ForFact { binds }));
                 if let Some(body) = each.body() {
-                    self.statements(cx, body.statements(), target);
+                    self.nested_statements(cx, body.statements(), target, included);
                 }
                 cx.scope.truncate(mark);
             }
         }
     }
 
-    fn if_statement(&mut self, cx: &mut Cx, branch: ast::IfStmt<'p>, target: Target) {
+    /// Checks an `if` statement. Each branch starts from the part files
+    /// included before the statement, since only one of them runs, and the
+    /// statements after it see the part files of every branch.
+    fn if_statement(
+        &mut self,
+        cx: &mut Cx,
+        branch: ast::IfStmt<'p>,
+        target: Target,
+        included: &mut BTreeMap<FileId, Span>,
+    ) {
         if let Some(condition) = branch.condition() {
             self.structural(cx, condition, Some(TypeId::BOOL), "an `if` condition");
         }
+        let before = included.clone();
         if let Some(body) = branch.then_body() {
             let mark = cx.scope.len();
-            self.statements(cx, body.statements(), target);
+            self.nested_statements(cx, body.statements(), target, included);
             cx.scope.truncate(mark);
         }
+        let mut otherwise = before;
         match branch.else_branch() {
             Some(ast::ElseBranch::Body(body)) => {
                 let mark = cx.scope.len();
-                self.statements(cx, body.statements(), target);
+                self.nested_statements(cx, body.statements(), target, &mut otherwise);
                 cx.scope.truncate(mark);
             }
-            Some(ast::ElseBranch::If(nested)) => self.if_statement(cx, nested, target),
+            Some(ast::ElseBranch::If(nested)) => {
+                self.if_statement(cx, nested, target, &mut otherwise);
+            }
             None => {}
+        }
+        for (file, span) in otherwise {
+            included.entry(file).or_insert(span);
         }
     }
 
@@ -296,7 +324,9 @@ impl<'p> Checker<'p> {
             }
         };
         let Some(value) = attr.value() else { return };
-        let (priority, value) = self.marker(cx, value);
+        let Some((priority, value)) = self.marker(cx, value) else {
+            return;
+        };
         let saved = std::mem::take(&mut cx.reads);
         cx.partial = true;
         self.expr(cx, value, Some(ty.unwrap_or(TypeId::ERROR)));
@@ -321,29 +351,31 @@ impl<'p> Checker<'p> {
 
     /// Returns the priority of a right-hand side and the contributed value:
     /// the argument of `default(...)` or `force(...)`, or the whole side.
-    fn marker(&mut self, cx: &mut Cx, value: Expr<'p>) -> (Priority, Expr<'p>) {
+    /// Returns `None` after reporting a marker with the wrong arguments.
+    fn marker(&mut self, cx: &mut Cx, value: Expr<'p>) -> Option<(Priority, Expr<'p>)> {
+        let plain = Some((Priority::Plain, value));
         let Expr::Call(call) = value else {
-            return (Priority::Plain, value);
+            return plain;
         };
         let Some(Expr::Name(name)) = call.callee() else {
-            return (Priority::Plain, value);
+            return plain;
         };
         let Some(token) = name.token() else {
-            return (Priority::Plain, value);
+            return plain;
         };
         let priority = match token.text() {
             "default" => Priority::Default,
             "force" => Priority::Force,
-            _ => return (Priority::Plain, value),
+            _ => return plain,
         };
         if cx.lookup(token.text()).is_some() || self.lookup_value(cx.file, token.text()).is_some() {
-            return (Priority::Plain, value);
+            return plain;
         }
         let args: Vec<ast::Arg<'p>> = call.args().map(|a| a.args().collect()).unwrap_or_default();
         match args.as_slice() {
             [arg] if arg.name().is_none() => match arg.value() {
-                Some(inner) => (priority, inner),
-                None => (Priority::Plain, value),
+                Some(inner) => Some((priority, inner)),
+                None => plain,
             },
             _ => {
                 self.error(
@@ -354,7 +386,8 @@ impl<'p> Checker<'p> {
                         format!("`{}` takes one positional argument", token.text()),
                     ),
                 );
-                (Priority::Plain, value)
+                self.synth_args(cx, &args);
+                None
             }
         }
     }
