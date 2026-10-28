@@ -1,0 +1,20 @@
+[package]
+name = "stav-fuzz"
+description = "Fuzz targets for the Stav language library"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[[bin]]
+name = "lexer"
+path = "fuzz_targets/lexer.rs"
+test = false
+doc = false
+bench = false
+
+[dependencies]
+libfuzzer-sys = "0.4.13"
+stav = { version = "0.1.0", path = "../crates/stav" }
