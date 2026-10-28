@@ -8,8 +8,8 @@ use std::process::{Command, Stdio};
 
 use insta::assert_snapshot;
 
-/// The application program of the language overview, with a refinement
-/// that every upstream satisfies.
+/// A program with a sum type, blocks, a function and refinements that
+/// every upstream satisfies.
 const APP: &str = r#"type Level = debug | info | warn | error
 
 struct Upstream {
@@ -35,13 +35,13 @@ upstreams.dev = local(9000)
 "#;
 
 /// A program with two unknown names, each with a suggestion.
-const UNKNOWN_NAMES: &str = "type Init = runit | s6
+const UNKNOWN_NAMES: &str = "type Mode = strict | lenient
 struct Root {
-  init:  Init = runit
+  mode:  Mode = strict
   count: Int = cont
 }
 let cuont = 1
-init = runti
+mode = strcit
 ";
 
 /// Creates an empty directory named after the test and writes `files`
@@ -671,4 +671,30 @@ fn fmt_refuses_files_larger_than_the_checker_accepts() {
     error: cannot read `big.stav`: it is larger than 4 MiB
     ");
     assert_eq!(fs::read_to_string(dir.join("big.stav")).unwrap(), big);
+}
+
+/// A program that evaluates but has a warning: the binding `warn` hides
+/// the variant of the same name.
+const SHADOWED_VARIANT: &str = "type Level = debug | info | warn | error
+struct Root { log_level: Level = info }
+let warn: Level = error
+log_level = warn
+";
+
+#[test]
+fn warnings_are_reported_and_do_not_fail() {
+    let files = [("app.stav", SHADOWED_VARIANT)];
+    let human = run(
+        "warnings_are_reported_in_human_form",
+        &files,
+        &["eval", "app.stav"],
+    );
+    assert_snapshot!(human);
+    let json = run(
+        "warnings_are_reported_in_json_form",
+        &files,
+        &["check", "--message-format", "json", "app.stav"],
+    );
+    assert!(json.starts_with("status: 0\n"), "{json}");
+    assert!(json.contains(r#""severity":"warning""#), "{json}");
 }

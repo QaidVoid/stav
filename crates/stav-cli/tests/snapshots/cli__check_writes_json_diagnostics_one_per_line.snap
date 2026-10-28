@@ -6,4 +6,4 @@ status: 1
 --- stdout
 --- stderr
 {"code":"E0302","severity":"error","message":"unknown name `cont`","labels":[{"file":"app.stav","start":{"line":4,"col":16},"end":{"line":4,"col":20},"message":"","primary":true}],"notes":[],"help":"did you mean `cuont`?"}
-{"code":"E0302","severity":"error","message":"unknown name `runti`, which is not a variant of `Init`","labels":[{"file":"app.stav","start":{"line":7,"col":8},"end":{"line":7,"col":13},"message":"","primary":true}],"notes":[],"help":"did you mean `runit`?"}
+{"code":"E0302","severity":"error","message":"unknown name `strcit`, which is not a variant of `Mode`","labels":[{"file":"app.stav","start":{"line":7,"col":8},"end":{"line":7,"col":14},"message":"","primary":true}],"notes":[],"help":"did you mean `strict`?"}

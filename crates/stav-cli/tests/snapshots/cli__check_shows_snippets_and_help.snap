@@ -13,10 +13,10 @@ error[E0302]: unknown name `cont`
   │
   = help: did you mean `cuont`?
 
-error[E0302]: unknown name `runti`, which is not a variant of `Init`
+error[E0302]: unknown name `strcit`, which is not a variant of `Mode`
   ┌─ app.stav:7:8
   │
-7 │ init = runti
-  │        ^^^^^
+7 │ mode = strcit
+  │        ^^^^^^
   │
-  = help: did you mean `runit`?
+  = help: did you mean `strict`?

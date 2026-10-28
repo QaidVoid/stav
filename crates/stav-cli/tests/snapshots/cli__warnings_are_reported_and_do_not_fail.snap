@@ -1,0 +1,17 @@
+---
+source: crates/stav-cli/tests/cli.rs
+expression: human
+---
+status: 0
+--- stdout
+{
+  "log_level": "error"
+}
+--- stderr
+warning[W0302]: `warn` refers to a binding, not to the variant of `Level`
+  ┌─ app.stav:4:13
+  │
+4 │ log_level = warn
+  │             ^^^^
+  │
+  = help: rename the binding, or write `Level.warn` for the variant
