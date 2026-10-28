@@ -343,6 +343,7 @@ impl Parser<'_> {
         self.start_node(NodeKind::ArgList);
         let opener = self.open();
         let mut named: Vec<&str> = Vec::new();
+        let mut misplaced = false;
         self.comma_list(opener, T::RParen, "an argument", |p| {
             if !is_expr_start(p.current()) {
                 p.expected("an argument");
@@ -362,7 +363,8 @@ impl Parser<'_> {
                 named.push(name);
                 p.bump();
                 p.bump();
-            } else if !named.is_empty() {
+            } else if !named.is_empty() && !misplaced {
+                misplaced = true;
                 p.soft_error(
                     "E0203",
                     p.current_span(),
@@ -541,8 +543,10 @@ impl Parser<'_> {
                     self.start_node_at(checkpoint, NodeKind::VariantPat);
                     let opener = self.open();
                     let mut rest = false;
+                    let mut misplaced = false;
                     self.comma_list(opener, T::RParen, "a field pattern", |p| {
-                        if rest {
+                        if rest && !misplaced {
+                            misplaced = true;
                             p.soft_error(
                                 "E0210",
                                 p.current_span(),

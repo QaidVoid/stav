@@ -1750,6 +1750,16 @@ fn named_arguments_follow_positional_ones_and_never_repeat() {
 }
 
 #[test]
+fn misplaced_arguments_and_rest_patterns_are_reported_once_per_list() {
+    assert_snapshot!(errors("a = f(a = 1, x, y)\nb = match c {\n  f(.., a, b) => 1\n}\n"), @"
+    error[E0203] 13..14: positional argument after a named argument
+      help: move positional arguments before named ones
+    error[E0210] 41..42: `..` must come last in a variant pattern
+      help: move `..` to the end
+    ");
+}
+
+#[test]
 fn type_names_start_uppercase() {
     assert_snapshot!(errors("struct service {}\ntype level = a | b\nstruct _x {}\n"), @"
     error[E0205] 7..14: type name `service` must start with an uppercase letter
