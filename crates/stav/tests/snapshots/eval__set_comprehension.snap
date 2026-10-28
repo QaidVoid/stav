@@ -1,0 +1,15 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- JSON
+{
+  "levels": [
+    "debug",
+    "warn"
+  ],
+  "counts": [
+    20,
+    30
+  ]
+}

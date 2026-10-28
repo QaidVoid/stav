@@ -1,0 +1,10 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0306]: the key `b` is given more than once
+  --> app/main.stav:3:21
+  label: app/main.stav:3:14: first given here
+error[E0401]: functions and parts cannot be compared
+  --> app/main.stav:4:23

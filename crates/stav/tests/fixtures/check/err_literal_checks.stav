@@ -1,0 +1,4 @@
+struct Root { a: Int = 0 }
+fn double(x: Int) -> Int = x * 2
+let keys = { b = 1, b = 2, c = 3 }
+let compared = double == 1

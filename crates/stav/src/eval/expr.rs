@@ -72,7 +72,7 @@ impl<'c> Eval<'c> {
             Expr::Symbol(symbol) => self.symbol_word(cx, symbol, meaning, at),
             Expr::SelfExpr(_) => Err(self.bug(cx.file, at.span, "`self` stands alone")),
             Expr::List(list) => self.list(cx, list, ty, at),
-            Expr::ListComp(comp) => self.list_comp(cx, comp, meaning, at),
+            Expr::ListComp(comp) => self.list_comp(cx, comp, ty, meaning, at),
             Expr::Map(map) => match meaning {
                 Meaning::Struct(s) => self.struct_value(cx, *s, map.entries().collect(), at),
                 _ => self.map_literal(cx, map, ty, at),
@@ -142,6 +142,12 @@ impl<'c> Eval<'c> {
         for item in list.items() {
             items.push(self.expr(cx, item)?);
         }
+        self.sequence(items, ty, at)
+    }
+
+    /// Returns the elements as a set when `ty` is a set type, and as a
+    /// list otherwise.
+    fn sequence(&mut self, items: Vec<Val>, ty: TypeId, at: SourceSpan) -> R<Val> {
         if matches!(self.c.types.get(self.c.types.peel(ty)), Type::Set(_)) {
             self.new_set(items, at)
         } else {
@@ -153,6 +159,7 @@ impl<'c> Eval<'c> {
         &mut self,
         cx: &Cx<'_>,
         comp: ast::ListComp<'c>,
+        ty: TypeId,
         meaning: &Meaning,
         at: SourceSpan,
     ) -> R<Val> {
@@ -175,7 +182,7 @@ impl<'c> Eval<'c> {
                 items.push(self.expr(&inner, value)?);
             }
         }
-        self.new_list(items, at)
+        self.sequence(items, ty, at)
     }
 
     fn if_expr(&mut self, cx: &Cx<'_>, branch: ast::IfExpr<'c>, at: SourceSpan) -> R<Val> {

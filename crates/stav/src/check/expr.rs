@@ -164,7 +164,7 @@ impl<'p> Checker<'p> {
                 None => (TypeId::ERROR, Meaning::Plain),
             },
             Expr::Call(call) => self.call(cx, call, expected, want),
-            Expr::Field(field) => self.field(cx, field, want),
+            Expr::Field(field) => self.field(cx, field),
             Expr::Index(index) => self.index(cx, index),
             Expr::Binary(binary) => self.binary(cx, binary, expected),
             Expr::Unary(unary) => self.unary(cx, unary, want),
@@ -423,8 +423,29 @@ impl<'p> Checker<'p> {
             );
             return (TypeId::ERROR, Meaning::Plain);
         }
-        self.unknown_name(cx, name, span, want);
+        if !self.used_too_early(cx, name, span) {
+            self.unknown_name(cx, name, span, want);
+        }
         (TypeId::ERROR, Meaning::Plain)
+    }
+
+    /// Reports a name that resolves to nothing but is a binding of an
+    /// enclosing `let ... in` expression that is not visible yet, and
+    /// returns whether it is one.
+    pub(super) fn used_too_early(&mut self, cx: &Cx, name: &str, span: Span) -> bool {
+        if !cx.scope.is_pending(name) {
+            return false;
+        }
+        self.error(
+            cx.file,
+            Diagnostic::error(
+                "E0305",
+                span,
+                format!("`{name}` is used in its own definition or before it"),
+            )
+            .with_help("a binding can only use the bindings before it"),
+        );
+        true
     }
 
     fn unknown_name(&mut self, cx: &Cx, name: &str, span: Span, want: Option<TypeId>) {
@@ -483,26 +504,11 @@ impl<'p> Checker<'p> {
         name: &str,
         span: Span,
     ) -> Option<(TypeId, Meaning)> {
-        match cx.lookup(name) {
-            Some(Binding::Local(id)) => {
-                let local = &self.units[cx.unit.index()].locals[id.index()];
-                let (ty, reads, top) = (local.ty, local.reads.clone(), local.top);
-                self.use_late(cx, name, span, &reads, top);
-                return Some((ty, Meaning::Local(id)));
-            }
-            Some(Binding::Pending) => {
-                self.error(
-                    cx.file,
-                    Diagnostic::error(
-                        "E0305",
-                        span,
-                        format!("`{name}` is used in its own definition or before it"),
-                    )
-                    .with_help("a binding can only use the bindings before it"),
-                );
-                return Some((TypeId::ERROR, Meaning::Plain));
-            }
-            None => {}
+        if let Some(id) = cx.lookup(name) {
+            let local = &self.units[cx.unit.index()].locals[id.index()];
+            let (ty, reads, top) = (local.ty, local.reads.clone(), local.top);
+            self.use_late(cx, name, span, &reads, top);
+            return Some((ty, Meaning::Local(id)));
         }
         match self.lookup_value(cx.file, name)? {
             ValueItem::Global(g) => Some(self.global_value(cx, g, span)),
@@ -784,7 +790,7 @@ impl<'p> Checker<'p> {
             self.expr(cx, guard, Some(TypeId::BOOL));
         }
         let elem = want.and_then(|w| match self.types.get(w) {
-            Type::List(t) => Some((*t, w)),
+            Type::List(t) | Type::Set(t) => Some((*t, w)),
             Type::Data => Some((TypeId::DATA, TypeId::DATA)),
             _ => None,
         });
@@ -888,6 +894,9 @@ impl<'p> Checker<'p> {
                 return (want.unwrap_or(TypeId::ERROR), Meaning::Plain);
             }
             Some(Type::Data) => {
+                // A struct value inside `Data` becomes data when it is built
+                // and cannot merge with other contributions, so it must be
+                // complete even where a contribution may be partial.
                 self.map_entries(cx, TypeId::STR, TypeId::DATA, &entries, false);
                 return (TypeId::DATA, Meaning::Plain);
             }
@@ -909,8 +918,12 @@ impl<'p> Checker<'p> {
             return (self.types.map(TypeId::STR, TypeId::ERROR), Meaning::Plain);
         };
         let value = self.expr(cx, first, None);
-        self.map_entries(cx, TypeId::STR, value, &entries[1..], false);
-        self.check_map_keys(cx, TypeId::STR, &entries[..1]);
+        self.check_map_keys(cx, TypeId::STR, &entries);
+        for entry in &entries[1..] {
+            if let Some(v) = entry.value() {
+                self.expr(cx, v, Some(value));
+            }
+        }
         (self.types.map(TypeId::STR, value), Meaning::Plain)
     }
 
@@ -1223,12 +1236,7 @@ impl<'p> Checker<'p> {
         }
     }
 
-    fn field(
-        &mut self,
-        cx: &mut Cx,
-        field: ast::FieldExpr<'p>,
-        want: Option<TypeId>,
-    ) -> (TypeId, Meaning) {
+    fn field(&mut self, cx: &mut Cx, field: ast::FieldExpr<'p>) -> (TypeId, Meaning) {
         let span = field.syntax().span();
         let (Some(base), Some(member)) = (field.base(), field.field()) else {
             return (TypeId::ERROR, Meaning::Plain);
@@ -1237,7 +1245,7 @@ impl<'p> Checker<'p> {
             return self.self_field(cx, field, member);
         }
         if let Some(item) = self.static_path(cx, Expr::Field(field)) {
-            return self.path_value(cx, item, span, want);
+            return self.path_value(cx, item, span);
         }
         let base_ty = self.expr(cx, base, None);
         let name = member.text();
@@ -1313,13 +1321,7 @@ impl<'p> Checker<'p> {
     }
 
     /// Returns the value a static path names in expression position.
-    fn path_value(
-        &mut self,
-        cx: &mut Cx,
-        item: PathItem,
-        span: Span,
-        want: Option<TypeId>,
-    ) -> (TypeId, Meaning) {
+    fn path_value(&mut self, cx: &mut Cx, item: PathItem, span: Span) -> (TypeId, Meaning) {
         match item {
             PathItem::Value(g) => self.global_value(cx, g, span),
             PathItem::Variant(s, index) => {
@@ -1336,7 +1338,6 @@ impl<'p> Checker<'p> {
                         .with_help(format!("write `{name}(...)`")),
                     );
                 }
-                let _ = want;
                 (
                     self.types.intern(Type::Sum(s)),
                     Meaning::Variant {
@@ -1504,12 +1505,14 @@ impl<'p> Checker<'p> {
             }
             BinaryOp::Eq | BinaryOp::NotEq => {
                 let l = self.expr(cx, lhs, None);
-                self.expr(cx, rhs, Some(l));
                 if self.types.has_code(l) {
                     self.error(
                         cx.file,
                         Diagnostic::error("E0401", span, "functions and parts cannot be compared"),
                     );
+                    self.expr(cx, rhs, None);
+                } else {
+                    self.expr(cx, rhs, Some(l));
                 }
                 TypeId::BOOL
             }

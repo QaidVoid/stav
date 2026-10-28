@@ -1,0 +1,5 @@
+type Level = debug | info | warn
+struct Root { levels: Set<Level> = [], counts: Option<Set<Int>> }
+let found: List<Level> = [warn, debug, warn]
+levels = [for l in found -> l]
+counts = [for n in [3, 1, 3, 2] if n > 1 -> n * 10]

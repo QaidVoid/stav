@@ -271,7 +271,9 @@ fn diagnostics(program: &Program, items: Vec<FileDiagnostic>) -> Diagnostics {
 enum Binding {
     Local(LocalId),
     /// A binding of a `let ... in` expression that is not visible yet,
-    /// because the reference is in its own value or an earlier one.
+    /// because the reference is in its own value or an earlier one. Names
+    /// resolve past it, and it only explains a name that resolves to
+    /// nothing.
     Pending,
 }
 
@@ -337,10 +339,20 @@ impl Scope {
         }
     }
 
-    fn lookup(&self, name: &str) -> Option<Binding> {
+    /// Returns the innermost visible binding of `name`.
+    fn lookup(&self, name: &str) -> Option<LocalId> {
+        self.bindings.get(name)?.iter().rev().find_map(|b| match b {
+            Binding::Local(id) => Some(*id),
+            Binding::Pending => None,
+        })
+    }
+
+    /// Returns whether `name` is a binding of an enclosing `let ... in`
+    /// expression that is not visible yet.
+    fn is_pending(&self, name: &str) -> bool {
         self.bindings
             .get(name)
-            .and_then(|stack| stack.last().copied())
+            .is_some_and(|stack| stack.iter().any(|b| matches!(b, Binding::Pending)))
     }
 
     fn names(&self) -> impl Iterator<Item = &str> {
@@ -381,7 +393,7 @@ impl Cx {
         }
     }
 
-    fn lookup(&self, name: &str) -> Option<Binding> {
+    fn lookup(&self, name: &str) -> Option<LocalId> {
         self.scope.lookup(name)
     }
 }

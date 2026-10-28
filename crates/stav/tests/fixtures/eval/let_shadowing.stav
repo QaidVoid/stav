@@ -1,0 +1,5 @@
+struct Root { a: Int = 0, b: Int = 0 }
+fn next(y: Int) -> Int = (let y = y + 1 in y)
+let base = 10
+a = next(1)
+b = (let base = base + 5, base = base * 2 in base)

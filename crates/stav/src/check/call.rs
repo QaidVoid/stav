@@ -252,6 +252,9 @@ impl<'p> Checker<'p> {
                     );
                     return CallTarget::Error;
                 }
+                if self.used_too_early(cx, text, span) {
+                    return CallTarget::Error;
+                }
                 let mut candidates: Vec<String> = cx.scope.names().map(str::to_owned).collect();
                 candidates.extend(self.value_names(cx.file));
                 candidates.extend(builtins::names().map(str::to_owned));
