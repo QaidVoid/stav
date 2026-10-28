@@ -771,8 +771,8 @@ fn line_feed_in_multi_line_string_inside_single_line_string_ends_both() {
     18..18   "" Eof
     error[E0108] 4..5: unterminated string
       help: close the string with `"` before the end of the line
-    error[E0110] 8..11: the opening `"""` must be followed directly by a line break
-      help: start the content of the string on the next line
+    error[E0110] 8..11: a multi-line string cannot appear inside a single-line string
+      help: close the enclosing string before the multi-line string starts
     error[E0108] 8..11: unterminated string
       help: close the string with `"` before the end of the line
     "##);
@@ -796,8 +796,8 @@ fn multi_line_string_inside_single_line_string_reports_its_opener() {
     18..19   "}" InterpEnd
     19..20   "\"" StrEnd
     20..20   "" Eof
-    error[E0110] 10..13: the opening `"""` must be followed directly by a line break
-      help: start the content of the string on the next line
+    error[E0110] 10..13: a multi-line string cannot appear inside a single-line string
+      help: close the enclosing string before the multi-line string starts
     "##);
 }
 

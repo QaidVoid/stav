@@ -565,11 +565,20 @@ impl<'a> Lexer<'a> {
         // multi-line string there can never be valid. Text after the opener
         // is reported at the opener and lexed as content, so that a closing
         // `"""` on the same line still ends the string.
-        if form.is_multi() && self.single_line_from.is_some() && self.peek(0) != Some(b'\n') {
-            frame.bad_opener = true;
-            self.bad_opener(start);
-        }
-        if form.is_multi() && self.single_line_from.is_none() {
+        if form.is_multi() && self.single_line_from.is_some() {
+            if self.peek(0) != Some(b'\n') {
+                frame.bad_opener = true;
+                self.error(
+                    "E0110",
+                    start,
+                    self.pos,
+                    "a multi-line string cannot appear inside a single-line string".to_owned(),
+                    Some(
+                        "close the enclosing string before the multi-line string starts".to_owned(),
+                    ),
+                );
+            }
+        } else if form.is_multi() {
             if self.peek(0) != Some(b'\n') {
                 frame.bad_opener = true;
                 let rest = self.pos;
