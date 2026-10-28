@@ -514,28 +514,44 @@ fn empty_source_is_only_eof() {
     assert_snapshot!(render(""), @r#"0..0     "" Eof"#);
 }
 
-/// Builds the value of the only string in `source` from its literal parts,
-/// writing each interpolation as `{}` and each escape as `<escape>`.
-fn string_value(source: &str) -> String {
-    let mut value = String::new();
-    let mut depth = 0;
+/// Builds the value of every string in `source` from its literal parts, in
+/// the order the strings start. Each interpolation is written as `{}` and
+/// each escape as `<escape>`.
+fn string_values(source: &str) -> Vec<String> {
+    let mut values: Vec<String> = Vec::new();
+    // Open strings as indexes into `values`, and `None` for interpolations.
+    let mut open: Vec<Option<usize>> = Vec::new();
     for token in lex(source).tokens {
+        let current = open.last().copied().flatten();
         match token.kind {
-            TokenKind::InterpStart => {
-                depth += 1;
-                if depth == 1 {
-                    value.push_str("{}");
-                }
+            TokenKind::StrStart
+            | TokenKind::MStrStart
+            | TokenKind::RawStrStart
+            | TokenKind::RawMStrStart => {
+                open.push(Some(values.len()));
+                values.push(String::new());
             }
-            TokenKind::InterpEnd => depth -= 1,
-            TokenKind::StrText if depth == 0 => value.push_str(token.text(source)),
-            TokenKind::StrEscape if depth == 0 => {
-                write!(value, "<{}>", token.text(source)).unwrap();
+            TokenKind::StrEnd | TokenKind::MStrEnd | TokenKind::InterpEnd => {
+                open.pop();
+            }
+            TokenKind::InterpStart => {
+                if let Some(i) = current {
+                    values[i].push_str("{}");
+                }
+                open.push(None);
+            }
+            TokenKind::StrText => values[current.unwrap()].push_str(token.text(source)),
+            TokenKind::StrEscape => {
+                write!(values[current.unwrap()], "<{}>", token.text(source)).unwrap();
             }
             _ => {}
         }
     }
-    value
+    values
+}
+
+fn string_value(source: &str) -> String {
+    string_values(source).swap_remove(0)
 }
 
 #[test]
@@ -839,6 +855,38 @@ fn multi_line_interpolation_may_span_lines() {
     let source = "\"\"\"\n  a #{f(\n    x,\n  )} b\n  c\n  \"\"\"";
     assert_eq!(string_value(source), "a {} b\nc\n");
     assert!(lex(source).diagnostics.is_empty());
+}
+
+#[test]
+fn nested_multi_line_strings_strip_their_own_indentation() {
+    let source = "x = \"\"\"\n    outer #{\"\"\"\n        inner\n      \"\"\"} end\n  \"\"\"\n";
+    assert_eq!(string_values(source), ["  outer {} end\n", "  inner\n"]);
+    assert!(lex(source).diagnostics.is_empty());
+    assert_snapshot!(render(source), @r##"
+    0..1     "x" Ident
+    1..2     " " Whitespace
+    2..3     "=" Eq
+    3..4     " " Whitespace
+    4..7     "\"\"\"" MStrStart
+    7..8     "\n" StrLayout
+    8..10    "  " StrLayout
+    10..12   "  " StrText
+    12..18   "outer " StrText
+    18..20   "#{" InterpStart
+    20..23   "\"\"\"" MStrStart
+    23..24   "\n" StrLayout
+    24..30   "      " StrLayout
+    30..32   "  " StrText
+    32..38   "inner\n" StrText
+    38..44   "      " StrLayout
+    44..47   "\"\"\"" MStrEnd
+    47..48   "}" InterpEnd
+    48..53   " end\n" StrText
+    53..55   "  " StrLayout
+    55..58   "\"\"\"" MStrEnd
+    58..59   "\n" Newline
+    59..59   "" Eof
+    "##);
 }
 
 #[test]
