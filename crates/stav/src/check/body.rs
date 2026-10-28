@@ -4,10 +4,11 @@
 use std::collections::BTreeMap;
 
 use super::decls::{GlobalKind, ValueItem};
+use super::graph;
 use super::load::FileId;
 use super::model::{
-    AttrFact, BlockFact, BlockRule, Fact, ForFact, IncludeFact, LabelFact, LetFact, Priority, Step,
-    Target, UnitId,
+    AttrFact, BlockFact, BlockRule, Fact, ForFact, IncludeFact, LabelFact, LetFact, Priority,
+    SelfRead, Step, Target, UnitId,
 };
 use super::suggest::did_you_mean;
 use super::types::{StructId, Type, TypeId};
@@ -15,6 +16,26 @@ use super::{Binding, BodyCx, Checker, Cx, Frame, SelfMode};
 use crate::ast::{self, Expr, Item, Key, Stmt};
 use crate::diagnostic::Diagnostic;
 use crate::span::Span;
+
+/// The late contributions of one body and the fields they read through
+/// `self`. Nodes are fields of blocks, keyed by the path of the block from
+/// the top of the body and the field name.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct SelfGraph {
+    nodes: BTreeMap<(Vec<String>, String), usize>,
+    labels: Vec<String>,
+    edges: Vec<(usize, usize, Span)>,
+}
+
+impl SelfGraph {
+    fn node(&mut self, path: Vec<String>, field: String, label: String) -> usize {
+        let next = self.labels.len();
+        *self.nodes.entry((path, field)).or_insert_with(|| {
+            self.labels.push(label);
+            next
+        })
+    }
+}
 
 /// Where an attribute path stands: at a body target, or at a value of
 /// some type.
@@ -188,6 +209,7 @@ impl<'p> Checker<'p> {
         let mut place = Place::Target(target);
         let mut steps = Vec::new();
         let mut names = Vec::new();
+        let mut owner = self.target_name(target);
         let mut i = 0;
         let ty = loop {
             let Some(key) = keys.get(i) else {
@@ -240,6 +262,7 @@ impl<'p> Checker<'p> {
                         );
                         break None;
                     };
+                    owner = self.target_name(t);
                     steps.push(Step::Field(field.index));
                     names.push(text);
                     place = Place::Type(field.ty);
@@ -280,6 +303,9 @@ impl<'p> Checker<'p> {
         cx.partial = false;
         let reads = std::mem::replace(&mut cx.reads, saved);
         let Some(ty) = ty else { return };
+        if !reads.is_empty() {
+            self.late_contribution(cx, &names, owner, &reads, value.syntax().span());
+        }
         self.fact(
             cx,
             attr.syntax(),
@@ -333,6 +359,82 @@ impl<'p> Checker<'p> {
         }
     }
 
+    /// Adds the edges of a late contribution to the `self` graph of the
+    /// body.
+    fn late_contribution(
+        &mut self,
+        cx: &mut Cx,
+        names: &[String],
+        owner: String,
+        reads: &[SelfRead],
+        span: Span,
+    ) {
+        let SelfMode::Body(body) = &mut cx.self_mode else {
+            return;
+        };
+        let Some((field, prefix)) = names.split_last() else {
+            return;
+        };
+        let mut path = body
+            .frames
+            .last()
+            .map(|f| f.path.clone())
+            .unwrap_or_default();
+        path.extend(prefix.iter().cloned());
+        let label = format!("{owner}.{field}");
+        let from = body.graph.node(path, field.clone(), label);
+        for read in reads {
+            let Some(frame) = body.frames.get(read.depth) else {
+                continue;
+            };
+            let def = &self.types.structs[read.structure.index()];
+            let Some(f) = def.fields.get(read.field) else {
+                continue;
+            };
+            let label = format!("{}.{}", def.name, f.name);
+            let to = body.graph.node(frame.path.clone(), f.name.clone(), label);
+            body.graph.edges.push((from, to, span));
+        }
+    }
+
+    /// Reports the cycles of the `self` graph of a body.
+    pub(super) fn self_cycles(&mut self, file: FileId, graph: &SelfGraph) {
+        let mut adj = vec![Vec::new(); graph.labels.len()];
+        for &(from, to, _) in &graph.edges {
+            adj[from].push(to);
+        }
+        for list in &mut adj {
+            list.sort_unstable();
+            list.dedup();
+        }
+        for cycle in graph::cycles(&adj) {
+            let mut diagnostic: Option<Diagnostic> = None;
+            for (i, &from) in cycle.iter().enumerate() {
+                let to = cycle[(i + 1) % cycle.len()];
+                let Some(&(_, _, span)) =
+                    graph.edges.iter().find(|(f, t, _)| *f == from && *t == to)
+                else {
+                    continue;
+                };
+                let message = format!("`{}` reads `{}`", graph.labels[from], graph.labels[to]);
+                diagnostic = Some(match diagnostic {
+                    None => Diagnostic::error("E0607", span, "`self` dependencies form a cycle")
+                        .with_label(None, span, message),
+                    Some(d) => d.with_label(None, span, message),
+                });
+            }
+            let Some(diagnostic) = diagnostic else {
+                continue;
+            };
+            let mut chain: Vec<&str> = cycle.iter().map(|&n| graph.labels[n].as_str()).collect();
+            chain.push(&graph.labels[cycle[0]]);
+            self.error(
+                file,
+                diagnostic.with_note(format!("cycle: {}", chain.join(" -> "))),
+            );
+        }
+    }
+
     fn block(&mut self, cx: &mut Cx, block: ast::Block<'p>, target: Target) {
         let Some(kind_token) = block.kind() else {
             return;
@@ -358,6 +460,10 @@ impl<'p> Checker<'p> {
             _ => None,
         };
         let named = fields.iter().find(|f| f.name == kind);
+        let segment = match &label_fact {
+            Some(LabelFact::Static(text)) => text.clone(),
+            _ => format!("#{}", block.syntax().index()),
+        };
         let mapped = match (clause, named) {
             (Some(field), _) => {
                 let ty = self.types.peel(field.ty);
@@ -375,7 +481,12 @@ impl<'p> Checker<'p> {
                         } else if let Some(s) = self.types.as_sum(k) {
                             self.label_variant(cx, s, label_fact.as_ref(), label_span);
                         }
-                        Some((BlockRule::Clause, field.index, target))
+                        Some((
+                            BlockRule::Clause,
+                            field.index,
+                            vec![field.name.clone(), segment],
+                            target,
+                        ))
                     }
                     _ => self.tagged(cx, field, kind, label_fact.as_ref(), label_span),
                 }
@@ -388,13 +499,19 @@ impl<'p> Checker<'p> {
                 match self.types.get(ty).clone() {
                     Type::Struct(s) => {
                         self.no_label(cx, kind, label, label_span);
-                        Some((BlockRule::Field, field.index, Target::Struct(s)))
+                        Some((
+                            BlockRule::Field,
+                            field.index,
+                            vec![field.name.clone()],
+                            Target::Struct(s),
+                        ))
                     }
                     Type::Map(k, v) => {
                         self.no_label(cx, kind, label, label_span);
                         Some((
                             BlockRule::MapField,
                             field.index,
+                            vec![field.name.clone()],
                             Target::Map { key: k, value: v },
                         ))
                     }
@@ -411,7 +528,7 @@ impl<'p> Checker<'p> {
                 None
             }
         };
-        let Some((rule, field, body_target)) = mapped else {
+        let Some((rule, field, segments, body_target)) = mapped else {
             if let Some(body) = block.body() {
                 self.ignored_body(cx, body);
             }
@@ -429,8 +546,11 @@ impl<'p> Checker<'p> {
         );
         let Some(body) = block.body() else { return };
         if let SelfMode::Body(b) = &mut cx.self_mode {
+            let mut path = b.frames.last().map(|f| f.path.clone()).unwrap_or_default();
+            path.extend(segments);
             b.frames.push(Frame {
                 target: body_target,
+                path,
             });
         }
         let mark = cx.scope.len();
@@ -450,7 +570,10 @@ impl<'p> Checker<'p> {
         };
         let mark = cx.scope.len();
         if let SelfMode::Body(b) = &mut cx.self_mode {
-            b.frames.push(Frame { target: error });
+            b.frames.push(Frame {
+                target: error,
+                path: vec![format!("#{}", body.syntax().index())],
+            });
         }
         self.statements(cx, body.statements(), error);
         if let SelfMode::Body(b) = &mut cx.self_mode {
@@ -466,7 +589,7 @@ impl<'p> Checker<'p> {
         kind: &str,
         label: Option<&LabelFact>,
         span: Span,
-    ) -> Option<(BlockRule, usize, Target)> {
+    ) -> Option<(BlockRule, usize, Vec<String>, Target)> {
         let ty = self
             .types
             .unwrap_option(field.ty)
@@ -477,9 +600,11 @@ impl<'p> Checker<'p> {
             return None;
         }
         let variant = self.label_variant(cx, s, label, span)?;
+        let name = self.types.sum(s).variants[variant].name.clone();
         Some((
             BlockRule::Tagged,
             field.index,
+            vec![field.name.clone(), format!(":{name}")],
             Target::Variant { sum: s, variant },
         ))
     }
@@ -677,7 +802,9 @@ impl<'p> Checker<'p> {
             top,
             frames: vec![Frame {
                 target: Target::Struct(root),
+                path: Vec::new(),
             }],
+            graph: SelfGraph::default(),
         };
         let mut cx = Cx::new(unit, file, SelfMode::Body(body), None);
         let mut included = BTreeMap::new();
@@ -690,6 +817,10 @@ impl<'p> Checker<'p> {
             }
             cx.limit = Some(statement.syntax().span().start);
             self.statement(&mut cx, statement, Target::Struct(root), &mut included);
+        }
+        if let SelfMode::Body(body) = std::mem::replace(&mut cx.self_mode, SelfMode::Forbidden(""))
+        {
+            self.self_cycles(file, &body.graph);
         }
         unit
     }

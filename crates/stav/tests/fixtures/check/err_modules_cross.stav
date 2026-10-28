@@ -1,0 +1,5 @@
+import "./lib.stav" as lib
+struct Root { a: Int = lib.f(1) }
+#- file lib.stav
+fn f(n: Int) -> Int = g(n)
+fn g(n: Int) -> Int = f(n)

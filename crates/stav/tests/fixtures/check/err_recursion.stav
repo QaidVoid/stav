@@ -1,0 +1,11 @@
+struct Root { a: Int = fact(3) }
+fn fact(n: Int) -> Int = if n == 0 { 1 } else { n * fact(n - 1) }
+fn even(n: Int) -> Bool = if n == 0 { true } else { odd(n - 1) }
+fn odd(n: Int) -> Bool = if n == 0 { false } else { even(n - 1) }
+fn apply(f: Fn(Int) -> Int, x: Int) -> Int = f(x)
+fn loop(x: Int) -> Int = apply(loop, x)
+struct S { a: Int = build() }
+fn build() -> Int = S {}.a
+let fs: List<Fn(Int) -> Int> = [through]
+fn through(x: Int) -> Int = fs[0](x)
+fn check(n: Int where check) -> Bool = true

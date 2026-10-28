@@ -2,9 +2,9 @@
 //!
 //! [`check`] loads every file of a root through the host's [`Loader`],
 //! resolves imports and part files, resolves every name and type checks
-//! every declaration, expression and statement. It rejects recursive types,
-//! bindings used before their definition, and cycles of imports and part
-//! files. Nothing is evaluated.
+//! every declaration, expression and statement, and enforces the totality
+//! rules: no recursive functions, bindings or types, and no cycles of
+//! imports, part files or `self` dependencies. Nothing is evaluated.
 
 mod body;
 mod builtins;
@@ -218,12 +218,16 @@ struct BodyCx {
     /// `part { }` expression.
     top: u32,
     frames: Vec<Frame>,
+    graph: body::SelfGraph,
 }
 
 /// One block around a statement.
 #[derive(Debug, Clone)]
 struct Frame {
     target: Target,
+    /// The keys from the top of the body to the block, which identify the
+    /// block in the `self` graph.
+    path: Vec<String>,
 }
 
 /// The lexical bindings in scope, innermost last.
@@ -374,7 +378,7 @@ impl<'p> Checker<'p> {
                 self.entries.push(unit);
             }
         }
-        self.order_lets();
+        self.check_totality();
     }
 
     /// Returns the diagnostics, and what the evaluator needs when none of

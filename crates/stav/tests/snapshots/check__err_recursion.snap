@@ -1,0 +1,33 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0610]: `fact` calls itself
+  --> app/main.stav:2:53
+  note: cycle: `fact` -> `fact`
+  note: evaluation must terminate, so functions cannot recurse
+  help: iterate with `fold` over `range(...)`, for example `fold(range(1, n + 1), 1, fn(acc: Int, i: Int) = acc * i)`
+error[E0610]: functions may not call each other in a cycle
+  --> app/main.stav:3:53
+  note: cycle: `even` -> `odd` -> `even`
+  note: evaluation must terminate, so functions cannot recurse
+  help: iterate with `fold` over `range(...)`, for example `fold(range(1, n + 1), 1, fn(acc: Int, i: Int) = acc * i)`
+error[E0610]: `loop` calls itself
+  --> app/main.stav:6:32
+  note: cycle: `loop` -> `loop`
+  note: evaluation must terminate, so functions cannot recurse
+  help: iterate with `fold` over `range(...)`, for example `fold(range(1, n + 1), 1, fn(acc: Int, i: Int) = acc * i)`
+error[E0610]: functions may not call each other in a cycle
+  --> app/main.stav:8:21
+  note: cycle: `build` -> the defaults of `S` -> `build`
+  note: evaluation must terminate, so functions cannot recurse
+  help: iterate with `fold` over `range(...)`, for example `fold(range(1, n + 1), 1, fn(acc: Int, i: Int) = acc * i)`
+error[E0305]: `fs` depends on itself
+  --> app/main.stav:9:33
+  note: cycle: `fs` -> `through` -> `fs`
+error[E0610]: `check` calls itself
+  --> app/main.stav:11:23
+  note: cycle: `check` -> `check`
+  note: evaluation must terminate, so functions cannot recurse
+  help: iterate with `fold` over `range(...)`, for example `fold(range(1, n + 1), 1, fn(acc: Int, i: Int) = acc * i)`

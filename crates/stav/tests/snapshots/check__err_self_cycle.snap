@@ -1,0 +1,14 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0607]: `self` dependencies form a cycle
+  --> app/main.stav:8:13
+  label: app/main.stav:8:13: `Package.version` reads `Package.tag`
+  label: app/main.stav:9:9: `Package.tag` reads `Package.version`
+  note: cycle: Package.version -> Package.tag -> Package.version
+error[E0607]: `self` dependencies form a cycle
+  --> app/main.stav:13:9
+  label: app/main.stav:13:9: `Package.url` reads `Package.url`
+  note: cycle: Package.url -> Package.url

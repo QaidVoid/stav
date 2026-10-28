@@ -668,7 +668,9 @@ impl<'p> Checker<'p> {
                 top: self.entry_top(file),
                 frames: vec![Frame {
                     target: Target::Struct(root),
+                    path: Vec::new(),
                 }],
+                graph: super::body::SelfGraph::default(),
             }),
             _ => SelfMode::Forbidden("a module"),
         }
@@ -1837,14 +1839,19 @@ impl<'p> Checker<'p> {
             top,
             frames: vec![Frame {
                 target: Target::Struct(s),
+                path: Vec::new(),
             }],
+            graph: super::body::SelfGraph::default(),
         };
         let saved_mode = std::mem::replace(&mut cx.self_mode, SelfMode::Body(body));
         let saved_reads = std::mem::take(&mut cx.reads);
         let mark = cx.scope.len();
         self.statements(cx, statements, Target::Struct(s));
         cx.scope.truncate(mark);
-        cx.self_mode = saved_mode;
+        let mode = std::mem::replace(&mut cx.self_mode, saved_mode);
         cx.reads = saved_reads;
+        if let SelfMode::Body(body) = mode {
+            self.self_cycles(cx.file, &body.graph);
+        }
     }
 }

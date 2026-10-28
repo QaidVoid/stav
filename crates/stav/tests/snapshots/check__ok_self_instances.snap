@@ -1,0 +1,17 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+file 0 app/a.stav (entry)
+file 1 app/b.stav (entry)
+entries 0, 1
+root Root
+bodies unit 0, unit 1
+unit 0 app/a.stav
+  6:1 block package "a" (clause packages) -> Package
+  7:3   version: Str (plain) late(Package.tag@1)
+  8:3   tag: Str (plain)
+unit 1 app/b.stav
+  1:1 block package "b" (clause packages) -> Package
+  2:3   version: Str (plain)
+  3:3   tag: Str (plain) late(Package.version@1)

@@ -1,0 +1,14 @@
+struct Package {
+  version: Str
+  tag: Str
+  url: Str = ""
+}
+struct Root { packages: Map<Str, Package> = {} block package }
+package foo {
+  version = "#{self.tag}"
+  tag = "v#{self.version}"
+}
+package bar {
+  let v = self.url
+  url = "x#{v}"
+}
