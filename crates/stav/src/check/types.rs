@@ -206,9 +206,7 @@ pub(crate) enum Predicate {
 /// evaluated.
 #[derive(Debug, Clone)]
 pub(crate) struct Refinement {
-    #[expect(dead_code, reason = "read by the evaluator")]
     pub(crate) file: FileId,
-    #[expect(dead_code, reason = "read by the evaluator")]
     pub(crate) span: Span,
     pub(crate) predicates: Vec<Predicate>,
 }

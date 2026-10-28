@@ -7,27 +7,27 @@
 //! imports, part files or `self` dependencies. Nothing is evaluated.
 
 mod body;
-mod builtins;
+pub(crate) mod builtins;
 mod call;
-mod decls;
+pub(crate) mod decls;
 mod expr;
-mod graph;
+pub(crate) mod graph;
 mod host;
 mod load;
-mod model;
+pub(crate) mod model;
 mod pattern;
 mod schema;
-mod suggest;
+pub(crate) mod suggest;
 mod summary;
 mod totality;
-mod types;
+pub(crate) mod types;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 pub use host::{
-    Host, HostModule, ImportRoot, LoadError, Loader, MemoryLoader, RelPath, RootSpec, Source,
-    SymbolType,
+    Host, HostModule, ImplicitRefs, ImportRoot, LoadError, Loader, MemoryLoader, RelPath, RootSpec,
+    Source, SymbolType,
 };
 pub use load::FileId;
 pub use schema::{SchemaField, SchemaIndex, SchemaStruct, SchemaSum, SchemaVariant};
@@ -48,18 +48,22 @@ use crate::syntax::SyntaxNode;
 /// warnings found on the way.
 #[derive(Debug)]
 pub struct Checked {
-    program: Program,
-    types: Types,
-    globals: Vec<Global>,
-    units: Vec<Unit>,
-    root: StructId,
-    entries: Vec<UnitId>,
-    implicit_parts: Vec<UnitId>,
-    let_order: Vec<types::GlobalId>,
+    pub(crate) program: Program,
+    pub(crate) types: Types,
+    pub(crate) globals: Vec<Global>,
+    pub(crate) units: Vec<Unit>,
+    pub(crate) root: StructId,
+    pub(crate) root_ty: types::TypeId,
+    pub(crate) entries: Vec<UnitId>,
+    pub(crate) implicit_parts: Vec<UnitId>,
+    pub(crate) let_order: Vec<types::GlobalId>,
     calls: CallGraph,
-    ref_targets: BTreeMap<StructId, Vec<model::Step>>,
+    pub(crate) ref_targets: BTreeMap<StructId, Vec<model::Step>>,
     warnings: Diagnostics,
     inputs: Vec<(PathBuf, [u8; 32])>,
+    pub(crate) symbols: Vec<SymbolType>,
+    pub(crate) implicit_refs: Vec<ImplicitRefs>,
+    pub(crate) import_roots: Vec<ImportRoot>,
 }
 
 impl Checked {
@@ -96,6 +100,35 @@ impl Checked {
     /// inputs tells apart every evaluation whose sources differ.
     pub fn inputs(&self) -> &[(PathBuf, [u8; 32])] {
         &self.inputs
+    }
+
+    /// Returns the names and texts of the files, for diagnostics.
+    pub(crate) fn named_sources(&self) -> Vec<NamedSource> {
+        diagnostics(&self.program, Vec::new()).files
+    }
+
+    /// Returns whether a top-level `let` reads `self`.
+    pub(crate) fn let_reads(&self, g: types::GlobalId) -> bool {
+        matches!(
+            &self.globals[g.index()].kind,
+            decls::GlobalKind::Let(decls::LetGlobal {
+                state: decls::LetState::Done { reads, .. },
+                ..
+            }) if !reads.is_empty()
+        )
+    }
+
+    /// Returns the annotated type of a top-level `let`.
+    pub(crate) fn let_annotation(&self, g: types::GlobalId) -> Option<types::TypeId> {
+        match &self.globals[g.index()].kind {
+            decls::GlobalKind::Let(l) => l.annotation,
+            decls::GlobalKind::Fn(_) => None,
+        }
+    }
+
+    /// Returns whether a top-level declaration is a function.
+    pub(crate) fn is_fn(&self, g: types::GlobalId) -> bool {
+        matches!(self.globals[g.index()].kind, decls::GlobalKind::Fn(_))
     }
 }
 
@@ -181,9 +214,12 @@ pub fn check(host: &Host, root: &RootSpec) -> Result<Checked, Diagnostics> {
         Some(parts) => {
             let warnings = diagnostics(&program, found);
             let inputs = inputs(&program, root);
+            let mut types = parts.types;
+            let root_ty = types.intern(types::Type::Struct(parts.root));
             Ok(Checked {
                 program,
-                types: parts.types,
+                types,
+                root_ty,
                 globals: parts.globals,
                 units: parts.units,
                 root: parts.root,
@@ -194,6 +230,9 @@ pub fn check(host: &Host, root: &RootSpec) -> Result<Checked, Diagnostics> {
                 ref_targets: parts.ref_targets,
                 warnings,
                 inputs,
+                symbols: host.symbols.clone(),
+                implicit_refs: host.implicit_refs.clone(),
+                import_roots: root.import_roots.clone(),
             })
         }
         None => Err(diagnostics(&program, found)),

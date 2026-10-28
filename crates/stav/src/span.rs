@@ -2,6 +2,8 @@
 
 use std::ops::Range;
 
+use crate::check::FileId;
+
 /// A half-open byte range `start..end` into a source text.
 ///
 /// Both offsets always fall on UTF-8 character boundaries of the text the
@@ -19,4 +21,13 @@ impl Span {
     pub fn range(self) -> Range<usize> {
         self.start..self.end
     }
+}
+
+/// A span in a particular file of a checked program.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct SourceSpan {
+    /// The file the span is in.
+    pub file: FileId,
+    /// The bytes of the file the span covers.
+    pub span: Span,
 }

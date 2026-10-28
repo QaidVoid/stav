@@ -73,8 +73,14 @@ pub(crate) fn components(adj: &[Vec<usize>]) -> Vec<Vec<usize>> {
 /// node of its component and is as short as possible from there. A node
 /// with an edge to itself is a cycle of one node.
 pub(crate) fn cycles(adj: &[Vec<usize>]) -> Vec<Vec<usize>> {
+    cycles_of(adj, &components(adj))
+}
+
+/// Returns the cycles of [`cycles`] for strongly connected components
+/// already computed by [`components`].
+pub(crate) fn cycles_of(adj: &[Vec<usize>], components: &[Vec<usize>]) -> Vec<Vec<usize>> {
     let mut out = Vec::new();
-    for component in components(adj) {
+    for component in components {
         let start = component[0];
         if component.len() == 1 {
             if adj[start].contains(&start) {

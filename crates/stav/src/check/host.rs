@@ -5,6 +5,8 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::path::{Component, Path, PathBuf};
 
+use crate::value::Value;
+
 /// Reads source files for the checker.
 ///
 /// The library never touches the filesystem itself. Every source file it
@@ -170,6 +172,22 @@ pub struct HostModule {
     pub source: String,
 }
 
+/// Labels that a host lets references to a struct name, in addition to
+/// the labels of the struct's target map.
+///
+/// The host derives them from the merged value of the root, for example a
+/// group for every user that has no explicit group. The function must be
+/// deterministic and total. It runs after merging and before references
+/// are checked, and cannot change the value.
+#[derive(Debug, Clone)]
+pub struct ImplicitRefs {
+    /// The name of the struct the labels are targets for, for example
+    /// `Group`.
+    pub target: String,
+    /// Returns the labels, given the merged value of the root.
+    pub labels: fn(&Value) -> Vec<String>,
+}
+
 /// Everything a host program contributes to the checking of a root.
 pub struct Host {
     /// Files whose declarations are in scope, unqualified, in every file.
@@ -181,19 +199,23 @@ pub struct Host {
     pub symbols: Vec<SymbolType>,
     /// The modules the host supplies for this evaluation.
     pub host_modules: Vec<HostModule>,
+    /// Labels that references may name although no block declares them.
+    pub implicit_refs: Vec<ImplicitRefs>,
     /// Reads every other source file.
     pub loader: Box<dyn Loader>,
 }
 
 impl Host {
-    /// Returns a host without prelude, implicit parts, symbol types or host
-    /// modules, which reads files through `loader`.
+    /// Returns a host without prelude, implicit parts, symbol types, host
+    /// modules or implicit reference targets, which reads files through
+    /// `loader`.
     pub fn new(loader: impl Loader + 'static) -> Self {
         Self {
             prelude: Vec::new(),
             implicit_parts: Vec::new(),
             symbols: Vec::new(),
             host_modules: Vec::new(),
+            implicit_refs: Vec::new(),
             loader: Box::new(loader),
         }
     }
@@ -206,6 +228,7 @@ impl fmt::Debug for Host {
             .field("implicit_parts", &self.implicit_parts)
             .field("symbols", &self.symbols)
             .field("host_modules", &self.host_modules)
+            .field("implicit_refs", &self.implicit_refs)
             .finish_non_exhaustive()
     }
 }

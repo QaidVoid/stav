@@ -90,7 +90,7 @@ pub(crate) enum Fact {
     Include(IncludeFact),
     Let(LetFact),
     For(ForFact),
-    Pattern(#[expect(dead_code, reason = "read by the evaluator")] PatternFact),
+    Pattern(PatternFact),
 }
 
 /// The type and meaning of an expression.
@@ -102,7 +102,6 @@ pub(crate) struct ExprFact {
     pub(crate) to_data: bool,
     /// Whether the value is wrapped into an `Option` for its position.
     pub(crate) wrap: bool,
-    #[expect(dead_code, reason = "read by the evaluator")]
     pub(crate) meaning: Meaning,
 }
 
@@ -205,14 +204,12 @@ pub(crate) enum Step {
 /// An attribute statement `path = value`.
 #[derive(Debug, Clone)]
 pub(crate) struct AttrFact {
-    #[expect(dead_code, reason = "read by the evaluator")]
     pub(crate) steps: Vec<Step>,
     /// The type of the attribute the path ends at.
     pub(crate) ty: TypeId,
     pub(crate) priority: Priority,
     /// The node index of the contributed expression, inside the priority
     /// marker if there is one.
-    #[expect(dead_code, reason = "read by the evaluator")]
     pub(crate) value: usize,
     /// The `self` fields the value reads. A contribution that reads `self`
     /// is late, and evaluated after merging.

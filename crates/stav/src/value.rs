@@ -157,6 +157,76 @@ impl Value {
     pub fn to_canonical_json(&self) -> Vec<u8> {
         render::json::canonical(self).into_bytes()
     }
+
+    /// Returns a short description of the value for diagnostics, cut off
+    /// after about 40 characters.
+    pub(crate) fn describe(&self) -> String {
+        let mut text = String::new();
+        describe(self, &mut text);
+        if text.chars().count() > 40 {
+            let cut: String = text.chars().take(37).collect();
+            return format!("{cut}...");
+        }
+        text
+    }
+}
+
+fn describe(value: &Value, out: &mut String) {
+    if out.len() > 60 {
+        return;
+    }
+    match value {
+        Value::None => out.push_str("none"),
+        Value::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
+        Value::Int(i) => out.push_str(&i.to_string()),
+        Value::Float(f) => out.push_str(&format!("{f:?}")),
+        Value::Str(s) => out.push_str(&format!("{s:?}")),
+        Value::Path(p) => out.push_str(&p.display().to_string()),
+        Value::Symbol { text, .. } => out.push_str(text),
+        Value::Ref(label) => out.push_str(label),
+        Value::List(items) | Value::Set(items) => {
+            out.push('[');
+            for (i, item) in items.iter().enumerate() {
+                if i > 0 {
+                    out.push_str(", ");
+                }
+                describe(item, out);
+            }
+            out.push(']');
+        }
+        Value::Map(entries)
+        | Value::Struct {
+            fields: entries, ..
+        } => {
+            if let Value::Struct { name, .. } = value {
+                out.push_str(name);
+                out.push(' ');
+            }
+            out.push('{');
+            for (i, (key, item)) in entries.iter().enumerate() {
+                out.push_str(if i > 0 { ", " } else { " " });
+                out.push_str(key);
+                out.push_str(" = ");
+                describe(item, out);
+            }
+            out.push_str(if entries.is_empty() { "}" } else { " }" });
+        }
+        Value::Variant { name, fields, .. } => {
+            out.push_str(name);
+            if let Some(fields) = fields {
+                out.push('(');
+                for (i, (key, item)) in fields.iter().enumerate() {
+                    if i > 0 {
+                        out.push_str(", ");
+                    }
+                    out.push_str(key);
+                    out.push_str(" = ");
+                    describe(item, out);
+                }
+                out.push(')');
+            }
+        }
+    }
 }
 
 /// A path to an attribute of a value: struct field names, map keys and

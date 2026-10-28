@@ -774,7 +774,7 @@ impl<'a> Str<'a> {
 }
 
 /// Returns the character an escape such as `\n` or `\u{1F600}` stands for.
-fn unescape(escape: &str) -> Option<char> {
+pub(crate) fn unescape(escape: &str) -> Option<char> {
     let rest = escape.strip_prefix('\\')?;
     if let Some(hex) = rest.strip_prefix("u{") {
         let digits = hex.strip_suffix('}')?;
