@@ -26,7 +26,8 @@ impl Token {
 /// The kind of a [`Token`].
 ///
 /// A kind describes the shape of the text. A token with the right shape but
-/// an invalid value, such as an integer that does not fit in 64 bits, keeps
+/// an invalid value, such as an integer that does not fit in a signed 64-bit
+/// integer, keeps
 /// its kind and comes with a diagnostic. Text that forms no token at all is
 /// a [`TokenKind::Error`] token.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -48,6 +49,9 @@ pub enum TokenKind {
     /// digit or `_` follows it directly, and a `.` belongs to it when a digit
     /// follows it directly. `a-b` is therefore one identifier and `a - b` is
     /// a subtraction.
+    ///
+    /// An identifier is at most 255 bytes long. A longer one keeps its kind
+    /// and comes with a diagnostic.
     Ident,
     /// An identifier that starts with an uppercase ASCII letter, such as
     /// `Str` or `Apache-2.0`.
@@ -67,7 +71,7 @@ pub enum TokenKind {
     Int,
     /// A float such as `0.5`, `1.0e-3` or `2e10`.
     ///
-    /// A `_` may separate two digits, as in an [`TokenKind::Int`].
+    /// A `_` may separate two digits, as in a [`TokenKind::Int`].
     Float,
     /// A relative path such as `./fix.patch` or `../files/a.conf`.
     ///
@@ -88,8 +92,9 @@ pub enum TokenKind {
     /// exactly as written.
     StrText,
     /// A backslash escape inside a string, such as `\n` or `\u{1F600}`. It
-    /// stands for the one character it denotes. In multi-line strings the
-    /// only escape is `\#` directly before `{`, standing for `#`.
+    /// stands for the one character it denotes. In multi-line strings that
+    /// are not raw, the only escape is `\#` directly before `{`, standing for
+    /// `#`. Raw strings have no escapes.
     StrEscape,
     /// Layout of a multi-line string that is not part of its value: the line
     /// feed after the opening delimiter, the common indentation at the start
@@ -208,7 +213,11 @@ pub enum TokenKind {
     /// `!`
     Bang,
 
-    /// Text that forms no valid token. A diagnostic always explains it.
+    /// Text that forms no valid token.
+    ///
+    /// A diagnostic covers every error token, with one exception: a file
+    /// gets a single diagnostic for all of its carriage returns, at the
+    /// first one.
     Error,
     /// The end of the source. It is always the last token and covers no text.
     Eof,

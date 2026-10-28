@@ -319,9 +319,9 @@ fn numbers_out_of_range_are_reported() {
     64..65   " " Whitespace
     65..70   "1e309" Float
     70..70   "" Eof
-    error[E0107] 20..39: integer `9223372036854775808` does not fit in 64 bits
+    error[E0107] 20..39: integer `9223372036854775808` does not fit in a signed 64-bit integer
       help: the largest integer is 9223372036854775807
-    error[E0107] 40..58: integer `0x8000000000000000` does not fit in 64 bits
+    error[E0107] 40..58: integer `0x8000000000000000` does not fit in a signed 64-bit integer
       help: the largest integer is 9223372036854775807
     error[E0107] 65..70: float `1e309` is too large to be finite
     "#
@@ -465,14 +465,14 @@ fn byte_order_mark_and_carriage_returns_are_rejected_once() {
     9..9     "" Eof
     error[E0101] 0..3: byte order mark is not allowed
       help: save the file as UTF-8 without a byte order mark
-    error[E0101] 4..5: carriage return is not allowed
+    error[E0114] 4..5: carriage return is not allowed
       help: save the file with LF line endings
     "#);
 }
 
 #[test]
 fn foreign_whitespace_and_characters_are_errors() {
-    assert_snapshot!(render("a\u{a0}b \u{20ac} \u{0}"), @r#"
+    assert_snapshot!(render("a\u{a0}b \u{20ac} \u{0} \u{200b} \u{feff}"), @r#"
     0..1     "a" Ident
     1..3     "\u{a0}" Error
     3..4     "b" Ident
@@ -480,18 +480,32 @@ fn foreign_whitespace_and_characters_are_errors() {
     5..8     "€" Error
     8..9     " " Whitespace
     9..10    "\0" Error
-    10..10   "" Eof
+    10..11   " " Whitespace
+    11..14   "\u{200b}" Error
+    14..15   " " Whitespace
+    15..18   "\u{feff}" Error
+    18..18   "" Eof
     error[E0102] 1..3: invalid whitespace character U+00A0
       help: use spaces or tabs
     error[E0113] 5..8: unexpected character `€`
     error[E0113] 9..10: unexpected character U+0000
+    error[E0113] 11..14: unexpected character U+200B
+    error[E0113] 15..18: unexpected character U+FEFF
     "#);
 }
 
 #[test]
 fn identifier_length_is_limited() {
     assert!(codes(&"a".repeat(255)).is_empty());
-    assert_eq!(codes(&"a".repeat(256)), ["E0104"]);
+    let long = "a".repeat(256);
+    let lexed = lex(&long);
+    assert_eq!(codes(&long), ["E0104"]);
+    assert_eq!(lexed.tokens[0].kind, TokenKind::Ident);
+    assert_eq!(lexed.tokens[0].text(&long), long);
+    assert_eq!(
+        lexed.diagnostics[0].help.as_deref(),
+        Some("shorten the identifier to 255 bytes")
+    );
     assert_eq!(codes(&format!("{}@1", "a".repeat(256))), ["E0104"]);
 }
 
@@ -706,7 +720,7 @@ fn single_line_string_ends_at_line_feed_inside_nested_multi_line_string() {
       help: close the string with `"` before the end of the line
     error[E0108] 8..11: unterminated string
       help: close the string with `"""` on a line of its own
-    error[E0110] 18..21: the opening `"""` must be followed directly by a line break
+    error[E0110] 18..24: the opening `"""` must be followed directly by a line break
       help: start the content of the string on the next line
     error[E0108] 18..21: unterminated string
       help: close the string with `"""` on a line of its own
@@ -842,9 +856,9 @@ fn opening_delimiter_must_end_its_line() {
     20..23   "abc" Error
     23..26   "\"\"\"" MStrEnd
     26..26   "" Eof
-    error[E0110] 0..3: the opening `"""` must be followed directly by a line break
+    error[E0110] 0..6: the opening `"""` must be followed directly by a line break
       help: start the content of the string on the next line
-    error[E0110] 17..20: the opening `"""` must be followed directly by a line break
+    error[E0110] 17..23: the opening `"""` must be followed directly by a line break
       help: start the content of the string on the next line
     "#);
 }

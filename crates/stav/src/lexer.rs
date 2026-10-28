@@ -170,8 +170,10 @@ struct Line {
 impl<'a> Lexer<'a> {
     fn run(&mut self) {
         if let Some(cr) = self.src.find('\r') {
+            // One error covers every carriage return in the file, because
+            // they nearly always come from line endings throughout it.
             self.error(
-                "E0101",
+                "E0114",
                 cr,
                 cr + 1,
                 "carriage return is not allowed".to_owned(),
@@ -361,7 +363,7 @@ impl<'a> Lexer<'a> {
                     "identifier is {} bytes long, more than the limit of {MAX_IDENT_LEN}",
                     ident_end - start
                 ),
-                None,
+                Some(format!("shorten the identifier to {MAX_IDENT_LEN} bytes")),
             );
         }
         let kind = if self.eat_symbol_suffix() {
@@ -496,7 +498,7 @@ impl<'a> Lexer<'a> {
                     "E0107",
                     start,
                     self.pos,
-                    format!("integer `{text}` does not fit in 64 bits"),
+                    format!("integer `{text}` does not fit in a signed 64-bit integer"),
                     Some(format!("the largest integer is {}", i64::MAX)),
                 );
             }
@@ -561,13 +563,6 @@ impl<'a> Lexer<'a> {
         if form.is_multi() && self.single_line_from.is_none() {
             if self.peek(0) != Some(b'\n') {
                 frame.bad_opener = true;
-                self.error(
-                    "E0110",
-                    start,
-                    self.pos,
-                    "the opening `\"\"\"` must be followed directly by a line break".to_owned(),
-                    Some("start the content of the string on the next line".to_owned()),
-                );
                 let rest = self.pos;
                 while self.peek(0).is_some_and(|b| b != b'\n') && !self.at("\"\"\"") {
                     self.bump_char();
@@ -575,6 +570,13 @@ impl<'a> Lexer<'a> {
                 if self.pos > rest {
                     self.push(TokenKind::Error, rest);
                 }
+                self.error(
+                    "E0110",
+                    start,
+                    self.pos,
+                    "the opening `\"\"\"` must be followed directly by a line break".to_owned(),
+                    Some("start the content of the string on the next line".to_owned()),
+                );
             }
             if self.peek(0) == Some(b'\n') {
                 let line_feed = self.pos;
@@ -944,12 +946,45 @@ fn describe_indent(indent: &str) -> String {
     }
 }
 
+/// Shows a character in backticks, or as its code point when it would be
+/// invisible or misleading there.
 fn describe_char(c: char) -> String {
-    if c.is_control() {
+    if c.is_control() || c.is_whitespace() || is_invisible_format(c) {
         format!("U+{:04X}", c as u32)
     } else {
         format!("`{c}`")
     }
+}
+
+/// Returns whether `c` is a Unicode format character (general category Cf)
+/// or a variation selector, which render as nothing on their own.
+fn is_invisible_format(c: char) -> bool {
+    matches!(
+        c,
+        '\u{ad}'
+            | '\u{600}'..='\u{605}'
+            | '\u{61c}'
+            | '\u{6dd}'
+            | '\u{70f}'
+            | '\u{890}'..='\u{891}'
+            | '\u{8e2}'
+            | '\u{180e}'
+            | '\u{200b}'..='\u{200f}'
+            | '\u{202a}'..='\u{202e}'
+            | '\u{2060}'..='\u{2064}'
+            | '\u{2066}'..='\u{206f}'
+            | '\u{fe00}'..='\u{fe0f}'
+            | '\u{feff}'
+            | '\u{fff9}'..='\u{fffb}'
+            | '\u{110bd}'
+            | '\u{110cd}'
+            | '\u{13430}'..='\u{1343f}'
+            | '\u{1bca0}'..='\u{1bca3}'
+            | '\u{1d173}'..='\u{1d17a}'
+            | '\u{e0001}'
+            | '\u{e0020}'..='\u{e007f}'
+            | '\u{e0100}'..='\u{e01ef}'
+    )
 }
 
 fn parse_int(text: &str) -> Option<i64> {
