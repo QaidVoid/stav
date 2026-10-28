@@ -540,9 +540,13 @@ fn string_values(source: &str) -> Vec<String> {
                 }
                 open.push(None);
             }
-            TokenKind::StrText => values[current.unwrap()].push_str(token.text(source)),
+            TokenKind::StrText => {
+                let i = current.expect("string text is inside a string");
+                values[i].push_str(token.text(source));
+            }
             TokenKind::StrEscape => {
-                write!(values[current.unwrap()], "<{}>", token.text(source)).unwrap();
+                let i = current.expect("an escape is inside a string");
+                write!(values[i], "<{}>", token.text(source)).unwrap();
             }
             _ => {}
         }
@@ -551,7 +555,10 @@ fn string_values(source: &str) -> Vec<String> {
 }
 
 fn string_value(source: &str) -> String {
-    string_values(source).swap_remove(0)
+    string_values(source)
+        .into_iter()
+        .next()
+        .expect("the source contains a string")
 }
 
 #[test]
@@ -941,6 +948,91 @@ fn nested_multi_line_strings_strip_their_own_indentation() {
 }
 
 #[test]
+fn nested_multi_line_strings_split_their_indentation_in_order() {
+    let source = "x = \"\"\"\n    a #{\"\"\"\n      b\n    \"\"\"} c\n  \"\"\"\n";
+    assert_eq!(string_values(source), ["  a {} c\n", "  b\n"]);
+    assert!(lex(source).diagnostics.is_empty());
+}
+
+/// A well-formed multi-line string for property tests.
+#[derive(Debug, Clone)]
+struct MultiLine {
+    indent: usize,
+    lines: Vec<ContentLine>,
+}
+
+/// A content line: indentation beyond the closing indentation, text, and
+/// optionally an interpolated multi-line string followed by more text.
+#[derive(Debug, Clone)]
+struct ContentLine {
+    extra: usize,
+    text: String,
+    nested: Option<(MultiLine, String)>,
+}
+
+impl MultiLine {
+    fn source(&self) -> String {
+        let mut out = "\"\"\"\n".to_owned();
+        for line in &self.lines {
+            out.push_str(&" ".repeat(self.indent + line.extra));
+            out.push_str(&line.text);
+            if let Some((nested, after)) = &line.nested {
+                write!(out, "#{{{}}}{after}", nested.source()).unwrap();
+            }
+            out.push('\n');
+        }
+        out.push_str(&" ".repeat(self.indent));
+        out.push_str("\"\"\"");
+        out
+    }
+
+    /// Appends the value of the string and then of every string nested in
+    /// it, in source order, with `{}` for each interpolation.
+    fn values(&self, out: &mut Vec<String>) {
+        let slot = out.len();
+        out.push(String::new());
+        let mut value = String::new();
+        for line in &self.lines {
+            if line.nested.is_none() && line.text.trim().is_empty() {
+                value.push('\n');
+                continue;
+            }
+            value.push_str(&" ".repeat(line.extra));
+            value.push_str(&line.text);
+            if let Some((nested, after)) = &line.nested {
+                value.push_str("{}");
+                nested.values(out);
+                value.push_str(after);
+            }
+            value.push('\n');
+        }
+        out[slot] = value;
+    }
+}
+
+fn multi_line() -> impl Strategy<Value = MultiLine> {
+    let text = "([a-z][a-z ]{0,5})?";
+    let line = (0..4usize, text).prop_map(|(extra, text)| ContentLine {
+        extra,
+        text,
+        nested: None,
+    });
+    let leaf = (0..6usize, prop::collection::vec(line, 0..4))
+        .prop_map(|(indent, lines)| MultiLine { indent, lines });
+    leaf.prop_recursive(3, 12, 4, move |inner| {
+        let line = (0..4usize, text, prop::option::of((inner, "[a-z ]{0,4}"))).prop_map(
+            |(extra, text, nested)| ContentLine {
+                extra,
+                text,
+                nested,
+            },
+        );
+        (0..6usize, prop::collection::vec(line, 0..4))
+            .prop_map(|(indent, lines)| MultiLine { indent, lines })
+    })
+}
+
+#[test]
 fn opening_delimiter_must_end_its_line() {
     assert_snapshot!(render("\"\"\"abc\n  x\n  \"\"\" \"\"\"abc\"\"\""), @r#"
     0..3     "\"\"\"" MStrStart
@@ -1078,6 +1170,15 @@ proptest! {
     #[test]
     fn arbitrary_text_lexes_losslessly(source in any::<String>()) {
         assert_lossless(&source);
+    }
+
+    #[test]
+    fn nested_multi_line_strings_have_their_written_values(string in multi_line()) {
+        let source = format!("x = {}\n", string.source());
+        let mut expected = Vec::new();
+        string.values(&mut expected);
+        assert!(lex(&source).diagnostics.is_empty(), "{source}");
+        assert_eq!(string_values(&source), expected, "{source}");
     }
 
     #[test]
