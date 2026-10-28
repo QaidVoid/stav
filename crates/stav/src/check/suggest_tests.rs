@@ -3,17 +3,17 @@ use super::{did_you_mean, distance};
 #[test]
 fn a_close_name_is_suggested() {
     assert_eq!(
-        did_you_mean("nginix", ["nginx", "apache"]),
-        Some("did you mean `nginx`?".to_owned())
+        did_you_mean("brigde", ["bridge", "tunnel"]),
+        Some("did you mean `bridge`?".to_owned())
     );
 }
 
 #[test]
 fn transpositions_count_as_one_edit() {
-    assert_eq!(distance("runti", "runit", 3), Some(1));
+    assert_eq!(distance("lable", "label", 3), Some(1));
     assert_eq!(
-        did_you_mean("runti", ["runit", "s6"]).as_deref(),
-        Some("did you mean `runit`?")
+        did_you_mean("lable", ["label", "xy"]).as_deref(),
+        Some("did you mean `label`?")
     );
 }
 
@@ -39,6 +39,12 @@ fn the_limit_grows_with_the_length_of_the_name() {
 fn at_most_three_closest_candidates_are_suggested_in_order() {
     let help = did_you_mean("cat", ["bat", "cut", "car", "cab", "dog"]);
     assert_eq!(help.as_deref(), Some("did you mean `bat`, `cab` or `car`?"));
+}
+
+#[test]
+fn closer_candidates_come_first_whatever_their_spelling() {
+    let help = did_you_mean("abcdef", ["abxdyf", "zbcdef"]);
+    assert_eq!(help.as_deref(), Some("did you mean `zbcdef` or `abxdyf`?"));
 }
 
 #[test]
