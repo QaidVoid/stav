@@ -83,7 +83,7 @@ impl Parser<'_> {
             );
         } else if kind == T::ImportKw && self.past_imports {
             self.soft_error(
-                "E0208",
+                "E0213",
                 span,
                 "`import` must come before every other item".to_owned(),
                 Some("move the import to the start of the file".to_owned()),

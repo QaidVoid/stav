@@ -379,7 +379,7 @@ impl Loader<'_> {
             for (_, _, span) in &imports {
                 self.error(
                     file,
-                    Diagnostic::error("E0208", *span, "a prelude file cannot import modules")
+                    Diagnostic::error("E0707", *span, "a prelude file cannot import modules")
                         .with_help("declare what the prelude needs in the prelude itself"),
                 );
             }

@@ -198,7 +198,7 @@ impl<'a> SourceFile<'a> {
     /// contain, and returns an error for each item that does not belong.
     ///
     /// A library cannot contain statements other than `let` (`E0209`), and
-    /// a part file cannot declare a `struct`, `type` or `fn` (`E0208`).
+    /// a part file cannot declare a `struct`, `type` or `fn` (`E0214`).
     pub fn validate(self, kind: FileKind) -> Vec<Diagnostic> {
         let mut diagnostics = Vec::new();
         for item in self.items() {
@@ -215,7 +215,7 @@ impl<'a> SourceFile<'a> {
                     let keyword = first_token(node).map_or("", SyntaxToken::text);
                     diagnostics.push(
                         Diagnostic::error(
-                            "E0208",
+                            "E0214",
                             span,
                             format!("a part file cannot contain a `{keyword}` declaration"),
                         )

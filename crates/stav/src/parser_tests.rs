@@ -1797,7 +1797,7 @@ fn declarations_and_imports_belong_at_the_top_of_a_file() {
     assert_snapshot!(
         errors("import \"a\" as a\nx = 1\nimport \"b\" as b\nsystem {\n  struct A {}\n  fn f() -> Int = 1\n}\n"),
         @"
-    error[E0208] 22..28: `import` must come before every other item
+    error[E0213] 22..28: `import` must come before every other item
       help: move the import to the start of the file
     error[E0208] 49..55: `struct` is only allowed at the top level of a file
       help: move it to the top level of the file
@@ -1821,7 +1821,7 @@ fn file_kinds_restrict_their_items() {
       help: move the statement into an entry file or a part file
     ");
     assert_snapshot!(render_diagnostics(&file.validate(FileKind::Part)), @"
-    error[E0208] 16..22: a part file cannot contain a `struct` declaration
+    error[E0214] 16..22: a part file cannot contain a `struct` declaration
       help: move the declaration into a library and import it
     ");
 }

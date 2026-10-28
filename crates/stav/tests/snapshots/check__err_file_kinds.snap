@@ -6,6 +6,6 @@ expression: output
 error[E0209]: a library cannot contain statements
   --> app/lib.stav:2:1
   help: move the statement into an entry file or a part file
-error[E0208]: a part file cannot contain a `struct` declaration
+error[E0214]: a part file cannot contain a `struct` declaration
   --> app/part.stav:1:1
   help: move the declaration into a library and import it
