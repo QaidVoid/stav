@@ -6,13 +6,15 @@
 //! rendered or converted to Rust types.
 //!
 //! The entry points so far are [`lex`], which splits source text into
-//! tokens, and [`parse`], which builds a lossless [`SyntaxTree`] with a typed
-//! view in [`ast`].
+//! tokens, [`parse`], which builds a lossless [`SyntaxTree`] with a typed
+//! view in [`ast`], and [`format()`], which lays source text out in its
+//! canonical form.
 
 #![forbid(unsafe_code)]
 
 pub mod ast;
 mod diagnostic;
+mod format;
 mod lexer;
 mod parser;
 mod span;
@@ -20,6 +22,7 @@ mod syntax;
 mod token;
 
 pub use diagnostic::Diagnostic;
+pub use format::format;
 pub use lexer::{Lexed, lex};
 pub use parser::{MAX_DEPTH, Parsed, parse};
 pub use span::Span;

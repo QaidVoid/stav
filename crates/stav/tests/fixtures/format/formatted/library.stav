@@ -1,0 +1,31 @@
+## Helpers shared by the recipes of this repository.
+type Mirror = gnu | kernel | sourceforge(project: Str)
+
+## Returns the download URL of `file` on a mirror.
+fn mirror_url(mirror: Mirror, file: Str) -> Str = match mirror {
+  gnu                  => "https://ftpmirror.gnu.org/#{file}"
+  kernel               => "https://cdn.kernel.org/pub/#{file}"
+  sourceforge(project) => "https://downloads.sourceforge.net/#{project}/#{file}"
+}
+
+## Returns the `--with` or `--without` flag for a feature.
+fn with(feature: Str, enabled: Bool) -> Str =
+  if enabled { "--with-#{feature}" } else { "--without-#{feature}" }
+
+fn flags(features: Map<Str, Bool>) -> List<Str> =
+  [for name, enabled in features -> with(name, enabled)]
+
+fn total_weight(weights: List<Int>) -> Int = fold(weights, 0, fn(sum: Int, w: Int) = sum + w)
+
+fn describe(major: Int, minor: Int, suffix: Option<Str>) -> Str =
+  let base = "#{major}.#{minor}",
+      tail = suffix ?? ""
+  in if tail == "" { base } else { "#{base}-#{tail}" }
+
+let default_features = { ssl = true, zlib = true, docs = false }
+
+let configure_args = flags(default_features) ++ [
+  "--disable-static",
+  "--enable-shared",
+  "--with-pic",
+]

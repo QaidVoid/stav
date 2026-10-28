@@ -1,0 +1,48 @@
+## Configuration of a small reverse proxy, rendered to TOML.
+type Level = trace | debug | info | warn | error
+
+type Balance = round_robin | least_connections | hash(header: Str = "x-forwarded-for")
+
+## One backend server.
+struct Backend {
+  ## Base URL of the backend.
+  url:     Str where matches(r"^https?://")
+  weight:  Int where 1..=100 = 10
+  tags:    Set<Str> = []
+  timeout: Option<Int where 1..>
+}
+
+struct Limits { requests_per_second: Int where 1.. = 100 }
+
+struct Root {
+  listen:    Str = "0.0.0.0:8443"
+  log_level: Level = info
+  balance:   Balance = round_robin
+  limits:    Limits = {}
+  backends:  Map<Str, Backend> = {} block backend
+}
+
+fn local(port: Int where 1..=65535) -> Backend =
+  Backend { url = "http://127.0.0.1:#{port}", tags = ["local"] }
+
+fn label(level: Level) -> Str = match level {
+  trace | debug => "verbose"
+  info          => "normal"
+  _             => "quiet"
+}
+
+log_level = warn
+balance   = hash(header = "x-real-ip")
+
+backend eu { url = "https://eu.example.net", weight = 60 }
+backend us { url = "https://us.example.net", weight = 40, tags = ["primary", "us"] }
+
+backend fallback {
+  url     = "https://fallback.example.net"
+  weight  = 1
+  timeout = 30
+}
+
+backends.dev = local(9000)
+
+limits { requests_per_second = 250 }

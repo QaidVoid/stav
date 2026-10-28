@@ -1,0 +1,29 @@
+# Header comment.
+
+## Documented struct.
+struct Cache { # opening
+  ## Size in megabytes.
+  size: Int = 64 # default
+  # a plain comment between fields
+  ttl: Int = 300
+}
+
+cache_items = [ # head of the list
+  "a", # first
+
+  # before b
+  "b",
+  # at the end
+]
+
+threshold = a + # explain the sum
+  b
+
+fn pick(x: Int) -> Int = match x { # opening the match
+  0 => 1 # zero
+  # other values
+  _ => x
+}
+
+
+# Footer comment.

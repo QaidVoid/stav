@@ -1,0 +1,77 @@
+# The machine configuration of a small workstation.
+import "std/desktop" as desktop
+import "std/services" as services
+
+let admin_keys = [
+  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGq7w0d6r1Yb6vXcT2pJmH3k4sLq2xNnR8Zf admin@laptop",
+  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKd9yP0aQ4u2wZt7m1cB5eVr3hJnL6sF0gXo admin@phone",
+]
+
+system {
+  include "./hardware.stav"
+
+  hostname      = "workbench"
+  timezone      = "Europe/Oslo"
+  locale        = "nb_NO.UTF-8"
+  extra_locales = ["en_US.UTF-8"]
+
+  packages = [neovim, git, jujutsu, ripgrep:static, fd, zsh, firefox, llvm@19:static]
+
+  alternatives.sh = dash
+
+  users {
+    mutable = false
+    user ada {
+      uid      = 1000
+      groups   = [wheel, video, kvm] # kvm for virtual machines
+      shell    = "/usr/bin/zsh"
+      ssh_keys = admin_keys
+    }
+    group media { members = [ada] }
+  }
+
+  # Desktop and services.
+  include desktop.wayland(
+    user = ada,
+    compositor = niri,
+    fonts = [ttf-jetbrains-mono, noto-fonts-cjk, noto-fonts-emoji],
+  )
+  include services.sshd(port = 2222)
+
+  service backup {
+    kind  = oneshot
+    exec  = ["/usr/bin/restic", "backup", "--one-file-system", "/home"]
+    after = [network]
+  }
+
+  for name in ["tty1", "tty2"] {
+    getty { ttys = [name] }
+  }
+
+  if enable_printing {
+    service cupsd { exec = ["/usr/bin/cupsd", "-f"] }
+  } else {
+    packages = []
+  }
+
+  file "/etc/profile.d/editor.sh" {
+    text = """
+      export EDITOR=nvim
+      export VISUAL="$EDITOR"
+      """
+    mode = 0o644
+  }
+
+  file "/etc/xdg/foot/foot.ini" { source = ./files/foot.ini }
+
+  sysctl {
+    "vm.swappiness"       = 10
+    "net.ipv4.ip_forward" = 1
+  }
+
+  kernel {
+    modules   = ["kvm-amd", "vfio-pci"]
+    blacklist = ["pcspkr"]
+    options   = { snd_hda_intel = "power_save=1" }
+  }
+}
