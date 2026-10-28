@@ -15,6 +15,7 @@
 
 pub mod ast;
 mod check;
+mod de;
 mod diagnostic;
 mod format;
 mod hash;
@@ -31,6 +32,7 @@ pub use check::{
     RootSpec, SchemaField, SchemaIndex, SchemaStruct, SchemaSum, SchemaVariant, Source, SymbolType,
     check,
 };
+pub use de::ConvertError;
 pub use diagnostic::{Diagnostic, Diagnostics, FileDiagnostic, Label, Severity};
 pub use format::format;
 pub use lexer::{Lexed, lex};
