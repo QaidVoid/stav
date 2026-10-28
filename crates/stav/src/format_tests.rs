@@ -1,6 +1,10 @@
 use proptest::prelude::*;
 
+use self::support::meaning;
 use crate::{MAX_DEPTH, SyntaxElement, TokenKind, format, parse};
+
+#[path = "../tests/support/mod.rs"]
+mod support;
 
 /// Formats `source`, which must be free of errors, and checks that the
 /// result keeps the meaning and comments of the source and is stable.
@@ -30,35 +34,6 @@ fn assert_preserved(source: &str, formatted: &str) {
         again, formatted,
         "formatting is not idempotent for {source:?}"
     );
-}
-
-/// Returns the nodes and tokens of `source` in order, and its comments in
-/// order. Whitespace and line feeds are left out, and so are the separators
-/// the formatter may add or remove: commas and the `|` before the first
-/// variant of a sum type.
-fn meaning(source: &str) -> (Vec<String>, Vec<String>) {
-    let parsed = parse(source);
-    let mut tree = Vec::new();
-    let mut comments = Vec::new();
-    let mut stack = vec![SyntaxElement::Node(parsed.tree.root())];
-    while let Some(element) = stack.pop() {
-        match element {
-            SyntaxElement::Node(node) => {
-                tree.push(format!("{:?}", node.kind()));
-                let children: Vec<_> = node.children_with_tokens().collect();
-                stack.extend(children.into_iter().rev());
-            }
-            SyntaxElement::Token(token) => match token.kind() {
-                TokenKind::Comment | TokenKind::DocComment => {
-                    comments.push(token.text().trim_end().to_owned());
-                }
-                TokenKind::Whitespace | TokenKind::Newline | TokenKind::Comma => {}
-                TokenKind::Pipe if tree.last().is_some_and(|last| last == "=") => {}
-                _ => tree.push(token.text().to_owned()),
-            },
-        }
-    }
-    (tree, comments)
 }
 
 #[test]

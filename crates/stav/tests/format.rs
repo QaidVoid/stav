@@ -6,6 +6,10 @@ use std::path::{Path, PathBuf};
 
 use stav::{SyntaxElement, TokenKind, format, parse};
 
+use self::support::meaning;
+
+mod support;
+
 fn fixtures(dir: &str) -> Vec<PathBuf> {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/format")
@@ -18,33 +22,6 @@ fn fixtures(dir: &str) -> Vec<PathBuf> {
     paths.sort();
     assert!(!paths.is_empty(), "{} has no fixtures", dir.display());
     paths
-}
-
-/// Returns the nodes and tokens of `source` without layout, commas and
-/// leading `|` of sum types, and its comments.
-fn meaning(source: &str) -> (Vec<String>, Vec<String>) {
-    let parsed = parse(source);
-    let mut tree = Vec::new();
-    let mut comments = Vec::new();
-    let mut stack = vec![SyntaxElement::Node(parsed.tree.root())];
-    while let Some(element) = stack.pop() {
-        match element {
-            SyntaxElement::Node(node) => {
-                tree.push(format!("{:?}", node.kind()));
-                let children: Vec<_> = node.children_with_tokens().collect();
-                stack.extend(children.into_iter().rev());
-            }
-            SyntaxElement::Token(token) => match token.kind() {
-                TokenKind::Comment | TokenKind::DocComment => {
-                    comments.push(token.text().trim_end().to_owned());
-                }
-                TokenKind::Whitespace | TokenKind::Newline | TokenKind::Comma => {}
-                TokenKind::Pipe if tree.last().is_some_and(|last| last == "=") => {}
-                _ => tree.push(token.text().to_owned()),
-            },
-        }
-    }
-    (tree, comments)
 }
 
 fn format_checked(path: &Path) -> (String, String) {

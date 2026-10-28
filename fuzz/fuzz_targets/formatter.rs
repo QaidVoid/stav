@@ -19,7 +19,8 @@ fuzz_target!(|source: &str| {
 });
 
 /// Returns the nodes and tokens of `source` without layout, commas and the
-/// leading `|` of sum types, and its comments.
+/// leading `|` of sum types, and its comments. It must match `meaning` in
+/// `crates/stav/tests/support/mod.rs`, which the formatter tests use.
 fn meaning(source: &str) -> (Vec<String>, Vec<String>) {
     let parsed = stav::parse(source);
     let mut tree = Vec::new();
