@@ -1,7 +1,7 @@
 //! `match` expressions: typing patterns, binding their names, and checking
 //! that the arms are exhaustive and reachable.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use super::decls::{TypeItem, ValueItem};
 use super::model::{Fact, LocalId, Meaning, PatternFact};
@@ -15,9 +15,19 @@ use crate::span::Span;
 use crate::syntax::SyntaxToken;
 
 /// The most work the exhaustiveness check does for one `match`, counted in
-/// steps of its search. Beyond it, the match is reported as not provably
-/// exhaustive, so that checking always finishes quickly.
-const BUDGET: usize = 200_000;
+/// steps of its search and in pattern slots of the rows it builds. Beyond
+/// it, the check gives up with an error, so that checking always finishes
+/// quickly.
+const BUDGET: usize = 1_000_000;
+
+/// The work counted for building a matrix, apart from its rows, in the
+/// units of [`BUDGET`]. It keeps the memory the budget allows near that of
+/// the rows it allows.
+const MATRIX_COST: usize = 32;
+
+/// A wildcard that rows can point to where a constructor has fields that
+/// a row does not mention.
+static WILD: Pat = Pat::Wild;
 
 /// A constructor of a value, as far as patterns can tell values apart.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -542,21 +552,20 @@ impl<'p> Checker<'p> {
             checker: self,
             budget: BUDGET,
         };
-        let mut matrix: Vec<Vec<Pat>> = Vec::new();
+        let mut matrix = Matrix::default();
         let mut unreachable = Vec::new();
         for (pat, guarded, arm_span) in rows {
-            let row = vec![pat.clone()];
-            match search.useful(&matrix, &row, &[ty], 0) {
+            match search.useful(&mut matrix, &[pat], &[ty], 0) {
                 Some(false) => unreachable.push(*arm_span),
                 Some(true) => {}
                 None => break,
             }
-            if !guarded {
-                matrix.push(row);
+            if !guarded && search.add(&mut matrix, vec![pat]).is_none() {
+                break;
             }
         }
         let mut missing = Vec::new();
-        let complete = search.missing(&matrix, ty, &mut missing);
+        let complete = search.missing(&mut matrix, ty, &mut missing);
         let complete = match complete {
             Some(complete) => complete,
             None => {
@@ -623,9 +632,40 @@ fn literal_ctor(expr: Expr<'_>) -> Option<(Ctor, TypeId)> {
     }
 }
 
+/// A row of the pattern matrix: the patterns still to match, first column
+/// first.
+type Row<'a> = Vec<&'a Pat>;
+
+/// The pattern matrix of the exhaustiveness search, indexed by the first
+/// column.
+///
+/// No row starts with alternatives: they are expanded into one row each
+/// when the row is added. The specializations of the matrix that a search
+/// asked for are kept, and rows added later are added to them too, so that
+/// checking each arm of a long `match` against the arms before it does not
+/// build the same matrices again.
+#[derive(Default)]
+struct Matrix<'a> {
+    rows: Vec<Row<'a>>,
+    /// The rows that start with each constructor.
+    heads: BTreeMap<&'a Ctor, Vec<usize>>,
+    /// The rows that start with a wildcard.
+    wild: Vec<usize>,
+    /// The rows that match each constructor, with its arguments in place
+    /// of the first column, and the number of arguments.
+    specialized: BTreeMap<Ctor, (usize, Box<Matrix<'a>>)>,
+    /// The rows that start with a wildcard, without it.
+    defaults: Option<Box<Matrix<'a>>>,
+}
+
 /// The search of the exhaustiveness check, after the classic usefulness
 /// algorithm: a pattern row is useful when some value matches it and no
 /// earlier row.
+///
+/// Copying the matrix on every step made a 30 000 arm `match` on `Int`
+/// take 18 seconds, and one on `Option<Int>` 86 seconds, in a release
+/// build. The indexed [`Matrix`] keeps both below a tenth of a second, and
+/// its work is counted against [`BUDGET`].
 struct Search<'a, 'p> {
     checker: &'a Checker<'p>,
     budget: usize,
@@ -634,7 +674,7 @@ struct Search<'a, 'p> {
 /// The constructors of a type, when there are finitely many.
 type Ctors = Vec<(Ctor, Vec<TypeId>)>;
 
-impl Search<'_, '_> {
+impl<'a> Search<'_, '_> {
     fn ctors(&self, ty: TypeId) -> Option<Ctors> {
         let types = &self.checker.types;
         match types.get(types.peel(ty)) {
@@ -656,29 +696,129 @@ impl Search<'_, '_> {
         }
     }
 
+    /// Spends `work` units of the budget, or returns `None` when it is
+    /// spent.
+    fn charge(&mut self, work: usize) -> Option<()> {
+        match self.budget.checked_sub(work) {
+            Some(left) => {
+                self.budget = left;
+                Some(())
+            }
+            None => {
+                self.budget = 0;
+                None
+            }
+        }
+    }
+
     fn step(&mut self, depth: usize) -> Option<()> {
-        if self.budget == 0 || depth > 512 {
+        if depth > 512 {
             self.budget = 0;
             return None;
         }
-        self.budget -= 1;
+        self.charge(1)
+    }
+
+    /// Adds a row to the matrix and to the specializations kept so far,
+    /// with one row for each alternative its first pattern has.
+    fn add(&mut self, matrix: &mut Matrix<'a>, row: Row<'a>) -> Option<()> {
+        let mut stack = vec![row];
+        while let Some(row) = stack.pop() {
+            self.charge(1 + row.len())?;
+            let rest = row.get(1..).unwrap_or_default();
+            match row.first() {
+                Some(Pat::Or(alternatives)) => {
+                    for alternative in alternatives.iter().rev() {
+                        let mut expanded = vec![alternative];
+                        expanded.extend_from_slice(rest);
+                        stack.push(expanded);
+                    }
+                    continue;
+                }
+                Some(Pat::Ctor(ctor, args)) => {
+                    if let Some((_, specialized)) = matrix.specialized.get_mut(ctor) {
+                        let mut inner: Row<'a> = args.iter().collect();
+                        inner.extend_from_slice(rest);
+                        self.add(specialized, inner)?;
+                    }
+                    let index = matrix.rows.len();
+                    matrix.heads.entry(ctor).or_default().push(index);
+                }
+                Some(Pat::Wild) | None => {
+                    for (arity, specialized) in matrix.specialized.values_mut() {
+                        let mut inner: Row<'a> = vec![&WILD; *arity];
+                        inner.extend_from_slice(rest);
+                        self.add(specialized, inner)?;
+                    }
+                    if let Some(defaults) = &mut matrix.defaults {
+                        self.add(defaults, rest.to_vec())?;
+                    }
+                    matrix.wild.push(matrix.rows.len());
+                }
+            }
+            matrix.rows.push(row);
+        }
         Some(())
+    }
+
+    /// Returns the rows that match the constructor `ctor`, with its
+    /// arguments in place of the first column.
+    fn specialize<'m>(
+        &mut self,
+        matrix: &'m mut Matrix<'a>,
+        ctor: &Ctor,
+        arity: usize,
+    ) -> Option<&'m mut Matrix<'a>> {
+        if !matrix.specialized.contains_key(ctor) {
+            self.charge(MATRIX_COST)?;
+            let mut out = Matrix::default();
+            let matching = matrix.heads.get(ctor).into_iter().flatten();
+            for &i in matching.chain(&matrix.wild) {
+                let row = &matrix.rows[i];
+                let mut inner: Row<'a> = match row.first() {
+                    Some(Pat::Ctor(_, args)) => args.iter().collect(),
+                    _ => vec![&WILD; arity],
+                };
+                inner.extend_from_slice(row.get(1..).unwrap_or_default());
+                self.add(&mut out, inner)?;
+            }
+            matrix
+                .specialized
+                .insert(ctor.clone(), (arity, Box::new(out)));
+        }
+        matrix.specialized.get_mut(ctor).map(|(_, m)| &mut **m)
+    }
+
+    /// Returns the rows that start with a wildcard, without it.
+    fn defaults<'m>(&mut self, matrix: &'m mut Matrix<'a>) -> Option<&'m mut Matrix<'a>> {
+        if matrix.defaults.is_none() {
+            self.charge(MATRIX_COST)?;
+            let mut out = Matrix::default();
+            for &i in &matrix.wild {
+                let row = matrix.rows[i].get(1..).unwrap_or_default().to_vec();
+                self.add(&mut out, row)?;
+            }
+            matrix.defaults = Some(Box::new(out));
+        }
+        matrix.defaults.as_deref_mut()
     }
 
     /// Returns whether `row` matches a value that no row of `matrix` does,
     /// or `None` when the search ran out of budget.
     fn useful(
         &mut self,
-        matrix: &[Vec<Pat>],
-        row: &[Pat],
+        matrix: &mut Matrix<'a>,
+        row: &[&'a Pat],
         tys: &[TypeId],
         depth: usize,
     ) -> Option<bool> {
         self.step(depth)?;
-        let Some((head, rest)) = row.split_first() else {
-            return Some(matrix.is_empty());
+        if matrix.rows.is_empty() {
+            return Some(true);
+        }
+        let Some((&head, rest)) = row.split_first() else {
+            return Some(false);
         };
-        let matrix = expand_or(matrix);
         let (ty, rest_tys) = match tys.split_first() {
             Some((ty, rest)) => (*ty, rest),
             None => (TypeId::ERROR, &[][..]),
@@ -686,52 +826,46 @@ impl Search<'_, '_> {
         match head {
             Pat::Or(alternatives) => {
                 for alternative in alternatives {
-                    let mut row = vec![alternative.clone()];
+                    let mut row = vec![alternative];
                     row.extend_from_slice(rest);
-                    if self.useful(&matrix, &row, tys, depth + 1)? {
+                    if self.useful(matrix, &row, tys, depth + 1)? {
                         return Some(true);
                     }
                 }
                 Some(false)
             }
             Pat::Ctor(ctor, args) => {
-                let arg_tys = self.arg_types(ty, ctor, args.len());
-                let mut row = args.clone();
+                if matrix.wild.is_empty() && !matrix.heads.contains_key(ctor) {
+                    return Some(true);
+                }
+                let mut row: Row<'a> = args.iter().collect();
                 row.extend_from_slice(rest);
-                let mut tys = arg_tys;
+                let mut tys = self.arg_types(ty, ctor, args.len());
                 tys.extend_from_slice(rest_tys);
-                let specialized = specialize(&matrix, ctor, args.len());
-                self.useful(&specialized, &row, &tys, depth + 1)
+                let specialized = self.specialize(matrix, ctor, args.len())?;
+                self.useful(specialized, &row, &tys, depth + 1)
             }
             Pat::Wild => {
-                let used: BTreeSet<Ctor> = matrix
-                    .iter()
-                    .filter_map(|r| match r.first() {
-                        Some(Pat::Ctor(c, _)) => Some(c.clone()),
-                        _ => None,
-                    })
-                    .collect();
                 if let Some(ctors) = self.ctors(ty)
-                    && ctors.iter().all(|(c, _)| used.contains(c))
+                    && ctors.iter().all(|(c, _)| matrix.heads.contains_key(c))
                 {
                     for (ctor, fields) in ctors {
-                        let mut row = vec![Pat::Wild; fields.len()];
+                        let mut row: Row<'a> = vec![&WILD; fields.len()];
                         row.extend_from_slice(rest);
                         let mut tys = fields.clone();
                         tys.extend_from_slice(rest_tys);
-                        let specialized = specialize(&matrix, &ctor, fields.len());
-                        if self.useful(&specialized, &row, &tys, depth + 1)? {
+                        let specialized = self.specialize(matrix, &ctor, fields.len())?;
+                        if self.useful(specialized, &row, &tys, depth + 1)? {
                             return Some(true);
                         }
                     }
                     return Some(false);
                 }
-                let defaults: Vec<Vec<Pat>> = matrix
-                    .iter()
-                    .filter(|r| matches!(r.first(), Some(Pat::Wild)))
-                    .map(|r| r[1..].to_vec())
-                    .collect();
-                self.useful(&defaults, rest, rest_tys, depth + 1)
+                if matrix.wild.is_empty() {
+                    return Some(true);
+                }
+                let defaults = self.defaults(matrix)?;
+                self.useful(defaults, rest, rest_tys, depth + 1)
             }
         }
     }
@@ -749,8 +883,13 @@ impl Search<'_, '_> {
     /// Lists the constructors of `ty` that no row covers, and returns
     /// whether the rows are exhaustive, or `None` when the search ran out of
     /// budget.
-    fn missing(&mut self, matrix: &[Vec<Pat>], ty: TypeId, out: &mut Vec<String>) -> Option<bool> {
-        if !self.useful(matrix, &[Pat::Wild], &[ty], 0)? {
+    fn missing(
+        &mut self,
+        matrix: &mut Matrix<'a>,
+        ty: TypeId,
+        out: &mut Vec<String>,
+    ) -> Option<bool> {
+        if !self.useful(matrix, &[&WILD], &[ty], 0)? {
             return Some(true);
         }
         let Some(ctors) = self.ctors(ty) else {
@@ -758,15 +897,16 @@ impl Search<'_, '_> {
             return Some(false);
         };
         for (ctor, fields) in ctors {
-            let row = [Pat::Ctor(ctor.clone(), vec![Pat::Wild; fields.len()])];
-            if !self.useful(matrix, &row, &[ty], 0)? {
+            let row = vec![&WILD; fields.len()];
+            let specialized = self.specialize(matrix, &ctor, fields.len())?;
+            if !self.useful(specialized, &row, &fields, 1)? {
                 continue;
             }
             if ctor == Ctor::Some {
                 let inner = fields.first().copied().unwrap_or(TypeId::ERROR);
-                let specialized = specialize(&expand_or(matrix), &Ctor::Some, 1);
+                let specialized = self.specialize(matrix, &Ctor::Some, 1)?;
                 let mut nested = Vec::new();
-                self.missing(&specialized, inner, &mut nested)?;
+                self.missing(specialized, inner, &mut nested)?;
                 out.extend(nested);
                 continue;
             }
@@ -791,42 +931,4 @@ impl Search<'_, '_> {
             Ctor::Str(s) => format!("`{s:?}`"),
         }
     }
-}
-
-/// Replaces rows whose first pattern is an alternative by one row per
-/// alternative.
-fn expand_or(matrix: &[Vec<Pat>]) -> Vec<Vec<Pat>> {
-    let mut out = Vec::new();
-    let mut stack: Vec<Vec<Pat>> = matrix.iter().rev().cloned().collect();
-    while let Some(row) = stack.pop() {
-        match row.first() {
-            Some(Pat::Or(alternatives)) => {
-                for alternative in alternatives.iter().rev() {
-                    let mut expanded = vec![alternative.clone()];
-                    expanded.extend_from_slice(&row[1..]);
-                    stack.push(expanded);
-                }
-            }
-            _ => out.push(row),
-        }
-    }
-    out
-}
-
-/// Keeps the rows that match the constructor `ctor`, with its arguments in
-/// place of the first column.
-fn specialize(matrix: &[Vec<Pat>], ctor: &Ctor, arity: usize) -> Vec<Vec<Pat>> {
-    matrix
-        .iter()
-        .filter_map(|row| {
-            let (head, rest) = row.split_first()?;
-            let mut out = match head {
-                Pat::Ctor(c, args) if c == ctor => args.clone(),
-                Pat::Ctor(..) => return None,
-                Pat::Wild | Pat::Or(_) => vec![Pat::Wild; arity],
-            };
-            out.extend_from_slice(rest);
-            Some(out)
-        })
-        .collect()
 }

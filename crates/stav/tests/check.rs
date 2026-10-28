@@ -430,6 +430,29 @@ fn long_let_chains_check_without_overflowing_the_stack() {
     assert_eq!(codes_on_small_stack(loader), ["E0401"]);
 }
 
+#[test]
+fn matches_with_thousands_of_arms_check_quickly() {
+    let arms = 30_000;
+    let ints: String = (0..arms).map(|i| format!("  {i} => {i},\n")).collect();
+    let strs: String = (0..arms).map(|i| format!("  \"s{i}\" => {i},\n")).collect();
+    let ors: String = (0..arms)
+        .map(|i| format!("  {i} | {} => {i},\n", i + arms))
+        .collect();
+    let functions = [
+        format!("fn f(x: Int) -> Int = match x {{\n{ints}  _ => 0,\n}}\n"),
+        format!("fn f(x: Str) -> Int = match x {{\n{strs}  _ => 0,\n}}\n"),
+        format!("fn f(x: Int) -> Int = match x {{\n{ors}  _ => 0,\n}}\n"),
+        format!("fn f(x: Option<Int>) -> Int = match x {{\n  none => 0,\n{ints}  _ => 0,\n}}\n"),
+    ];
+    for function in functions {
+        let source = format!("struct Root {{ a: Int = 0 }}\n{function}");
+        let host = Host::new(MemoryLoader::new().with_file("app/main.stav", source));
+        let start = std::time::Instant::now();
+        assert_eq!(codes(&host, &app_root()), Vec::<&str>::new());
+        assert!(start.elapsed() < std::time::Duration::from_secs(10));
+    }
+}
+
 mod random {
     use proptest::prelude::*;
     use proptest::sample::select;
