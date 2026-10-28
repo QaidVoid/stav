@@ -1,0 +1,3 @@
+struct Unit { after: List<Ref<Unit>> = [] }
+struct Root { units: Map<Str, Unit> = {} block Unit }
+Unit a { after = [b] }

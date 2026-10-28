@@ -1,0 +1,8 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- errors
+error[E0802]: `units.a.after` refers to `b`, which is not a declared `Unit`
+  --> app/main.stav:3:19
+  help: did you mean `a`?

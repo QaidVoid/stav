@@ -191,7 +191,7 @@ impl<'c> Eval<'c> {
                     ast::Item::Stmt(s) => Some(s),
                     _ => None,
                 });
-            for statement in statements.collect::<Vec<_>>() {
+            for statement in statements {
                 self.statement(&mut body, statement, &mut out)?;
             }
         }
@@ -218,7 +218,7 @@ impl<'c> Eval<'c> {
             env: Env::default(),
             via,
         };
-        let statements: Vec<Stmt<'c>> = self
+        let statements = self
             .c
             .program
             .file(file)
@@ -228,8 +228,7 @@ impl<'c> Eval<'c> {
             .filter_map(|item| match item {
                 ast::Item::Stmt(s) => Some(s),
                 _ => None,
-            })
-            .collect();
+            });
         for statement in statements {
             self.statement(&mut body, statement, out)?;
         }

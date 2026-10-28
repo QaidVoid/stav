@@ -13,7 +13,7 @@ use crate::check::suggest::did_you_mean;
 use crate::check::types::{Number, Predicate, RefinementId, StructId, Type, TypeId};
 use crate::diagnostic::{Diagnostic, FileDiagnostic};
 use crate::span::SourceSpan;
-use crate::value::Value;
+use crate::value::{AttrPath, Value};
 
 impl<'c> Eval<'c> {
     /// Checks the merged value of the root, and returns it in its public
@@ -262,7 +262,7 @@ impl<'c> Eval<'c> {
     fn check_refs(&mut self, root: &Val, public: &Value) {
         let mut targets: BTreeMap<StructId, BTreeSet<String>> = BTreeMap::new();
         let mut refs = Vec::new();
-        self.collect_refs(root, "", &mut refs);
+        self.collect_refs(root, &mut Vec::new(), &mut refs);
         for (field, r) in refs {
             let labels = targets
                 .entry(r.target)
@@ -277,20 +277,23 @@ impl<'c> Eval<'c> {
             } else {
                 format!("`{field}`")
             };
+            let mut diagnostic = Diagnostic::error(
+                "E0802",
+                r.span,
+                format!(
+                    "{subject} refers to `{}`, which is not a declared `{kind}`",
+                    r.label
+                ),
+            )
+            .with_optional_help(help);
+            if kind != name {
+                diagnostic = diagnostic.with_note(format!(
+                    "references to `{name}` name the blocks of `{kind}`"
+                ));
+            }
             self.errors.push(FileDiagnostic {
                 file: Some(r.file),
-                diagnostic: Diagnostic::error(
-                    "E0802",
-                    r.span,
-                    format!(
-                        "{subject} refers to `{}`, which is not a declared `{kind}`",
-                        r.label
-                    ),
-                )
-                .with_optional_help(help)
-                .with_note(format!(
-                    "references to `{name}` name the blocks of `{kind}`"
-                )),
+                diagnostic,
             });
         }
     }
@@ -345,23 +348,42 @@ impl<'c> Eval<'c> {
         (kind, name)
     }
 
-    fn collect_refs<'v>(&self, value: &'v Val, field: &str, out: &mut Vec<(String, &'v RefVal)>) {
+    /// Collects the references inside `value` with the attribute path of
+    /// each, where `path` is the path of `value`.
+    fn collect_refs<'v>(
+        &self,
+        value: &'v Val,
+        path: &mut Vec<String>,
+        out: &mut Vec<(String, &'v RefVal)>,
+    ) {
+        let mut nested = |key: String, item: &'v Val, path: &mut Vec<String>| {
+            path.push(key);
+            self.collect_refs(item, path, out);
+            path.pop();
+        };
         match value {
-            Val::Ref(r) => out.push((field.to_owned(), r)),
+            Val::Ref(r) => {
+                let shown = if path.is_empty() {
+                    String::new()
+                } else {
+                    AttrPath::new(path.iter().cloned()).to_string()
+                };
+                out.push((shown, r));
+            }
             Val::List(s) | Val::Set(s) => {
                 for item in &s.items {
-                    self.collect_refs(item, field, out);
+                    self.collect_refs(item, path, out);
                 }
             }
             Val::Map(m) => {
-                for (_, item) in &m.entries {
-                    self.collect_refs(item, field, out);
+                for (key, item) in &m.entries {
+                    nested(key.text(&self.c.types), item, path);
                 }
             }
             Val::Struct(s) => {
                 let def = self.c.types.structure(s.id);
                 for (f, item) in def.fields.iter().zip(&s.fields) {
-                    self.collect_refs(item, &f.name, out);
+                    nested(f.name.clone(), item, path);
                 }
             }
             Val::Variant(v) => {
@@ -373,7 +395,7 @@ impl<'c> Eval<'c> {
                     .get(v.index as usize)
                     .and_then(|v| v.fields.as_ref());
                 for (p, item) in params.into_iter().flatten().zip(&v.fields) {
-                    self.collect_refs(item, &p.name, out);
+                    nested(p.name.clone(), item, path);
                 }
             }
             _ => {}
