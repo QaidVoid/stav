@@ -51,11 +51,11 @@ const MAX_ALIGNED_KEY: usize = 24;
 /// # Examples
 ///
 /// ```
-/// let source = "system {\n  hostname=\"forge\"\n  init = runit, timezone = \"UTC\"\n}\n";
+/// let source = "system {\n  hostname=\"forge\"\n  init = supervisor, timezone = \"UTC\"\n}\n";
 /// let formatted = stav::format(source).expect("the source has no errors");
 /// assert_eq!(
 ///     formatted,
-///     "system {\n  hostname = \"forge\"\n  init     = runit\n  timezone = \"UTC\"\n}\n",
+///     "system {\n  hostname = \"forge\"\n  init     = supervisor\n  timezone = \"UTC\"\n}\n",
 /// );
 /// ```
 pub fn format(source: &str) -> Result<String, Vec<Diagnostic>> {

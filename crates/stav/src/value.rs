@@ -86,7 +86,7 @@ impl Value {
     ///
     /// Each key names a struct field or a map key. A key that names the
     /// variant of a value with payload steps into its payload fields, the
-    /// way the variant is rendered: `build.cargo.features`.
+    /// way the variant is rendered: `build.native.features`.
     pub fn at(&self, path: &AttrPath) -> Option<&Value> {
         let mut current = self;
         let mut keys = path.keys().iter();
@@ -241,7 +241,7 @@ fn describe(value: &Value, out: &mut String) {
 /// `_` and `-`. Any other key is written in double quotes with the escapes
 /// of a string literal: `\\`, `\"`, `\n`, `\t`, `\r`, `\0`, `\#` before
 /// `{`, and `\u{...}` for other control characters. For example the keys
-/// `sysctl` and `vm.swappiness` display as `sysctl."vm.swappiness"`.
+/// `tunables` and `mem.reclaim` display as `tunables."mem.reclaim"`.
 /// [`FromStr`] parses that form back into the same path.
 #[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct AttrPath {
@@ -261,8 +261,8 @@ impl AttrPath {
     /// ```
     /// use stav::AttrPath;
     ///
-    /// let path = AttrPath::new(["sysctl", "vm.swappiness"]);
-    /// assert_eq!(path.to_string(), "sysctl.\"vm.swappiness\"");
+    /// let path = AttrPath::new(["tunables", "mem.reclaim"]);
+    /// assert_eq!(path.to_string(), "tunables.\"mem.reclaim\"");
     /// ```
     pub fn new<I>(keys: I) -> Self
     where
@@ -337,8 +337,8 @@ impl fmt::Display for AttrPath {
 /// ```
 /// use stav::AttrPath;
 ///
-/// let path: AttrPath = r#"sysctl."vm.swappiness""#.parse()?;
-/// assert_eq!(path.keys(), ["sysctl", "vm.swappiness"]);
+/// let path: AttrPath = r#"tunables."mem.reclaim""#.parse()?;
+/// assert_eq!(path.keys(), ["tunables", "mem.reclaim"]);
 /// assert_eq!(path.to_string().parse::<AttrPath>()?, path);
 /// # Ok::<(), stav::AttrPathError>(())
 /// ```

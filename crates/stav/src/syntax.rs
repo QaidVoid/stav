@@ -67,7 +67,7 @@ pub enum NodeKind {
     Interp,
     /// An identifier in expression position.
     Name,
-    /// A symbol word such as `llvm@19:static` in expression position.
+    /// A symbol word such as `compiler@19:static` in expression position.
     Symbol,
     /// `self`.
     SelfExpr,

@@ -621,7 +621,7 @@ choice! {
         Str(Str),
         /// An identifier.
         Name(Name),
-        /// A symbol word such as `llvm@19:static`.
+        /// A symbol word such as `compiler@19:static`.
         Symbol(Symbol),
         /// `self`.
         SelfExpr(SelfExpr),
@@ -825,7 +825,7 @@ impl<'a> Name<'a> {
 }
 
 node! {
-    /// A symbol word such as `llvm@19.1:static`, a compact literal of a
+    /// A symbol word such as `compiler@19.1:static`, a compact literal of a
     /// host symbol type.
     Symbol = Symbol
 }

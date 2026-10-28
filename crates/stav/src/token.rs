@@ -43,7 +43,7 @@ pub enum TokenKind {
     /// comments between them, are separate tokens.
     Newline,
 
-    /// An identifier such as `name`, `xdg-utils` or `openssl1.1`.
+    /// An identifier such as `name`, `app-utils` or `ciphers1.1`.
     ///
     /// Identifiers are ASCII. A `-` belongs to an identifier when a letter,
     /// digit or `_` follows it directly, and a `.` belongs to it when a digit
