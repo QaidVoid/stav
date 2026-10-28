@@ -1,0 +1,8 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0703]: `app/part.stav` imports or includes itself
+  --> app/part.stav:2:1
+  note: cycle: app/part.stav -> app/part.stav

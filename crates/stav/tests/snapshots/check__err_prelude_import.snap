@@ -1,0 +1,8 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0208]: a prelude file cannot import modules
+  --> base.stav:1:1
+  help: declare what the prelude needs in the prelude itself

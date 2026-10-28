@@ -206,23 +206,21 @@ impl<'a> SourceFile<'a> {
             let span = first_token(node).map_or(node.span(), SyntaxToken::span);
             match (kind, item) {
                 (FileKind::Library, Item::Stmt(stmt)) if !matches!(stmt, Stmt::Let(_)) => {
-                    diagnostics.push(Diagnostic {
-                        code: "E0209",
-                        message: "a library cannot contain statements".to_owned(),
-                        span,
-                        help: Some(
-                            "move the statement into an entry file or a part file".to_owned(),
-                        ),
-                    });
+                    diagnostics.push(
+                        Diagnostic::error("E0209", span, "a library cannot contain statements")
+                            .with_help("move the statement into an entry file or a part file"),
+                    );
                 }
                 (FileKind::Part, Item::Struct(_) | Item::Type(_) | Item::Fn(_)) => {
                     let keyword = first_token(node).map_or("", SyntaxToken::text);
-                    diagnostics.push(Diagnostic {
-                        code: "E0208",
-                        message: format!("a part file cannot contain a `{keyword}` declaration"),
-                        span,
-                        help: Some("move the declaration into a library and import it".to_owned()),
-                    });
+                    diagnostics.push(
+                        Diagnostic::error(
+                            "E0208",
+                            span,
+                            format!("a part file cannot contain a `{keyword}` declaration"),
+                        )
+                        .with_help("move the declaration into a library and import it"),
+                    );
                 }
                 _ => {}
             }

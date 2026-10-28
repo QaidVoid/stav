@@ -1,0 +1,3 @@
+#! entries ../outside.stav
+#- file main.stav
+struct Root { x: Int = 1 }

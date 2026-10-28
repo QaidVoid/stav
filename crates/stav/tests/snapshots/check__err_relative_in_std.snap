@@ -1,0 +1,8 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0704]: a host source cannot use the relative import path `./b.stav`
+  --> std/a:1:8
+  help: use a `std/...` path or a host module path

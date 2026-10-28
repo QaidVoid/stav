@@ -1,0 +1,7 @@
+import "./a.stav" as a
+
+struct Root { x: Int = 1 }
+#- file a.stav
+import "./b.stav" as b
+#- file b.stav
+import "./a.stav" as a

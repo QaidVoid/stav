@@ -1,0 +1,27 @@
+struct Boot { kernel: Str, modules: List<Str> = [] }
+
+struct Fs { device: Str, fstype: Str = "ext4" }
+
+struct System {
+  boot: Boot
+  fs:   Map<Str, Fs> = {} block fs
+}
+
+struct Root { system: System }
+
+system {
+  include "./hardware.stav"
+  include "./hardware.stav"
+}
+#- file hardware.stav
+import "./lib/disks.stav" as disks
+
+let root = disks.root_device
+boot {
+  kernel = "linux-lts"
+  modules = ["nvme", "xhci_pci"]
+}
+
+fs "/" { device = root }
+#- file lib/disks.stav
+let root_device = "UUID=3f1c2a8e"

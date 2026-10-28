@@ -1,0 +1,33 @@
+#! symbol Pkg pkg words
+import "./lib/net.stav" as net
+import "std/desktop" as desktop
+import "ns/target" as target
+
+struct Root {
+  server:     net.Server
+  compositor: desktop.Compositor = desktop.Compositor.sway
+  level:      net.Level = net.Level.info
+  variant:    target.Variant
+}
+
+server = net.server(8080)
+compositor = niri
+level = net.default_level
+variant = target.variant
+#- file lib/net.stav
+import "./util.stav" as util
+
+type Level = debug | info
+
+struct Server { port: Int, host: Str = util.localhost }
+
+fn server(port: Int) -> Server = Server { port = port }
+
+let default_level: Level = debug
+#- file lib/util.stav
+let localhost = "127.0.0.1"
+#- std desktop
+type Compositor = sway | niri
+#- host ns/target
+type Variant = dynamic | static
+let variant: Variant = static

@@ -1,0 +1,7 @@
+import "./missing.stav" as missing
+import "std/nothing" as nothing
+import "ns/missing" as host
+
+struct Root { a: Int = 1 }
+#- host ns/present
+let x = 1

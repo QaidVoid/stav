@@ -1,0 +1,26 @@
+#! root Root
+system {
+  hostname = "forge"
+  service sshd { exec = ["/usr/bin/sshd", "-D"] }
+}
+#- prelude system.stav
+## A long-running program.
+struct Service {
+  ## The command line.
+  exec: List<Str> where nonEmpty
+  enable: Bool = true
+}
+
+struct System {
+  hostname: Str where hostname
+  services: Map<Str, Service> = {} block service
+}
+
+struct Root { system: System }
+
+fn hostname(s: Str) -> Bool = len(s) > 0 && len(s) < 64
+#- part base.stav
+system {
+  hostname = default("localhost")
+  service getty { exec = default(["/sbin/getty"]) }
+}

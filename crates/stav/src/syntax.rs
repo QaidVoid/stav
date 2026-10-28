@@ -181,6 +181,12 @@ impl SyntaxTree {
         }
     }
 
+    /// Returns the node with the given index, as returned by
+    /// [`SyntaxNode::index`].
+    pub(crate) fn node(&self, index: usize) -> Option<SyntaxNode<'_>> {
+        (index < self.nodes.len()).then_some(SyntaxNode { tree: self, index })
+    }
+
     fn element(&self, element: Element) -> SyntaxElement<'_> {
         match element {
             Element::Node(index) => SyntaxElement::Node(SyntaxNode { tree: self, index }),
@@ -238,6 +244,12 @@ impl<'a> SyntaxNode<'a> {
         tree.elements[data.first_child..data.first_child + data.child_count]
             .iter()
             .map(move |&element| tree.element(element))
+    }
+
+    /// Returns the index of the node in its tree. Every node of a tree has
+    /// a distinct index below [`SyntaxTree::node_count`].
+    pub(crate) fn index(self) -> usize {
+        self.index
     }
 
     fn data(self) -> &'a NodeData {

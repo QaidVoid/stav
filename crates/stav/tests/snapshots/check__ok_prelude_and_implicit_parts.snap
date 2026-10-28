@@ -1,0 +1,10 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+file 0 system.stav (prelude)
+file 1 base.stav (part)
+file 2 app/main.stav (entry)
+prelude files 0
+implicit parts 1
+entries 2

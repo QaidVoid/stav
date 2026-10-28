@@ -1,0 +1,14 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+file 0 app/main.stav (entry)
+  import net -> file 1
+  import desktop -> file 2
+  import target -> file 3
+file 1 app/lib/net.stav (module)
+  import util -> file 4
+file 2 std/desktop (module)
+file 3 ns/target (module)
+file 4 app/lib/util.stav (module)
+entries 0

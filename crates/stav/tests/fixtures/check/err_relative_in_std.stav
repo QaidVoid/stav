@@ -1,0 +1,5 @@
+import "std/a" as a
+
+struct Root { x: Int = 1 }
+#- std a
+import "./b.stav" as b

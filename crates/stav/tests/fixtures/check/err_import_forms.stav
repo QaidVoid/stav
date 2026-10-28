@@ -1,0 +1,8 @@
+import "lib.stav" as a
+import "./lib" as b
+import "/abs/lib.stav" as c
+import "https://example.org/lib.stav" as d
+import "../outside.stav" as e
+import "other/module" as f
+
+struct Root { a: Int = 1 }

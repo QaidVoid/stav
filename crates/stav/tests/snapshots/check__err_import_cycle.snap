@@ -1,0 +1,8 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0703]: imports and part files form a cycle
+  --> app/b.stav:1:1
+  note: cycle: app/a.stav -> app/b.stav -> app/a.stav

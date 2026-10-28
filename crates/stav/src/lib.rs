@@ -7,12 +7,14 @@
 //!
 //! The entry points so far are [`lex`], which splits source text into
 //! tokens, [`parse`], which builds a lossless [`SyntaxTree`] with a typed
-//! view in [`ast`], and [`format()`], which lays source text out in its
-//! canonical form.
+//! view in [`ast`], [`format()`], which lays source text out in its
+//! canonical form, and [`check`], which loads the files of a root through a
+//! host's [`Loader`] and checks them.
 
 #![forbid(unsafe_code)]
 
 pub mod ast;
+mod check;
 mod diagnostic;
 mod format;
 mod lexer;
@@ -21,7 +23,11 @@ mod span;
 mod syntax;
 mod token;
 
-pub use diagnostic::Diagnostic;
+pub use check::{
+    Checked, FileId, Host, HostModule, ImportRoot, LoadError, Loader, MemoryLoader, RelPath,
+    RootSpec, Source, SymbolType, check,
+};
+pub use diagnostic::{Diagnostic, Diagnostics, FileDiagnostic, Label, Severity};
 pub use format::format;
 pub use lexer::{Lexed, lex};
 pub use parser::{MAX_DEPTH, Parsed, parse};

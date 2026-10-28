@@ -483,12 +483,8 @@ impl<'s> Parser<'s> {
     /// Errors are suppressed until the next separator.
     fn error(&mut self, code: &'static str, span: Span, message: String, help: Option<String>) {
         if !self.recovering {
-            self.diagnostics.push(Diagnostic {
-                code,
-                message,
-                span,
-                help,
-            });
+            self.diagnostics
+                .push(Diagnostic::error(code, span, message).with_optional_help(help));
         }
         self.recovering = true;
     }
@@ -503,12 +499,8 @@ impl<'s> Parser<'s> {
         help: Option<String>,
     ) {
         if !self.recovering {
-            self.diagnostics.push(Diagnostic {
-                code,
-                message,
-                span,
-                help,
-            });
+            self.diagnostics
+                .push(Diagnostic::error(code, span, message).with_optional_help(help));
         }
     }
 

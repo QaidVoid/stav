@@ -906,12 +906,8 @@ impl<'a> Lexer<'a> {
         message: String,
         help: Option<String>,
     ) {
-        self.diagnostics.push(Diagnostic {
-            code,
-            message,
-            span: Span { start, end },
-            help,
-        });
+        self.diagnostics
+            .push(Diagnostic::error(code, Span { start, end }, message).with_optional_help(help));
     }
 }
 

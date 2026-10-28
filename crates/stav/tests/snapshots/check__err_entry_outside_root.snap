@@ -1,0 +1,7 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0702]: entry file `app/../outside.stav` is not inside an import root
+  help: add the directory that contains it to the import roots

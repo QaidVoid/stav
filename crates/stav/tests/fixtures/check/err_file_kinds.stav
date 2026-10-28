@@ -1,0 +1,11 @@
+import "./lib.stav" as lib
+
+struct Root { x: Int = 1 }
+
+include "./part.stav"
+#- file lib.stav
+let ok = 1
+x = 2
+#- file part.stav
+struct Inner { y: Int }
+x = 3

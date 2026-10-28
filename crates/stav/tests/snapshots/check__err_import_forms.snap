@@ -1,0 +1,22 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0704]: unsupported import path `lib.stav`
+  --> app/main.stav:1:8
+  help: write a relative path such as `./lib.stav`, a `std/...` path or a host module path
+error[E0704]: the relative import path `./lib` does not end in `.stav`
+  --> app/main.stav:2:8
+  help: write `./lib.stav`
+error[E0704]: unsupported import path `/abs/lib.stav`
+  --> app/main.stav:3:8
+  help: write a relative path such as `./lib.stav`, a `std/...` path or a host module path
+error[E0704]: unsupported import path `https://example.org/lib.stav`
+  --> app/main.stav:4:8
+  help: write a relative path such as `./lib.stav`, a `std/...` path or a host module path
+error[E0702]: the import path `../outside.stav` leaves its import root
+  --> app/main.stav:5:8
+error[E0704]: unsupported import path `other/module`
+  --> app/main.stav:6:8
+  help: write a relative path such as `./lib.stav`, a `std/...` path or a host module path

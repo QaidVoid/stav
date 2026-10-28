@@ -1,0 +1,11 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+file 0 app/main.stav (entry)
+  include at 13:3 -> file 1
+  include at 14:3 -> file 1
+file 1 app/hardware.stav (part)
+  import disks -> file 2
+file 2 app/lib/disks.stav (module)
+entries 0

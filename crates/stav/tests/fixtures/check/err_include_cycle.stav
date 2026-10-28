@@ -1,0 +1,6 @@
+struct Root { x: Int = 1, y: Int = 2 }
+
+include "./part.stav"
+#- file part.stav
+x = 3
+include "./part.stav"

@@ -1,0 +1,11 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0701]: `app/missing.stav` does not exist
+  --> app/main.stav:1:8
+error[E0701]: there is no module `std/nothing`
+  --> app/main.stav:2:8
+error[E0701]: there is no host module `ns/missing`
+  --> app/main.stav:3:8

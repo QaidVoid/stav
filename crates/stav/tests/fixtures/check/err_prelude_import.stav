@@ -1,0 +1,4 @@
+struct Root { x: Int = 1 }
+#- prelude base.stav
+import "std/x" as x
+struct System { name: Str }
