@@ -255,3 +255,7 @@ fn fits(next: &Doc<'_>, rest: &[(usize, Mode, &Doc<'_>)], width: usize) -> bool 
         }
     }
 }
+
+#[cfg(test)]
+#[path = "doc_tests.rs"]
+mod tests;
