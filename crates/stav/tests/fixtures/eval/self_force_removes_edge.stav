@@ -1,0 +1,15 @@
+#! entries recipe.stav overlay.stav mirror.stav
+#- file recipe.stav
+struct Package {
+  version: Str
+  url:     Str
+}
+struct Root { packages: Map<Str, Package> = {} block package }
+package foo {
+  version = "1.0"
+  url     = "https://example.org/foo-#{self.version}.tar.gz"
+}
+#- file overlay.stav
+package foo { version = force("from #{self.url}") }
+#- file mirror.stav
+package foo { url = force("https://mirror.example/foo.tar.gz") }

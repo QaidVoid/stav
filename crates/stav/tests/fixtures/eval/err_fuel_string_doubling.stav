@@ -1,0 +1,3 @@
+struct Root { s: Str = "" }
+s = fold(range(0, 40), "x", fn(acc: Str, i: Int) =
+  fold(range(0, 2), "", fn(b: Str, j: Int) = b ++ acc))

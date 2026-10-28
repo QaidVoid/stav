@@ -1,0 +1,12 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- JSON
+{
+  "patch": "app/conf/fixes/one.patch",
+  "files": [
+    "app/conf/x.conf",
+    "app/conf/y.conf"
+  ]
+}

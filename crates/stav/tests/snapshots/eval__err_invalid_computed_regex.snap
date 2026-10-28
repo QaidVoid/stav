@@ -1,0 +1,7 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- errors
+error[E0609]: `(a` is not a valid regular expression
+  --> app/main.stav:3:19

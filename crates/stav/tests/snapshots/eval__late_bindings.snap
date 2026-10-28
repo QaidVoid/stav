@@ -1,0 +1,21 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- JSON
+{
+  "release": "testing",
+  "packages": {
+    "zlib": {
+      "name": "zlib",
+      "version": "1.3.1",
+      "url": "https://example.org/zlib-1.3.1.tar.gz",
+      "files": [
+        "zlib-1.3.1.tar.gz",
+        "zlib-1.3.1.sig"
+      ],
+      "summary": "https://example.org/zlib-1.3.1.tar.gz (testing-channel)"
+    }
+  },
+  "banner": "built for testing-channel"
+}

@@ -1,0 +1,50 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- JSON
+{
+  "jobs": {
+    "a": {
+      "build": {
+        "cargo": {
+          "features": [
+            "a",
+            "b"
+          ],
+          "bins": [
+            "rg"
+          ]
+        }
+      }
+    },
+    "b": {
+      "build": {
+        "make": {
+          "target": "x"
+        }
+      }
+    }
+  }
+}
+--- TOML
+[jobs.a.build.cargo]
+features = ["a", "b"]
+bins = ["rg"]
+
+[jobs.b.build.make]
+target = "x"
+--- YAML
+jobs:
+  a:
+    build:
+      cargo:
+        features:
+          - a
+          - b
+        bins:
+          - rg
+  b:
+    build:
+      make:
+        target: x

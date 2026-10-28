@@ -1,0 +1,3 @@
+struct Root { ok: Bool = false }
+let pattern = "(" ++ "a"
+ok = matches("a", pattern)

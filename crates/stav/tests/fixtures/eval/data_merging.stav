@@ -1,0 +1,11 @@
+#! render json toml yaml
+#! entries a.stav b.stav c.stav
+#- file a.stav
+struct Root { settings: Data = none, replaced: Data = none }
+settings = { port = 80, hosts = ["a"], tls = { enabled = true } }
+replaced = { kind = "map" }
+#- file b.stav
+settings = { hosts = ["b"], tls = { cert = "/etc/cert.pem" }, ratio = 0.5 }
+replaced = force(["a", "list"])
+#- file c.stav
+settings = { port = 80 }

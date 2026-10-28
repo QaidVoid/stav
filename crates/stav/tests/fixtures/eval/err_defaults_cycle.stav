@@ -1,0 +1,6 @@
+struct Pair {
+  a: Str = "#{self.b}!"
+  b: Str = "#{self.a}?"
+}
+struct Root { pairs: Map<Str, Pair> = {} block pair }
+pair p { }

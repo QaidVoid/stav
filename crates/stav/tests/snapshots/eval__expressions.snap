@@ -1,0 +1,67 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- JSON
+{
+  "arithmetic": [
+    7,
+    9,
+    3,
+    -3,
+    1,
+    -1,
+    42,
+    5
+  ],
+  "floats": [
+    3.5,
+    0.30000000000000004,
+    0.3333333333333333,
+    1e-7,
+    2.0
+  ],
+  "compare": [
+    true,
+    true,
+    true,
+    true,
+    false,
+    false
+  ],
+  "text": "1 2.5 true warn 0.1 #{literal} é",
+  "multi": "line one\n  indented\n\nline three\n",
+  "raw": "\\d+ #{not interpolated}",
+  "options": [
+    7,
+    3,
+    0,
+    20,
+    4
+  ],
+  "described": [
+    "ready at start",
+    "notifies on fd 3",
+    "slow check: a b",
+    "checks with c",
+    "zero",
+    "small negative",
+    "positive",
+    "negative"
+  ],
+  "squares": {
+    "n1": 1,
+    "n3": 9
+  },
+  "point": {
+    "x": 2,
+    "y": 5
+  },
+  "nearest": 3,
+  "levels": [
+    "debug",
+    "info",
+    "warn"
+  ],
+  "ordered": true
+}

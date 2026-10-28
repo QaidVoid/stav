@@ -1,0 +1,3 @@
+struct Root { n: Int = 0 }
+let small: Int where ..10 = 12
+n = small

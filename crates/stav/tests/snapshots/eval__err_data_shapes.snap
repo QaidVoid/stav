@@ -1,0 +1,10 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- errors
+error[E0503]: `Data` values of different shapes for `settings`
+  --> app/a.stav:2:12
+  label: app/a.stav:2:12: a map (plain)
+  label: app/b.stav:1:12: a list (plain)
+  help: a higher priority contribution replaces the others: mark one with `force(...)`, or the others with `default(...)`

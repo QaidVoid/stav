@@ -1,0 +1,10 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- errors
+error[E0612]: a string is longer than 16777216 bytes
+  --> app/main.stav:3:46
+  label: app/main.stav:3:3: in this call of `fn`
+  label: app/main.stav:2:5: in this call of `fn`
+  help: make the value smaller, or raise the size limits

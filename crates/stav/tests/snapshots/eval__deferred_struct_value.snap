@@ -1,0 +1,16 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- JSON
+{
+  "tools": {
+    "jq": {
+      "version": "1.7",
+      "source": {
+        "url": "https://github.com/jqlang/jq/archive/v1.7.tar.gz",
+        "sha256": "abc"
+      }
+    }
+  }
+}

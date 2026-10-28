@@ -1,0 +1,8 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- errors
+error[E0608]: evaluation failed: port must be positive, got -1
+  --> app/main.stav:2:51
+  label: app/main.stav:3:8: in this call of `checked`

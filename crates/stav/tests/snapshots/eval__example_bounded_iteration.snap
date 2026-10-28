@@ -1,0 +1,13 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- JSON
+{
+  "total": 120,
+  "list": [
+    8000,
+    8001,
+    8002
+  ]
+}

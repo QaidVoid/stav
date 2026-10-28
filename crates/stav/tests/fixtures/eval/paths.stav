@@ -1,0 +1,4 @@
+#- file conf/main.stav
+struct Root { patch: Path = ./default.patch, files: List<Path> = [] }
+patch = ./fixes/one.patch
+files = [../conf/./x.conf, ./sub/../y.conf]

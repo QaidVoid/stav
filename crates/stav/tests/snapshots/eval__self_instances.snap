@@ -1,0 +1,17 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- JSON
+{
+  "packages": {
+    "a": {
+      "version": "v1",
+      "tag": "v1"
+    },
+    "b": {
+      "version": "1",
+      "tag": "v1"
+    }
+  }
+}

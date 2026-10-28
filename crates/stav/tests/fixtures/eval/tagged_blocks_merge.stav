@@ -1,0 +1,17 @@
+#! render json toml yaml
+type Build =
+  | cargo(features: List<Str> = [], bins: List<Str> = [])
+  | make(target: Str = "all")
+
+struct Job { build: Build }
+
+struct Root { jobs: Map<Str, Job> = {} block job }
+
+job a { build cargo { features = ["a"] } }
+job a { build cargo { features = ["b"], bins = ["rg"] } }
+
+job b {
+  build cargo { features = ["dropped"] }
+  build make { }
+  build = force(make(target = "x"))
+}

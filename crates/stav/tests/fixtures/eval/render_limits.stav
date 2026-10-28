@@ -1,0 +1,4 @@
+#! render toml json yaml
+struct Root { mixed: Data = none, holes: List<Option<Int>> = [] }
+mixed = [1, { a = 2 }]
+holes = [1, none]

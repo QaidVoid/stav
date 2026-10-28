@@ -1,0 +1,8 @@
+#! symbol Pkg pkg words strings
+struct Root {
+  packages: Set<Pkg> = []
+  primary:  Pkg = pkg("Default")
+  names:    List<Str> = []
+}
+packages = [Neovim, ripgrep:static, llvm@19.1:static, pkg("0AD"), "Zsh", neovim]
+names = [for p in toList(self.packages) -> "#{p}"]

@@ -1,0 +1,57 @@
+type Level = debug | info | warn | error
+type Ready = immediate | notify(fd: Int where 0..=1023) | check(cmd: List<Str>, interval: Int = 1)
+
+struct Point { x: Int = 0, y: Int = 0 }
+
+struct Root {
+  arithmetic: List<Int> = []
+  floats:     List<Float> = []
+  compare:    List<Bool> = []
+  text:       Str = ""
+  multi:      Str = ""
+  raw:        Str = ""
+  options:    List<Int> = []
+  described:  List<Str> = []
+  squares:    Map<Str, Int> = {}
+  point:      Option<Point>
+  nearest:    Int = 0
+  levels:     Set<Level> = []
+  ordered:    Bool = false
+}
+
+fn describe(r: Ready) -> Str = match r {
+  immediate => "ready at start"
+  notify(fd) => "notifies on fd #{fd}"
+  check(cmd, interval = i, ..) if i > 10 => "slow check: #{join(cmd, " ")}"
+  check(cmd, ..) => "checks with #{join(cmd, " ")}"
+}
+
+fn sign(n: Int) -> Str = match n {
+  0 => "zero"
+  -1 | -2 => "small negative"
+  _ => if n > 0 { "positive" } else { "negative" }
+}
+
+let origin = Point { }
+let shifted = Point { x = 3 }
+let maybe: Option<Point> = none
+let twice = fn(x: Int) -> Int = x * 2
+
+arithmetic = [1 + 2 * 3, (1 + 2) * 3, 7 / 2, -7 / 2, 7 % 3, -7 % 3, twice(21), -(-5)]
+floats     = [1.5 + 2.0, 0.1 * 3.0, 1.0 / 3.0, 1e-7, toFloat(2)]
+compare    = [1 < 2, "a" < "b", Level.info < Level.warn, [1, 2] == [1, 2], origin == shifted, !(1 == 1) || true && false]
+text       = "#{1} #{2.5} #{true} #{Level.warn} #{0.1} \#{literal} \u{e9}"
+multi      = """
+  line one
+    indented
+
+  line three
+  """
+raw        = r"\d+ #{not interpolated}"
+options    = [maybe?.x ?? 7, shifted.x, origin.y, [10, 20, 30][1], {"a" = 4}["a"]]
+described  = [describe(immediate), describe(notify(fd = 3)), describe(check(cmd = ["a", "b"], interval = 11)), describe(check(["c"])), sign(0), sign(-2), sign(5), sign(-9)]
+squares    = {for i in range(1, 4) if i != 2 -> "n#{i}" = i * i}
+point      = let p = Point { x = 1 }, q = Point { x = p.x + 1, y = 5 } in q
+nearest    = let xs = [5, 3, 9] in fold(xs, 100, fn(acc: Int, x: Int) = min(acc, x))
+levels     = [warn, debug, warn, info]
+ordered    = sort([Level.warn, debug, error, info]) == [Level.debug, info, warn, error]

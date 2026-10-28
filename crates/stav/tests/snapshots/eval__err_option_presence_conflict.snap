@@ -1,0 +1,11 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- errors
+error[E0501]: conflicting values for `tls`
+  --> app/main.stav:3:1
+  label: app/main.stav:3:1: present (plain)
+  label: app/main.stav:3:14: "/srv/cert.pem" (plain)
+  label: app/main.stav:4:7: none (plain)
+  help: keep one of them, or mark the one that should win with `force(...)`

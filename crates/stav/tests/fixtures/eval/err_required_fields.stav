@@ -1,0 +1,12 @@
+type Build = make(target: Str) | cargo(features: List<Str> = [])
+struct Unit {
+  exec:  List<Str>
+  user:  Option<Str>
+  build: Build = cargo()
+}
+struct Root {
+  name:  Str
+  units: Map<Str, Unit> = {} block unit
+}
+unit db { user = "postgres" }
+unit web { build make { } }

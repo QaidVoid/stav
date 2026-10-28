@@ -1,0 +1,10 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- errors
+error[E0501]: conflicting values for `system.hostname`
+  --> app/main.stav:4:14
+  label: app/main.stav:4:14: "forge" (plain)
+  label: app/laptop.stav:1:12: "laptop" (plain), included from app/main.stav:5:3
+  help: keep one of them, or mark the one that should win with `force(...)`

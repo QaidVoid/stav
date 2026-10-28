@@ -1,0 +1,52 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- JSON
+{
+  "jobs": {
+    "hello": {
+      "build": {
+        "make": {
+          "target": "all"
+        }
+      },
+      "timeout": 60
+    },
+    "rg": {
+      "build": {
+        "cargo": {
+          "features": [
+            "pcre2"
+          ]
+        }
+      },
+      "timeout": 600
+    }
+  }
+}
+--- TOML
+[jobs.hello]
+timeout = 60
+
+[jobs.hello.build.make]
+target = "all"
+
+[jobs.rg]
+timeout = 600
+
+[jobs.rg.build.cargo]
+features = ["pcre2"]
+--- YAML
+jobs:
+  hello:
+    build:
+      make:
+        target: all
+    timeout: 60
+  rg:
+    build:
+      cargo:
+        features:
+          - pcre2
+    timeout: 600

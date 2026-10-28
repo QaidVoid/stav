@@ -1,0 +1,20 @@
+struct Root {
+  plain:    Int = 1
+  forced:   Int = 1
+  defaulted: Int = 1
+  declared: Int = 1
+  tags:     List<Str> = ["declared"]
+  replaced: List<Str> = []
+  kept:     List<Str> = ["declared"]
+}
+plain = default(2)
+plain = 3
+forced = default(2)
+forced = 3
+forced = force(4)
+defaulted = default(2)
+tags = ["x"]
+tags = ["y"]
+replaced = ["p1"]
+replaced = force(["f"])
+replaced = ["p2"]

@@ -1,0 +1,13 @@
+#! entries recipe.stav overlay.stav
+#- file recipe.stav
+struct Package {
+  version: Str
+  url:     Str
+}
+struct Root { packages: Map<Str, Package> = {} block package }
+package foo {
+  version = "1.0"
+  url     = "https://example.org/foo-#{self.version}.tar.gz"
+}
+#- file overlay.stav
+package foo { version = force("v#{self.url}") }

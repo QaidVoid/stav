@@ -1,0 +1,8 @@
+#! entries base.stav prod.stav
+#- file base.stav
+struct Root { port: Int = 80, name: Str = "x" }
+port = 443
+name = "web"
+#- file prod.stav
+port = 443
+name = "web"

@@ -1,0 +1,9 @@
+#- file main.stav
+struct System { hostname: Str = "localhost" }
+struct Root { system: System = {} }
+system {
+  hostname = "forge"
+  include "./laptop.stav"
+}
+#- file laptop.stav
+hostname = "laptop"

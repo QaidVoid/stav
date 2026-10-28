@@ -1,0 +1,3 @@
+struct Root { port: Int = 0 }
+fn checked(p: Int) -> Int = if p > 0 { p } else { fail("port must be positive, got #{p}") }
+port = checked(-1)

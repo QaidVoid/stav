@@ -1,0 +1,9 @@
+struct Unit {
+  exec:  List<Str> where nonEmpty
+  after: List<Ref<Unit>> = []
+}
+
+struct Root { units: Map<Str, Unit> = {} block unit }
+
+unit db  { exec = ["/usr/bin/postgres"] }
+unit api { exec = ["/usr/bin/api"], after = [db, cache] }

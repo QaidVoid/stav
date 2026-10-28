@@ -1,0 +1,9 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- errors
+error[E0803]: value violates a refinement
+  --> app/main.stav:3:21
+  label: app/main.stav:3:21: 4096 is not in 0..=1023
+  label: app/main.stav:1:37: constraint declared here

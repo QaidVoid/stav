@@ -1,0 +1,21 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- JSON
+{
+  "plain": 3,
+  "forced": 4,
+  "defaulted": 2,
+  "declared": 1,
+  "tags": [
+    "x",
+    "y"
+  ],
+  "replaced": [
+    "f"
+  ],
+  "kept": [
+    "declared"
+  ]
+}

@@ -1,0 +1,13 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- JSON
+{
+  "name": "service",
+  "tags": [
+    "prod",
+    "web"
+  ],
+  "port": 443
+}

@@ -1,0 +1,9 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- errors
+error[E0802]: `after` refers to `netwrok`, which is not a declared `service`
+  --> app/main.stav:4:25
+  note: references to `Service` name the blocks of `service`
+  help: did you mean `network`?

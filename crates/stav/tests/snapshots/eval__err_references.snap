@@ -1,0 +1,8 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- errors
+error[E0802]: `after` refers to `cache`, which is not a declared `unit`
+  --> app/main.stav:9:50
+  note: references to `Unit` name the blocks of `unit`

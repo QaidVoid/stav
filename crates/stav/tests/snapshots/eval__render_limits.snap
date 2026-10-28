@@ -1,0 +1,27 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- TOML errors
+error[E0804]: cannot render `mixed` as TOML: the list mixes tables with other values, which TOML cannot express
+  --> app/main.stav:2:9
+--- JSON
+{
+  "mixed": [
+    1,
+    {
+      "a": 2
+    }
+  ],
+  "holes": [
+    1,
+    null
+  ]
+}
+--- YAML
+mixed:
+  - 1
+  - a: 2
+holes:
+  - 1
+  - null

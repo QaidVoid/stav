@@ -1,0 +1,51 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- JSON
+{
+  "listen": "127.0.0.1:8080",
+  "log_level": "warn",
+  "upstreams": {
+    "backup": {
+      "url": "https://b.example.org",
+      "weight": 10
+    },
+    "dev": {
+      "url": "http://127.0.0.1:9000",
+      "weight": 10
+    },
+    "primary": {
+      "url": "https://a.example.org",
+      "weight": 90
+    }
+  }
+}
+--- TOML
+listen = "127.0.0.1:8080"
+log_level = "warn"
+
+[upstreams.backup]
+url = "https://b.example.org"
+weight = 10
+
+[upstreams.dev]
+url = "http://127.0.0.1:9000"
+weight = 10
+
+[upstreams.primary]
+url = "https://a.example.org"
+weight = 90
+--- YAML
+listen: "127.0.0.1:8080"
+log_level: warn
+upstreams:
+  backup:
+    url: "https://b.example.org"
+    weight: 10
+  dev:
+    url: "http://127.0.0.1:9000"
+    weight: 10
+  primary:
+    url: "https://a.example.org"
+    weight: 90

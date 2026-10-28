@@ -1,0 +1,10 @@
+#! implicit Group
+struct Group { gid: Option<Int> }
+struct User { groups: List<Ref<Group>> = [] }
+struct Root {
+  users:  Map<Str, User> = {} block user
+  groups: Map<Str, Group> = {} block group
+}
+group wheel { gid = 10 }
+user alice { groups = [wheel, alice, "bob"] }
+user bob { groups = [bob] }

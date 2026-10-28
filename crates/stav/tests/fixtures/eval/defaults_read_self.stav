@@ -1,0 +1,15 @@
+struct Download {
+  version: Str
+  url:     Str = "https://example.org/tool-#{self.version}.tar.gz"
+  mirror:  Str = "#{self.url}.mirror"
+}
+struct Root {
+  downloads: Map<Str, Download> = {} block download
+  pinned:    List<Download> = []
+}
+download tool { version = "1.2.3" }
+download other {
+  version = "2.0"
+  url = "https://other.example/archive.tar.gz"
+}
+pinned = [Download { version = "0.9" }]

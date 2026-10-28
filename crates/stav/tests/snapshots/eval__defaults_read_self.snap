@@ -1,0 +1,26 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- JSON
+{
+  "downloads": {
+    "other": {
+      "version": "2.0",
+      "url": "https://other.example/archive.tar.gz",
+      "mirror": "https://other.example/archive.tar.gz.mirror"
+    },
+    "tool": {
+      "version": "1.2.3",
+      "url": "https://example.org/tool-1.2.3.tar.gz",
+      "mirror": "https://example.org/tool-1.2.3.tar.gz.mirror"
+    }
+  },
+  "pinned": [
+    {
+      "version": "0.9",
+      "url": "https://example.org/tool-0.9.tar.gz",
+      "mirror": "https://example.org/tool-0.9.tar.gz.mirror"
+    }
+  ]
+}

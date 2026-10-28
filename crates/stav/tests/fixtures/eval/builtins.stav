@@ -1,0 +1,51 @@
+struct Root {
+  strings: List<Str> = []
+  numbers: List<Int> = []
+  bools:   List<Bool> = []
+  lists:   List<List<Int>> = []
+  maps:    List<Map<Str, Int>> = []
+  parsed:  List<Option<Int>> = []
+  floats:  List<Float> = []
+  sets:    List<Set<Str>> = []
+}
+
+let m = {"b" = 2, "a" = 1, "c" = 3}
+
+strings = [
+  toStr(42), toStr(1.5), toStr(true),
+  join(["a", "b", "c"], "-"),
+  replace("a.b.c", ".", "::"),
+  trim("  padded\t"), lower("MiXed"), upper("MiXed"),
+  indent("one\n\ntwo\n", 2),
+  join(split("a,b,,c", ","), "|"),
+  join(lines("x\ny\n"), "+"),
+  join(keys(m), ""),
+]
+numbers = [len("h\u{e9}llo"), len([1, 2]), len(m), toInt(-2.7), abs(-4), max(3, 8), min(3, 8), first([4, 5]) ?? 0, last([4, 5]) ?? 0, get([4, 5], 7) ?? -1, get(m, "c") ?? 0]
+bools = [
+  nonEmpty(""), startsWith("prefix", "pre"), endsWith("suffix", "fix"),
+  contains("haystack", "st"), contains([1, 2, 3], 2), contains(toSet(["x"]), "y"),
+  matches("abc123", r"[a-z]+\d+"), matches("abc", r"b"),
+  any([1, 2, 3], fn(x: Int) = x > 2), all([1, 2, 3], fn(x: Int) = x > 2),
+  hasKey(m, "a"), hasKey(m, "z"),
+]
+lists = [
+  map([1, 2, 3], fn(x: Int) = x * 10),
+  filter([1, 2, 3, 4], fn(x: Int) = x % 2 == 0),
+  flatten([[1], [], [2, 3]]),
+  sort([3, 1, 2]),
+  unique([3, 1, 3, 2, 1]),
+  reverse([1, 2, 3]),
+  range(2, 5),
+  range(5, 2),
+  values(m),
+  if toList(toSet(["b", "a"])) == ["a", "b"] { [1] } else { [0] },
+]
+maps = [
+  mapValues(m, fn(k: Str, v: Int) = v * 100),
+  filterMap(m, fn(k: Str, v: Int) = v > 1),
+  union(m, {"a" = 10, "d" = 4}),
+]
+parsed = [parseInt("42"), parseInt("-7"), parseInt("x1"), parseInt(""), parseInt("99999999999999999999")]
+floats = [toFloat(3), max(1.5, 0.5), 0.5 + 0.25]
+sets = [toSet(["b", "a", "b"])]

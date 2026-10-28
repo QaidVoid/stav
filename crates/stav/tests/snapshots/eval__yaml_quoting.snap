@@ -1,0 +1,36 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- YAML
+words:
+  - "yes"
+  - "no"
+  - "on"
+  - "off"
+  - "null"
+  - "~"
+  - "1.0"
+  - "12"
+  - "0x1f"
+  - "true"
+  - ""
+  - " lead"
+  - "a: b"
+  - "#c"
+  - "-"
+  - plain words
+  - "multi\nline"
+  - "tab\there"
+  - "quote\"d"
+keys:
+  "1": one
+  a b: space
+  "yes": "y"
+--- TOML
+words = ["yes", "no", "on", "off", "null", "~", "1.0", "12", "0x1f", "true", "", " lead", "a: b", "#c", "-", "plain words", "multi\nline", "tab\there", "quote\"d"]
+
+[keys]
+1 = "one"
+"a b" = "space"
+yes = "y"

@@ -1,0 +1,10 @@
+struct Source { url: Str, sha256: Str = "unset" }
+struct Tool { version: Str, source: Source }
+struct Root { tools: Map<Str, Tool> = {} block tool }
+fn github(repo: Str, version: Str) -> Source =
+  Source { url = "https://github.com/#{repo}/archive/v#{version}.tar.gz" }
+tool jq {
+  version = "1.7"
+  source = github("jqlang/jq", self.version)
+  source.sha256 = "abc"
+}

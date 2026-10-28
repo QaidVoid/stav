@@ -1,0 +1,7 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- errors
+error[E0604]: index 3 is out of range for a list of 3 elements
+  --> app/main.stav:2:5

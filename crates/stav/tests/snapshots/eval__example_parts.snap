@@ -1,0 +1,23 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- JSON
+{
+  "servers": {
+    "admin": {
+      "name": "admin",
+      "replicas": 1,
+      "env": {
+        "RUST_LOG": "info"
+      }
+    },
+    "api": {
+      "name": "api",
+      "replicas": 8,
+      "env": {
+        "RUST_LOG": "info"
+      }
+    }
+  }
+}

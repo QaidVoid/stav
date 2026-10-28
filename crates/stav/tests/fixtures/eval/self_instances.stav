@@ -1,0 +1,16 @@
+#! entries a.stav b.stav
+#- file a.stav
+struct Package {
+  version: Str
+  tag: Str
+}
+struct Root { packages: Map<Str, Package> = {} block package }
+package a {
+  version = "#{self.tag}"
+  tag = "v1"
+}
+#- file b.stav
+package b {
+  version = "1"
+  tag = "v#{self.version}"
+}

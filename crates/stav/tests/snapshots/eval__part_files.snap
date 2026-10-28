@@ -1,0 +1,28 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- JSON
+{
+  "services": {
+    "cron": {
+      "exec": [
+        "/usr/bin/cron"
+      ],
+      "enabled": false
+    },
+    "sshd": {
+      "exec": [
+        "/usr/bin/sshd",
+        "-p",
+        "2222"
+      ],
+      "enabled": true
+    }
+  },
+  "hosts": [
+    "db.internal",
+    "cache.internal",
+    "last"
+  ]
+}

@@ -1,0 +1,26 @@
+#! entries main.stav overlay.stav
+#- file main.stav
+struct Package {
+  name:    Str
+  version: Str
+  url:     Str = "https://example.org/#{self.name}-#{self.version}.tar.gz"
+  files:   List<Str> = []
+  summary: Str = ""
+}
+struct Root {
+  release:  Str = "stable"
+  packages: Map<Str, Package> = {} block package
+  banner:   Str = ""
+}
+let channel = "#{self.release}-channel"
+banner = "built for #{channel}"
+package zlib {
+  let stem = "#{self.name}-#{self.version}"
+  name    = "zlib"
+  version = "1.3"
+  files   = ["#{stem}.tar.gz", "#{stem}.sig"]
+  summary = "#{self.url} (#{channel})"
+}
+#- file overlay.stav
+release = force("testing")
+package zlib { version = force("1.3.1") }

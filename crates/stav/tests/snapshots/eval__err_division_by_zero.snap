@@ -1,0 +1,7 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- errors
+error[E0603]: division by zero
+  --> app/main.stav:3:8

@@ -1,0 +1,7 @@
+type Build = cargo(features: List<Str> = []) | make(target: Str = "all")
+struct Job { build: Build }
+struct Root { jobs: Map<Str, Job> = {} block job }
+job b {
+  build cargo { }
+  build make { }
+}

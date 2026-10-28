@@ -1,0 +1,3 @@
+#! symbol Pkg pkg words strings
+struct Root { packages: List<Pkg> = [] }
+packages = [neovim, pkg("two words")]

@@ -1,0 +1,8 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- errors
+error[E0611]: evaluation needs more than 10000 steps
+  --> app/main.stav:2:10
+  help: make the computation smaller, or raise the step limit

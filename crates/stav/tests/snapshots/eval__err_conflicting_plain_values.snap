@@ -1,0 +1,10 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- errors
+error[E0501]: conflicting values for `port`
+  --> app/base.stav:2:8
+  label: app/base.stav:2:8: 8080 (plain)
+  label: app/prod.stav:1:8: 443 (plain)
+  help: keep one of them, or mark the one that should win with `force(...)`

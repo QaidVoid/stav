@@ -1,0 +1,4 @@
+struct Tls { cert: Str = "/etc/cert.pem" }
+struct Root { tls: Option<Tls> }
+tls { cert = "/srv/cert.pem" }
+tls = none

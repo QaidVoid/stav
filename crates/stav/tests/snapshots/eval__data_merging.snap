@@ -1,0 +1,47 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- JSON
+{
+  "settings": {
+    "hosts": [
+      "a",
+      "b"
+    ],
+    "port": 80,
+    "ratio": 0.5,
+    "tls": {
+      "cert": "/etc/cert.pem",
+      "enabled": true
+    }
+  },
+  "replaced": [
+    "a",
+    "list"
+  ]
+}
+--- TOML
+replaced = ["a", "list"]
+
+[settings]
+hosts = ["a", "b"]
+port = 80
+ratio = 0.5
+
+[settings.tls]
+cert = "/etc/cert.pem"
+enabled = true
+--- YAML
+settings:
+  hosts:
+    - a
+    - b
+  port: 80
+  ratio: 0.5
+  tls:
+    cert: /etc/cert.pem
+    enabled: true
+replaced:
+  - a
+  - list

@@ -1,0 +1,16 @@
+#! render json toml yaml
+struct Tls { cert: Str = "/etc/cert.pem", port: Int = 443 }
+struct Root {
+  tls:      Option<Tls>
+  plain:    Option<Tls>
+  dropped:  Option<Tls> = {}
+  note:     Option<Str>
+  cleared:  Option<Str> = "set"
+  limit:    Option<Int>
+  derived:  Int = 0
+}
+tls { port = 8443 }
+dropped = none
+cleared = none
+limit = 5
+derived = (self.limit ?? 0) + (self.plain?.port ?? 1) + (self.tls?.port ?? 0)

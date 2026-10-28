@@ -1,0 +1,24 @@
+#- file main.stav
+struct Service { exec: List<Str>, enabled: Bool = true }
+struct Root {
+  services: Map<Str, Service> = {} block service
+  hosts:    List<Str> = []
+}
+let suffix = ".internal"
+include "./services.stav"
+for name in ["db", "cache"] {
+  hosts = ["#{name}#{suffix}"]
+}
+if len(suffix) == 0 {
+  hosts = ["never"]
+} else {
+  hosts = ["last"]
+}
+#- file services.stav
+import "./lib.stav" as lib
+let base = "/usr/bin"
+service sshd { exec = ["#{base}/sshd", "-p", toStr(lib.port)] }
+service "#{lib.name}" { exec = ["#{base}/#{lib.name}"], enabled = false }
+#- file lib.stav
+let port = 2222
+let name = "cron"

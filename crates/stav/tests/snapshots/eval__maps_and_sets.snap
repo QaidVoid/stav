@@ -1,0 +1,76 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- JSON
+{
+  "limits": {
+    "debug": 1,
+    "info": 2,
+    "warn": 3
+  },
+  "levels": [
+    "debug",
+    "info",
+    "warn"
+  ],
+  "sysctl": {
+    "net.ipv4.ip_forward": 1,
+    "vm.swappiness": 10
+  },
+  "env": {
+    "RUST_LOG": "info",
+    "WITH SPACE": "yes"
+  },
+  "kernel": {
+    "modules": [
+      "kvm-amd",
+      "vfio-pci"
+    ],
+    "params": {
+      "quiet": ""
+    }
+  }
+}
+--- TOML
+levels = ["debug", "info", "warn"]
+
+[limits]
+debug = 1
+info = 2
+warn = 3
+
+[sysctl]
+"net.ipv4.ip_forward" = 1
+"vm.swappiness" = 10
+
+[env]
+RUST_LOG = "info"
+"WITH SPACE" = "yes"
+
+[kernel]
+modules = ["kvm-amd", "vfio-pci"]
+
+[kernel.params]
+quiet = ""
+--- YAML
+limits:
+  debug: 1
+  info: 2
+  warn: 3
+levels:
+  - debug
+  - info
+  - warn
+sysctl:
+  net.ipv4.ip_forward: 1
+  vm.swappiness: 10
+env:
+  RUST_LOG: info
+  WITH SPACE: "yes"
+kernel:
+  modules:
+    - kvm-amd
+    - vfio-pci
+  params:
+    quiet: ""

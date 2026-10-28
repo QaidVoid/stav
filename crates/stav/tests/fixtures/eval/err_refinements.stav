@@ -1,0 +1,15 @@
+struct Upstream {
+  url:    Str where matches(r"https?://.*")
+  weight: Int where 1..=100 = 10
+  tags:   List<Str where nonEmpty> = []
+}
+fn even(n: Int) -> Bool = n % 2 == 0
+struct Root {
+  upstreams: Map<Str, Upstream> = {} block upstream
+  count:     Int where even = 2
+  names:     List<Str> where 1..=2 = []
+}
+upstream primary { url = "https://a.example.org", weight = 900 }
+upstream backup  { url = "ftp://b.example.org", tags = ["ok", ""] }
+count = 3
+names = ["a", "b", "c"]

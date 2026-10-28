@@ -1,0 +1,8 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- errors
+error[E0601]: integer overflow in `4 * 4611686018427387904`
+  --> app/main.stav:2:28
+  label: app/main.stav:3:5: in this call of `grow`

@@ -1,0 +1,7 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- errors
+error[E0605]: the comprehension produces the key `1` more than once
+  --> app/main.stav:2:29

@@ -1,0 +1,6 @@
+#! entries base.stav prod.stav
+#- file base.stav
+struct Root { port: Int where 1..=65535 = 80 }
+port = 8080
+#- file prod.stav
+port = 443

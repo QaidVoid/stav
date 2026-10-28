@@ -1,0 +1,20 @@
+#! render json toml yaml
+type Build =
+  | cargo(features: List<Str> = [])
+  | make(target: Str = "all")
+
+struct Job {
+  build: Build
+  timeout: Int = 600
+}
+
+struct Root { jobs: Map<Str, Job> = {} block job }
+
+job rg {
+  build cargo { features = ["pcre2"] }
+}
+
+job hello {
+  build make { }
+  timeout = 60
+}

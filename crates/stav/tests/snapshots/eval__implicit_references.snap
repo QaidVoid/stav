@@ -1,0 +1,26 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- JSON
+{
+  "users": {
+    "alice": {
+      "groups": [
+        "wheel",
+        "alice",
+        "bob"
+      ]
+    },
+    "bob": {
+      "groups": [
+        "bob"
+      ]
+    }
+  },
+  "groups": {
+    "wheel": {
+      "gid": 10
+    }
+  }
+}

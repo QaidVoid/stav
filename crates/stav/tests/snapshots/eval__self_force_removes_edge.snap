@@ -1,0 +1,13 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- JSON
+{
+  "packages": {
+    "foo": {
+      "version": "from https://mirror.example/foo.tar.gz",
+      "url": "https://mirror.example/foo.tar.gz"
+    }
+  }
+}

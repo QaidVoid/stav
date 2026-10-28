@@ -1,0 +1,31 @@
+#! symbol Pkg pkg words
+#- file main.stav
+import "ns/target" as target
+import "std/net" as net
+system {
+  hostname = "forge"
+  packages = [vim]
+  port = net.port(target.variant)
+}
+#- prelude prelude/system.stav
+type Variant = dynamic | static
+struct System {
+  hostname: Str
+  packages: Set<Pkg> = []
+  accounts: List<Str> = []
+  port:     Int = 0
+}
+struct Root { system: System }
+#- part base.stav
+system {
+  hostname = default("localhost")
+  packages = [base]
+  accounts = ["root"]
+}
+#- std net
+fn port(v: Variant) -> Int = match v {
+  dynamic => 80
+  static  => 8080
+}
+#- host ns/target
+let variant: Variant = static

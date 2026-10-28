@@ -1,0 +1,8 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- errors
+error[E0604]: the map has no key `b`
+  --> app/main.stav:3:5
+  help: use `get(map, key)` for an `Option`

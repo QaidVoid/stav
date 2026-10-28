@@ -1,0 +1,7 @@
+struct Root { total: Int = factorial(5), list: List<Int> = ports(8000, 3) }
+
+fn factorial(n: Int where 0..=20) -> Int =
+  fold(range(1, n + 1), 1, fn(acc: Int, i: Int) = acc * i)
+
+fn ports(base: Int, count: Int where 1..=100) -> List<Int> =
+  [for i in range(0, count) -> base + i]

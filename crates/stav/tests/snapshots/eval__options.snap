@@ -1,0 +1,34 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- JSON
+{
+  "tls": {
+    "cert": "/etc/cert.pem",
+    "port": 8443
+  },
+  "plain": null,
+  "dropped": null,
+  "note": null,
+  "cleared": null,
+  "limit": 5,
+  "derived": 8449
+}
+--- TOML
+limit = 5
+derived = 8449
+
+[tls]
+cert = "/etc/cert.pem"
+port = 8443
+--- YAML
+tls:
+  cert: /etc/cert.pem
+  port: 8443
+plain: null
+dropped: null
+note: null
+cleared: null
+limit: 5
+derived: 8449

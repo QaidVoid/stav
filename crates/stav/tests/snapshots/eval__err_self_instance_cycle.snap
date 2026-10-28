@@ -1,0 +1,10 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- errors
+error[E0607]: `self` dependencies form a cycle
+  --> app/overlay.stav:1:31
+  label: app/overlay.stav:1:31: `packages.foo.version` reads `packages.foo.url`
+  label: app/recipe.stav:8:13: `packages.foo.url` reads `packages.foo.version`
+  note: cycle: packages.foo.version -> packages.foo.url -> packages.foo.version

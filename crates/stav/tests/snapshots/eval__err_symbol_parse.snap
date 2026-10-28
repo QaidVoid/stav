@@ -1,0 +1,7 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- errors
+error[E0613]: `two words` is not a valid `Pkg`: a symbol has no spaces
+  --> app/main.stav:2:25

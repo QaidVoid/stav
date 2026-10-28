@@ -1,0 +1,6 @@
+#! entries a.stav b.stav
+#- file a.stav
+struct Root { settings: Data = none }
+settings = { port = 80, hosts = ["a"] }
+#- file b.stav
+settings = ["not", "a", "map"]

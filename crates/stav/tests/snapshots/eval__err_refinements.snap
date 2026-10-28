@@ -1,0 +1,25 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- errors
+error[E0803]: value violates a refinement
+  --> app/main.stav:12:60
+  label: app/main.stav:12:60: 900 is not in 1..=100
+  label: app/main.stav:3:11: constraint declared here
+error[E0803]: value violates a refinement
+  --> app/main.stav:13:26
+  label: app/main.stav:13:26: "ftp://b.example.org" does not match `https?://.*`
+  label: app/main.stav:2:11: constraint declared here
+error[E0803]: value violates a refinement
+  --> app/main.stav:13:56
+  label: app/main.stav:13:56: "" is empty
+  label: app/main.stav:4:16: constraint declared here
+error[E0803]: value violates a refinement
+  --> app/main.stav:14:9
+  label: app/main.stav:14:9: `even` is false for 3
+  label: app/main.stav:9:14: constraint declared here
+error[E0803]: value violates a refinement
+  --> app/main.stav:15:9
+  label: app/main.stav:15:9: the length 3 is not in 1..=2
+  label: app/main.stav:10:14: constraint declared here

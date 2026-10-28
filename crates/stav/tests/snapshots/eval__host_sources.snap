@@ -1,0 +1,18 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- JSON
+{
+  "system": {
+    "hostname": "forge",
+    "packages": [
+      "base",
+      "vim"
+    ],
+    "accounts": [
+      "root"
+    ],
+    "port": 8080
+  }
+}
