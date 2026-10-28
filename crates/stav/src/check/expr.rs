@@ -47,33 +47,21 @@ impl<'p> Checker<'p> {
         meaning: Meaning,
         expected: Option<TypeId>,
     ) -> TypeId {
-        let mut fact = ExprFact {
-            ty,
-            to_data: false,
-            wrap: false,
-            meaning,
-        };
         let result = match expected {
             None => ty,
             Some(exp) => {
                 let inner = self.types.unwrap_option(exp);
                 let data_target = inner.unwrap_or(self.types.peel(exp));
-                if self.types.fits(ty, exp) {
-                    exp
-                } else if inner.is_some_and(|inner| self.types.fits(ty, inner)) {
-                    fact.wrap = true;
-                    exp
-                } else if data_target == TypeId::DATA && !self.types.has_code(ty) {
-                    fact.to_data = true;
-                    fact.wrap = inner.is_some() && self.types.unwrap_option(ty).is_none();
-                    exp
-                } else {
+                let fits = self.types.fits(ty, exp)
+                    || inner.is_some_and(|inner| self.types.fits(ty, inner))
+                    || (data_target == TypeId::DATA && !self.types.has_code(ty));
+                if !fits {
                     self.mismatch(cx.file, e.syntax().span(), exp, ty);
-                    exp
                 }
+                exp
             }
         };
-        self.fact(cx, e.syntax(), Fact::Expr(fact));
+        self.fact(cx, e.syntax(), Fact::Expr(ExprFact { ty, meaning }));
         result
     }
 

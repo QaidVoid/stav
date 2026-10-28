@@ -12,8 +12,13 @@ macro_rules! id {
         pub(crate) struct $name(pub(crate) u32);
 
         impl $name {
+            /// Returns the identifier of the item at `index`.
+            ///
+            /// Every list of items stays below 2^32 entries, since sources
+            /// are limited in size and each item comes from its source.
             pub(crate) fn new(index: usize) -> Self {
-                Self(u32::try_from(index).unwrap_or(u32::MAX))
+                debug_assert!(u32::try_from(index).is_ok(), "fewer than 2^32 items exist");
+                Self(index as u32)
             }
 
             pub(crate) fn index(self) -> usize {

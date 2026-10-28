@@ -212,16 +212,7 @@ impl<'p> Checker<'p> {
                         }
                         _ => CallTarget::Value(ty),
                     };
-                    self.fact(
-                        cx,
-                        callee.syntax(),
-                        Fact::Expr(ExprFact {
-                            ty,
-                            to_data: false,
-                            wrap: false,
-                            meaning,
-                        }),
-                    );
+                    self.fact(cx, callee.syntax(), Fact::Expr(ExprFact { ty, meaning }));
                     return target;
                 }
                 if let Some(s) = want.and_then(|w| self.types.as_sum(w))
@@ -276,16 +267,7 @@ impl<'p> Checker<'p> {
         match item {
             Some(PathItem::Value(g)) => {
                 let (ty, meaning) = self.global_value(cx, g, span);
-                self.fact(
-                    cx,
-                    callee.syntax(),
-                    Fact::Expr(ExprFact {
-                        ty,
-                        to_data: false,
-                        wrap: false,
-                        meaning,
-                    }),
-                );
+                self.fact(cx, callee.syntax(), Fact::Expr(ExprFact { ty, meaning }));
                 match self.globals[g.index()].kind {
                     GlobalKind::Fn(_) => CallTarget::Global(g),
                     GlobalKind::Let(_) => CallTarget::Value(ty),

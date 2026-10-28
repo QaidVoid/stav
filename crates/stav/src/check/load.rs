@@ -23,8 +23,13 @@ pub(crate) const MAX_SOURCE_LEN: usize = 4 * 1024 * 1024;
 pub struct FileId(u32);
 
 impl FileId {
+    /// Returns the identifier of the file at `index` of the file list.
+    ///
+    /// The file list stays below 2^32 entries, since every file takes
+    /// memory to hold.
     pub(crate) fn new(index: usize) -> Self {
-        Self(u32::try_from(index).unwrap_or(u32::MAX))
+        debug_assert!(u32::try_from(index).is_ok(), "fewer than 2^32 files exist");
+        Self(index as u32)
     }
 
     /// Returns the position of the file in the program's file list.

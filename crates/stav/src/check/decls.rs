@@ -28,6 +28,7 @@ const RESERVED: [&str; 13] = [
 /// A name in the value namespace of a file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ValueItem {
+    /// A top-level function or `let`.
     Global(GlobalId),
     /// An import alias, with the module or `None` when it failed to load.
     Module(Option<FileId>),
@@ -36,22 +37,29 @@ pub(crate) enum ValueItem {
 /// A name in the type namespace of a file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TypeItem {
+    /// A declared struct.
     Struct(StructId),
+    /// A declared sum type.
     Sum(SumId),
+    /// A symbol type of the host.
     Symbol(SymbolId),
 }
 
 /// The names a file declares or imports.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct FileScope {
+    /// The functions, `let` declarations and import aliases, by name.
     pub(crate) values: BTreeMap<String, ValueItem>,
+    /// The structs, sum types and symbol types, by name.
     pub(crate) types: BTreeMap<String, TypeItem>,
 }
 
 /// A top-level function or `let`.
 #[derive(Debug, Clone)]
 pub(crate) struct Global {
+    /// The declared name.
     pub(crate) name: String,
+    /// The file that declares it.
     pub(crate) file: FileId,
     /// The span of the name.
     pub(crate) span: Span,
@@ -60,16 +68,22 @@ pub(crate) struct Global {
     pub(crate) kind: GlobalKind,
 }
 
+/// Whether a top-level declaration is a function or a `let`, with what
+/// is known about it.
 #[derive(Debug, Clone)]
 pub(crate) enum GlobalKind {
+    /// A function and its signature.
     Fn(FnSig),
+    /// A `let` and its type.
     Let(LetGlobal),
 }
 
 /// The signature of a top-level function.
 #[derive(Debug, Clone)]
 pub(crate) struct FnSig {
+    /// The parameters in declaration order.
     pub(crate) params: Vec<ParamDef>,
+    /// The declared return type.
     pub(crate) ret: TypeId,
     /// The locals the parameters are bound to in the body.
     pub(crate) binds: Vec<LocalId>,
@@ -80,6 +94,7 @@ pub(crate) struct FnSig {
 pub(crate) struct LetGlobal {
     /// The type annotation, with its refinements.
     pub(crate) annotation: Option<TypeId>,
+    /// How far its value is checked.
     pub(crate) state: LetState,
     /// The start of the declaration, for finding forward references.
     pub(crate) start: usize,
@@ -88,8 +103,11 @@ pub(crate) struct LetGlobal {
 /// How far the type of a top-level `let` is known.
 #[derive(Debug, Clone)]
 pub(crate) enum LetState {
+    /// The value is not checked yet.
     Pending,
+    /// The value is being checked, so a use now depends on itself.
     InProgress,
+    /// The value is checked: its type and the `self` fields it reads.
     Done { ty: TypeId, reads: Vec<SelfRead> },
 }
 
@@ -102,6 +120,7 @@ pub(crate) struct PendingPredicate<'p> {
     pub(crate) refinement: RefinementId,
     /// The type the refinement restricts.
     pub(crate) base: TypeId,
+    /// The predicate as written.
     pub(crate) node: ast::NamedPredicate<'p>,
     /// The declaration that depends on the predicate function.
     pub(crate) owner: Option<Node>,
@@ -112,8 +131,11 @@ pub(crate) struct PendingPredicate<'p> {
 /// top-level `let` is, so that checking them never recurses through a
 /// chain of `let` values.
 pub(crate) struct PredicateArgs<'p> {
+    /// The file the refinement is written in.
     pub(crate) file: FileId,
+    /// The declaration that depends on what the arguments use.
     pub(crate) owner: Option<Node>,
+    /// Each argument with the type of its parameter.
     pub(crate) args: Vec<(Expr<'p>, TypeId)>,
 }
 
@@ -534,6 +556,8 @@ impl<'p> Checker<'p> {
         self.types.sums[sid.index()].variants = variants;
     }
 
+    /// Resolves the parameters of a function, a variant or a lambda,
+    /// reporting duplicate names and parameters without a type.
     pub(super) fn resolve_params(
         &mut self,
         file: FileId,
