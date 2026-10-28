@@ -1,0 +1,13 @@
+[package]
+name = "stav"
+description = "A statically typed, eager and total configuration language"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
