@@ -113,7 +113,9 @@ impl Parser<'_> {
             self.expected("a string");
         }
         if self.eat(T::AsKw) {
-            self.name("an alias");
+            if self.at_binding_name("an alias") {
+                self.binding_name(false);
+            }
         } else {
             self.expected("`as`");
         }
@@ -162,7 +164,7 @@ impl Parser<'_> {
             return;
         }
         self.start_node(NodeKind::Field);
-        self.binding_name();
+        self.binding_name(true);
         self.annotation(true);
         if self.eat(T::Eq) {
             self.expr();
@@ -236,7 +238,7 @@ impl Parser<'_> {
             return;
         }
         self.start_node(NodeKind::Param);
-        self.binding_name();
+        self.binding_name(true);
         self.annotation(true);
         if self.eat(T::Eq) {
             self.expr();
@@ -254,7 +256,7 @@ impl Parser<'_> {
     /// Parses `name: Type = value` after `let`, with an optional type.
     pub(super) fn binding(&mut self) {
         if self.at_binding_name("a name") {
-            self.binding_name();
+            self.binding_name(true);
         }
         self.annotation(false);
         if self.eat(T::Eq) {
@@ -275,14 +277,16 @@ impl Parser<'_> {
         found
     }
 
-    /// Bumps the name of a field, parameter or binding. A symbol word there
-    /// is almost always a name and type written without the space after
-    /// `:`.
-    fn binding_name(&mut self) {
+    /// Bumps the name of a field, parameter, binding or import alias, and
+    /// reports it if it is a symbol word. When `annotated` says that a type
+    /// may follow the name, a symbol word with a `:` is almost always a name
+    /// and type written without the space after `:`, and the help says so.
+    fn binding_name(&mut self, annotated: bool) {
         if self.at(T::SymWord) {
             let text = self.current_text();
             let help = text
                 .split_once(':')
+                .filter(|_| annotated)
                 .map(|(name, ty)| format!("write `{name}: {ty}` with a space after `:`"));
             let message = format!("expected a name, found symbol word `{text}`");
             self.error("E0206", self.current_span(), message, help);

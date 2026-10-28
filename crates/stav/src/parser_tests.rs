@@ -1783,6 +1783,14 @@ fn annotations_need_a_space_after_the_colon() {
 }
 
 #[test]
+fn import_alias_must_be_a_name() {
+    assert_snapshot!(errors("import \"a\" as llvm@19:static\nimport \"b\" as 1\n"), @"
+    error[E0206] 14..28: expected a name, found symbol word `llvm@19:static`
+    error[E0210] 43..44: expected an alias, found `1`
+    ");
+}
+
+#[test]
 fn comparisons_do_not_chain() {
     assert_snapshot!(errors("a = x < y < z\nb = x == y && y == z\nc = x == y != z\n"), @"
     error[E0207] 10..11: comparison operators cannot be chained
