@@ -1,0 +1,12 @@
+---
+source: crates/stav-cli/tests/cli.rs
+expression: scalar
+---
+status: 1
+--- stdout
+--- stderr
+error[E0804]: cannot render `upstreams.dev.weight` as TOML: TOML needs a table at the top
+  ┌─ app.stav:5:31
+  │
+5 │   weight: Int where 1..=100 = 10
+  │                               ^^

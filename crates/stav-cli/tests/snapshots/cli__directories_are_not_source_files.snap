@@ -1,0 +1,12 @@
+---
+source: crates/stav-cli/tests/cli.rs
+expression: output
+---
+status: 1
+--- stdout
+--- stderr
+error[E0705]: `app/lib.stav` is not a regular file
+  ┌─ app/main.stav:1:8
+  │
+1 │ import "./lib.stav" as lib
+  │        ^^^^^^^^^^^^

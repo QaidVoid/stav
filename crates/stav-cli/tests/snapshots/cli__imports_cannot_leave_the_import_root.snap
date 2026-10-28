@@ -1,0 +1,12 @@
+---
+source: crates/stav-cli/tests/cli.rs
+expression: output
+---
+status: 1
+--- stdout
+--- stderr
+error[E0702]: the import path `../secret.stav` leaves its import root
+  ┌─ app/main.stav:1:8
+  │
+1 │ import "../secret.stav" as s
+  │        ^^^^^^^^^^^^^^^^

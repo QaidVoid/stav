@@ -1,0 +1,14 @@
+---
+source: crates/stav-cli/tests/cli.rs
+expression: "stav(&dir, &[\"fmt\", \"bad.stav\"], \"\")"
+---
+status: 1
+--- stdout
+--- stderr
+error[E0210]: unclosed `(`
+  ┌─ bad.stav:1:5
+  │
+1 │ a = (1
+  │     ^
+  │
+  = help: add `)` to close it

@@ -1,0 +1,12 @@
+---
+source: crates/stav-cli/tests/cli.rs
+expression: "stav(&dir, &[\"check\", \"app/main.stav\"], \"\")"
+---
+status: 1
+--- stdout
+--- stderr
+error[E0702]: `app/lib.stav` leaves its import root once links are resolved
+  ┌─ app/main.stav:1:8
+  │
+1 │ import "./lib.stav" as lib
+  │        ^^^^^^^^^^^^

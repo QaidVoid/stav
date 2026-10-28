@@ -1,0 +1,22 @@
+---
+source: crates/stav-cli/tests/cli.rs
+expression: output
+---
+status: 1
+--- stdout
+--- stderr
+error[E0302]: unknown name `cont`
+  ┌─ app.stav:4:16
+  │
+4 │   count: Int = cont
+  │                ^^^^
+  │
+  = help: did you mean `cuont`?
+
+error[E0302]: unknown name `runti`, which is not a variant of `Init`
+  ┌─ app.stav:7:8
+  │
+7 │ init = runti
+  │        ^^^^^
+  │
+  = help: did you mean `runit`?

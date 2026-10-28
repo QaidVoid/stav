@@ -1,0 +1,12 @@
+---
+source: crates/stav-cli/tests/cli.rs
+expression: output
+---
+status: 1
+--- stdout
+--- stderr
+error[E0603]: division by zero
+  ┌─ app.stav:1:26
+  │
+1 │ struct Root { a: Int = 1 / zero }
+  │                          ^

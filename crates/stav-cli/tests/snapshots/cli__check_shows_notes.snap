@@ -1,0 +1,16 @@
+---
+source: crates/stav-cli/tests/cli.rs
+expression: output
+---
+status: 1
+--- stdout
+--- stderr
+error[E0610]: `fact` calls itself
+  ┌─ app.stav:2:53
+  │
+2 │ fn fact(n: Int) -> Int = if n == 0 { 1 } else { n * fact(n - 1) }
+  │                                                     ^^^^
+  │
+  = note: cycle: `fact` -> `fact`
+  = note: evaluation must terminate, so functions cannot recurse
+  = help: iterate with `fold` over `range(...)`, for example `fold(range(1, n + 1), 1, fn(acc: Int, i: Int) = acc * i)`

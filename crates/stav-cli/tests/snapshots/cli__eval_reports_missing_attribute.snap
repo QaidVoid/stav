@@ -1,0 +1,8 @@
+---
+source: crates/stav-cli/tests/cli.rs
+expression: missing
+---
+status: 1
+--- stdout
+--- stderr
+error[E0805]: there is no attribute `upstreams.nope`

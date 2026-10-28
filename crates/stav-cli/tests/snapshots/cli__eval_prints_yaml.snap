@@ -1,0 +1,19 @@
+---
+source: crates/stav-cli/tests/cli.rs
+expression: yaml
+---
+status: 0
+--- stdout
+listen: "127.0.0.1:8080"
+log_level: warn
+upstreams:
+  backup:
+    url: "https://b.example.org"
+    weight: 10
+  dev:
+    url: "http://127.0.0.1:9000"
+    weight: 10
+  primary:
+    url: "https://a.example.org"
+    weight: 90
+--- stderr
