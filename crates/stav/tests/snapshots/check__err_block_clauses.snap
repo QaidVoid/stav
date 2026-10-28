@@ -1,0 +1,14 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0306]: block kind `step` is declared more than once in `Root`
+  --> app/main.stav:4:3
+  label: app/main.stav:3:3: first declared here
+error[E0443]: a `block` clause needs a map of structs or a sum type, not `Int`
+  --> app/main.stav:5:3
+  help: declare the field as `Map<Str, T>` with a struct `T`
+error[E0443]: a `block` clause needs a map of structs or a sum type, not `Map<Str, Str>`
+  --> app/main.stav:6:3
+  help: declare the field as `Map<Str, T>` with a struct `T`

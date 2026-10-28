@@ -1,0 +1,13 @@
+fn even(n: Int) -> Bool = n % 2 == 0
+fn longer(s: Str, n: Int) -> Bool = len(s) > n
+struct Root {
+  a: Bool where 1..2
+  b: Int where nonEmpty
+  c: Str where matches(r"(unclosed")
+  d: Int where 0.5..2
+  e: Str where unknownPredicate
+  f: Str where even
+  g: Int where even && 0..=10
+  h: Str where longer(3) && matches(r"^[a-z]+$")
+  i: Int where matches(r"x")
+}

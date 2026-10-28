@@ -1,0 +1,17 @@
+type Ready = immediate | notify(fd: Int)
+struct Root { a: Int = 0, r: Ready = immediate }
+fn f(x: Int, y: Int = 2) -> Int = x + y
+let g = fn(x: Int) = x
+let n = 1
+a = f()
+a = f(1, 2, 3)
+a = f(1, z = 2)
+a = f(1, x = 2)
+a = g(1, 2)
+a = g(x = 1)
+a = n(1)
+a = h(1)
+r = notify()
+r = immediate(1)
+r = notify
+a = Ready(1)

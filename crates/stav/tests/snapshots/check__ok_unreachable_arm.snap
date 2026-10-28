@@ -1,0 +1,14 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+file 0 app/main.stav (entry)
+entries 0
+root Root
+fn f(l: Level) -> Int in app/main.stav
+uses Root defaults -> f
+bodies unit 0
+--- warnings
+warning[W0434]: this arm can never match
+  --> app/main.stav:5:3
+  help: remove it, or move it before the arms that cover it

@@ -1,0 +1,35 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0434]: non-exhaustive `match` on `Level`
+  --> app/main.stav:5:32
+  note: missing: `warn`, `error`
+  help: add the missing arms or a `_ => ...` arm
+error[E0432]: the pattern does not mention the fields `interval`
+  --> app/main.stav:12:3
+  help: add `..` to ignore the other fields
+error[E0433]: the alternatives of a pattern must bind the same names with the same types
+  --> app/main.stav:16:15
+error[E0434]: non-exhaustive `match` on `Int`
+  --> app/main.stav:19:29
+  note: missing: `_`
+  help: add the missing arms or a `_ => ...` arm
+error[E0434]: non-exhaustive `match` on `Option<Level>`
+  --> app/main.stav:24:39
+  note: missing: `none`
+  help: add the missing arms or a `_ => ...` arm
+error[E0432]: the variant `check` has payload fields
+  --> app/main.stav:31:3
+  help: write `check(..)` to ignore them
+error[E0302]: `Ready` has no variant `chek`
+  --> app/main.stav:36:3
+  help: did you mean `check`?
+warning[W0434]: this arm can never match
+  --> app/main.stav:36:3
+  help: remove it, or move it before the arms that cover it
+error[E0434]: non-exhaustive `match` on `Bool`
+  --> app/main.stav:39:28
+  note: missing: `false`
+  help: add the missing arms or a `_ => ...` arm

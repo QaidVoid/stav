@@ -1,0 +1,7 @@
+struct Step { run: Str }
+struct Root {
+  steps: Map<Str, Step> = {} block step
+  more: Map<Str, Step> = {} block step
+  count: Int = 0 block counter
+  names: Map<Str, Str> = {} block name
+}

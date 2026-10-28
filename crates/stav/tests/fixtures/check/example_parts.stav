@@ -1,0 +1,20 @@
+struct Server {
+  name:     Str
+  replicas: Int where 1..=64 = 1
+  env:      Map<Str, Str> = {}
+}
+
+struct Root { servers: Map<Str, Server> = {} block server }
+
+fn web(name: Str, replicas: Int where 1..=64 = 2) -> Part<Root> = part {
+  server "#{name}" {
+    name     = name
+    replicas = default(replicas)
+    env { RUST_LOG = "info" }
+  }
+}
+
+include web("api")
+include web("admin", replicas = 1)
+
+server api { replicas = 8 }

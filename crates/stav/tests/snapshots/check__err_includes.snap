@@ -1,0 +1,13 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0442]: cannot include a `Part<Root>` into a body of `Server`
+  --> app/main.stav:5:11
+  help: include it into a `Root` block, or make it a `Part<Server>`
+error[E0401]: expected `Part<Server>`, found `Int`
+  --> app/main.stav:6:11
+error[E0442]: cannot include a `Part<Server>` into a body of `Root`
+  --> app/main.stav:9:9
+  help: include it into a `Server` block, or make it a `Part<Root>`

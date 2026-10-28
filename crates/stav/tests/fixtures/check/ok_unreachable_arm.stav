@@ -1,0 +1,6 @@
+type Level = debug | info
+struct Root { a: Int = f(debug) }
+fn f(l: Level) -> Int = match l {
+  _ => 0
+  debug => 1
+}

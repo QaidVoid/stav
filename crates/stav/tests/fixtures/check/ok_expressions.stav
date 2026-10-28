@@ -1,0 +1,37 @@
+type Level = debug | info | warn | error
+struct Point { x: Int, y: Int = 0 }
+struct Root {
+  level: Level = info
+  maybe: Option<Int>
+  ratio: Float = 1
+  names: List<Str> = []
+  tags: Set<Level> = []
+  scores: Map<Str, Int> = {}
+  data: Data = { port = 80, hosts = ["a", "b"], tls = { enabled = true }, nothing = none }
+  point: Point = { x = 1 }
+  points: List<Point> = []
+  text: Str = ""
+}
+
+fn twice(f: Fn(Int) -> Int, x: Int) -> Int = f(f(x))
+fn inc(x: Int) -> Int = x + 1
+fn label(l: Level) -> Str = "level #{l}"
+
+let base = 10
+let add = fn(a: Int, b: Int) = a + b
+let adder: Fn(Int) -> Int = fn(x: Int) -> Int = x + base
+
+level = warn
+maybe = 3
+ratio = 2.5
+names = ["a", "b"] ++ [for n in ["c", "d"] if n != "c" -> n]
+tags = [debug, warn, debug]
+scores = {for n in self.names -> n = len(n)}
+points = [Point { x = 1, y = 2 }, { x = 3 }]
+text =
+  let a = twice(inc, 1),
+      b = add(a, base),
+      c = adder(b)
+  in "#{label(self.level)} #{a} #{b} #{c} #{if c > 10 { "big" } else { "small" }}"
+point.y = -(self.maybe ?? 0)
+data = [1, "two", 3.0, [true]]

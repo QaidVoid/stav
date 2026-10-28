@@ -1,0 +1,11 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0414]: `Ref<Unit>` has more than one target map
+  --> app/main.stav:6:10
+  help: declare exactly one field `Map<Str, Unit>` with a `block` clause reachable from the root struct
+error[E0414]: `Ref<Group>` has no target map
+  --> app/main.stav:7:10
+  help: declare exactly one field `Map<Str, Group>` with a `block` clause reachable from the root struct

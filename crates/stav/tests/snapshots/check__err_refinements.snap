@@ -1,0 +1,19 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0401]: a range applies to numbers, strings and collections, not `Bool`
+  --> app/main.stav:4:17
+error[E0401]: `nonEmpty` applies to strings and collections, not `Int`
+  --> app/main.stav:5:16
+error[E0415]: invalid regular expression: unclosed group
+  --> app/main.stav:6:24
+error[E0401]: a range on `Int` needs integer bounds
+  --> app/main.stav:7:16
+error[E0302]: unknown predicate `unknownPredicate`
+  --> app/main.stav:8:16
+error[E0401]: the predicate `even` must be a function of type `Fn(Str) -> Bool`
+  --> app/main.stav:9:16
+error[E0401]: `matches` applies to strings, not `Int`
+  --> app/main.stav:12:16

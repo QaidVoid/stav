@@ -1,0 +1,15 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+file 0 app/main.stav (entry)
+entries 0
+root Root
+bodies unit 0
+ref Unit -> units
+unit 0 app/main.stav
+  8:1 block unit "db" (clause units) -> Unit
+  8:12   exec: List<Str> (plain)
+  9:1 block unit "api" (clause units) -> Unit
+  9:12   exec: List<Str> (plain)
+  9:37   after: List<Ref<Unit>> (plain)

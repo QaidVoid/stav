@@ -1,0 +1,2 @@
+#! root Config
+struct Root { a: Int = 1 }

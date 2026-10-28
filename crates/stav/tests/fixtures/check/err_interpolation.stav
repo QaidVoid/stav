@@ -1,0 +1,8 @@
+struct Point { x: Int }
+type Shape = dot | circle(r: Int)
+struct Root { a: Str = "" }
+let xs = ["a"]
+let p = Point { x = 1 }
+let s: Shape = dot
+let o: Option<Int> = none
+a = "#{xs} #{p} #{s} #{o} #{toStr(xs)}"

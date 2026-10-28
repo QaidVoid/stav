@@ -1,0 +1,11 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+file 0 app/main.stav (entry)
+entries 0
+root Root
+bodies unit 0
+unit 0 app/main.stav
+  17:1 block job (field job) -> Job
+  17:7   run: Str (plain)

@@ -1,0 +1,17 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+file 0 app/main.stav (entry)
+entries 0
+root Root
+fn describe(r: Ready) -> Str in app/main.stav
+fn verbose(l: Level) -> Bool in app/main.stav
+fn size(o: Option<Int>) -> Str in app/main.stav
+fn flag(b: Bool) -> Int in app/main.stav
+fn qualified(l: Level) -> Int in app/main.stav
+fn names(s: Str) -> Int in app/main.stav
+uses Root defaults -> describe
+uses Root defaults -> verbose
+uses Root defaults -> Ready defaults
+bodies unit 0

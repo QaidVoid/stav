@@ -1,0 +1,20 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0305]: `b` is used in its own definition or before it
+  --> app/main.stav:2:9
+  help: a `let` can only use the declarations before it
+error[E0305]: `c` is used in its own definition or before it
+  --> app/main.stav:4:9
+  help: a `let` can only use the declarations before it
+error[E0305]: `y` is used in its own definition or before it
+  --> app/main.stav:5:17
+  help: a binding can only use the bindings before it
+error[E0305]: `z` is used in its own definition or before it
+  --> app/main.stav:6:17
+  help: a binding can only use the bindings before it
+error[E0305]: `later` is used in its own definition or before it
+  --> app/main.stav:7:5
+  help: a `let` can only use the declarations before it

@@ -1,0 +1,8 @@
+#! symbol Pkg pkg
+struct Service { name: Str }
+struct Pkg { name: Str }
+fn helper() -> Int = 1
+struct Root { s: Service }
+#- prelude base.stav
+struct Service { exec: Str }
+fn helper() -> Int = 2

@@ -1,0 +1,17 @@
+## A level of logging.
+type Level =
+  ## Everything.
+  | debug
+  | info
+## A unit of work.
+struct Job {
+  ## The command.
+  run: Str where nonEmpty
+  level: Level = info
+  note: Option<Str>
+  steps: Map<Str, Job2> = {} block step
+}
+struct Job2 { cmd: Str }
+type Ready = immediate | check(cmd: List<Str>, interval: Int = 1)
+struct Root { job: Job, ready: Ready = immediate }
+job { run = "x" }

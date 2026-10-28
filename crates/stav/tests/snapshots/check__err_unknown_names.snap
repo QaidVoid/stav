@@ -1,0 +1,17 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0302]: unknown type `Servr`
+  --> app/main.stav:5:11
+  help: did you mean `Server`?
+error[E0302]: unknown name `cont`
+  --> app/main.stav:6:16
+  help: did you mean `cuont`?
+error[E0302]: unknown name `runti`, which is not a variant of `Init`
+  --> app/main.stav:9:8
+  help: did you mean `runit`?
+error[E0302]: `Server` has no field `nmae`
+  --> app/main.stav:10:19
+  help: did you mean `name`?

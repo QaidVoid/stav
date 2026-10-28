@@ -1,0 +1,10 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+warning[W0302]: `warn` refers to a binding, not to the variant of `Level`
+  --> app/main.stav:4:13
+  help: rename the binding, or write `Level.warn` for the variant
+error[E0401]: expected `Level`, found `Int`
+  --> app/main.stav:4:13

@@ -1,0 +1,12 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+file 0 app/main.stav (entry)
+entries 0
+root Root
+fn factorial(n: Int) -> Int in app/main.stav
+fn ports(base: Int, count: Int) -> List<Int> in app/main.stav
+uses Root defaults -> factorial
+uses Root defaults -> ports
+bodies unit 0

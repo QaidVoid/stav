@@ -9,7 +9,7 @@
 //! tokens, [`parse`], which builds a lossless [`SyntaxTree`] with a typed
 //! view in [`ast`], [`format()`], which lays source text out in its
 //! canonical form, and [`check`], which loads the files of a root through a
-//! host's [`Loader`] and checks them.
+//! host's [`Loader`] and type checks the whole program.
 
 #![forbid(unsafe_code)]
 
@@ -25,7 +25,8 @@ mod token;
 
 pub use check::{
     Checked, FileId, Host, HostModule, ImportRoot, LoadError, Loader, MemoryLoader, RelPath,
-    RootSpec, Source, SymbolType, check,
+    RootSpec, SchemaField, SchemaIndex, SchemaStruct, SchemaSum, SchemaVariant, Source, SymbolType,
+    check,
 };
 pub use diagnostic::{Diagnostic, Diagnostics, FileDiagnostic, Label, Severity};
 pub use format::format;

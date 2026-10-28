@@ -1,0 +1,17 @@
+struct Package {
+  version: Str
+  tag: Str
+  name: Str = "#{self.version}-#{self.nmae}"
+}
+struct Root { packages: Map<Str, Package> = {} block package, count: Int = 0 }
+fn f() -> Str = self.version
+let g = fn(x: Int) = self.count
+package foo {
+  version = "1"
+  tag = "#{self.missing}"
+  if self.version == "1" { tag = "x" }
+  for v in [self.tag] { name = v }
+}
+package "#{self.count}" { version = "2" }
+include self.count
+let x = self

@@ -1,0 +1,39 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0401]: expected `Str`, found `Int`
+  --> app/main.stav:3:23
+error[E0401]: expected `Str`, found `Int`
+  --> app/main.stav:4:14
+error[E0401]: expected `Int`, found `Float`
+  --> app/main.stav:5:14
+error[E0401]: expected `Float`, found `Str`
+  --> app/main.stav:6:16
+error[E0401]: expected `Int`, found `Str`
+  --> app/main.stav:7:13
+error[E0401]: expected `Int`, found `Str`
+  --> app/main.stav:8:22
+error[E0801]: the `Point` value is missing the required fields `y`
+  --> app/main.stav:9:9
+  help: set them, or give the fields defaults
+error[E0401]: `+` needs two `Int` or two `Float` values, found `Option<Int>` and `Int`
+  --> app/main.stav:11:11
+error[E0401]: a value of type `Option<Int>` may be `none`
+  --> app/main.stav:12:11
+  help: write `?.x` to read the field of a present value
+error[E0431]: cannot mix `Int` and `Float` in arithmetic
+  --> app/main.stav:13:11
+  help: convert the `Int` with `toFloat(...)`
+error[E0401]: `+` needs two `Int` or two `Float` values, found `Str` and `Str`
+  --> app/main.stav:14:13
+error[E0401]: expected `Bool`, found `Int`
+  --> app/main.stav:15:10
+error[E0401]: cannot negate a value of type `Str`
+  --> app/main.stav:16:9
+error[E0401]: expected `Int`, found `Str`
+  --> app/main.stav:17:30
+error[E0401]: a `Data` value cannot be matched
+  --> app/main.stav:19:16
+  help: match on a typed value instead

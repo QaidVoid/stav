@@ -277,3 +277,77 @@ fn entries_belong_to_the_innermost_import_root() {
     };
     assert_eq!(codes(&Host::new(escaping), &only_sub), vec!["E0702"]);
 }
+
+#[test]
+fn the_schema_lists_declarations_with_their_docs() {
+    let source = "## Logging levels.\ntype Level =\n  ## Everything.\n  | debug\n  | info\n\
+                  ## The root.\nstruct Root {\n  ## How much to log.\n  level: Level = info\n  \
+                  name: Str where nonEmpty\n  note: Option<Str>\n  ready: Ready = now\n}\n\
+                  type Ready = now | later(after: Int, retries: Int = 3)\n";
+    let host = Host::new(MemoryLoader::new().with_file("app/main.stav", source));
+    let schema = check(&host, &app_root())
+        .expect("the program checks")
+        .schema();
+    let root = &schema.structs[0];
+    assert_eq!(
+        (root.name.as_str(), root.doc.as_deref()),
+        ("Root", Some("The root."))
+    );
+    let fields: Vec<(&str, &str, bool, Option<&str>)> = root
+        .fields
+        .iter()
+        .map(|f| (f.name.as_str(), f.ty.as_str(), f.required, f.doc.as_deref()))
+        .collect();
+    assert_eq!(
+        fields,
+        [
+            ("level", "Level", false, Some("How much to log.")),
+            ("name", "Str where nonEmpty", true, None),
+            ("note", "Option<Str>", false, None),
+            ("ready", "Ready", false, None),
+        ]
+    );
+    let level = &schema.sums[0];
+    assert_eq!(level.doc.as_deref(), Some("Logging levels."));
+    assert_eq!(level.variants[0].doc.as_deref(), Some("Everything."));
+    let later = &schema.sums[1].variants[1];
+    let payload: Vec<(&str, bool)> = later
+        .fields
+        .iter()
+        .flatten()
+        .map(|f| (f.name.as_str(), f.required))
+        .collect();
+    assert_eq!(payload, [("after", true), ("retries", false)]);
+}
+
+#[test]
+fn deeply_nested_programs_check_without_overflowing_the_stack() {
+    let depth = stav::MAX_DEPTH - 8;
+    let nested = [
+        format!("{}1{}", "(".repeat(depth), ")".repeat(depth)),
+        format!("{}1", "1 + ".repeat(depth)),
+        format!("{}1{}", "[".repeat(depth / 2), "]".repeat(depth / 2)),
+        format!(
+            "{}1{}",
+            "if true { ".repeat(depth / 3),
+            " } else { 0 }".repeat(depth / 3)
+        ),
+        format!("{}1", "let x = 1 in ".repeat(depth / 2)),
+        format!("{}1", "-".repeat(depth)),
+    ];
+    for expression in nested {
+        let source = format!("struct Root {{ a: Data = none }}\nlet v = {expression}\n");
+        let text = source.clone();
+        let result = std::thread::Builder::new()
+            .stack_size(2 * 1024 * 1024)
+            .spawn(move || {
+                let host = Host::new(MemoryLoader::new().with_file("app/main.stav", text));
+                check(&host, &app_root())
+                    .map(|_| ())
+                    .map_err(|d| d.to_string())
+            })
+            .expect("the thread starts")
+            .join();
+        assert!(result.is_ok(), "checking panicked for {source}");
+    }
+}

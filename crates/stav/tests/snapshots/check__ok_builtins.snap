@@ -1,0 +1,24 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+file 0 app/main.stav (entry)
+entries 0
+root Root
+let xs: List<Int> in app/main.stav
+let m: Map<Str, Int> in app/main.stav
+let order xs, m
+bodies unit 0
+unit 0 app/main.stav
+  10:1 let xs (top level)
+  11:1 let m (top level)
+  12:1 a: List<Str> (plain)
+  13:1 b: Map<Str, Int> (plain)
+  14:1 c: Int (plain)
+  15:1 d: Bool (plain)
+  16:1 e: Option<Int> (plain)
+  17:1 f: Float (plain) late(Root.c@0)
+  18:1 g: Set<Str> (plain)
+  19:1 a: List<Str> (plain)
+  20:1 a: List<Str> (plain)
+  21:1 c: Int (plain)

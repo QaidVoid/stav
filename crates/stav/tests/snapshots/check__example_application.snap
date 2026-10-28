@@ -1,0 +1,16 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+file 0 app/main.stav (entry)
+entries 0
+root Root
+fn base_url(p: Provider) -> Str in app/main.stav
+let models: List<Model> in app/main.stav
+uses models -> Model defaults
+let order models
+bodies unit 0
+unit 0 app/main.stav
+  22:1 let models (top level)
+  27:1 models: List<Model> (plain)
+  28:1 endpoints: List<Str> (plain)

@@ -1,0 +1,15 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+file 0 app/base.stav (entry)
+file 1 app/prod.stav (entry)
+entries 0, 1
+root Root
+bodies unit 0, unit 1
+unit 0 app/base.stav
+  6:1 tags: Set<Str> (plain)
+  7:1 port: Int (default)
+unit 1 app/prod.stav
+  1:1 tags: Set<Str> (plain)
+  2:1 port: Int (plain)

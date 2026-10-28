@@ -1,0 +1,19 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0421]: cannot interpolate a value of type `List<Str>`
+  --> app/main.stav:8:8
+  help: join the elements with `join(...)`
+error[E0421]: cannot interpolate a value of type `Point`
+  --> app/main.stav:8:14
+  help: convert the value to a string first
+error[E0421]: cannot interpolate a value of type `Shape`
+  --> app/main.stav:8:19
+  help: convert the value to a string first
+error[E0421]: cannot interpolate a value of type `Option<Int>`
+  --> app/main.stav:8:24
+  help: unwrap the value with `??` or a `match`
+error[E0421]: cannot convert a value of type `List<Str>` to a string
+  --> app/main.stav:8:29

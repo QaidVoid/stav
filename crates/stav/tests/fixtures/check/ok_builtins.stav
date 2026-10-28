@@ -1,0 +1,21 @@
+struct Root {
+  a: List<Str> = []
+  b: Map<Str, Int> = {}
+  c: Int = 0
+  d: Bool = false
+  e: Option<Int>
+  f: Float = 0.0
+  g: Set<Str> = []
+}
+let xs = [3, 1, 2]
+let m = {a = 1, b = 2}
+a = map(xs, fn(x: Int) = toStr(x)) ++ split("a,b", ",") ++ lines("x\ny") ++ keys(m)
+b = union(mapValues(m, fn(k: Str, v: Int) = v * 2), filterMap(m, fn(k: Str, v: Int) = v > 1))
+c = fold(xs, 0, fn(acc: Int, x: Int) = acc + x) + len(xs) + len("abc") + abs(-3) + min(1, 2) + max(1, 2) + toInt(2.5) + (first(xs) ?? 0)
+d = any(xs, fn(x: Int) = x > 2) && all(xs, fn(x: Int) = x > 0) && contains(xs, 1) && contains("abc", "b") && hasKey(m, "a") && startsWith("ab", "a") && endsWith("ab", "b") && matches("abc", r"^a.c$") && nonEmpty(xs)
+e = get(xs, 0)
+f = toFloat(self.c) + 1.5
+g = toSet(sort(unique(reverse(flatten([["b"], ["a"]])))))
+a = [join(toList(toSet(["x"])), ""), replace("aa", "a", "b"), trim(" a "), lower("A"), upper("a"), indent("x", 2)]
+a = [for i in range(0, 3) -> "#{i}"] ++ map(values(m), fn(v: Int) = "#{v}") ++ filter(["a", ""], fn(s: Str) = s != "")
+c = parseInt("4") ?? last(xs) ?? 0

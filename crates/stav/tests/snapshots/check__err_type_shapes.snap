@@ -1,0 +1,28 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0444]: `List` takes one type argument
+  --> app/main.stav:2:6
+error[E0444]: `Map` takes two type arguments
+  --> app/main.stav:3:6
+error[E0411]: `Float` cannot be a set element
+  --> app/main.stav:4:10
+  help: set elements are `Bool`, `Int`, `Str`, `Path`, sum types without fields, symbol types or `Ref<T>`
+error[E0411]: `Int` cannot be a map key
+  --> app/main.stav:5:10
+  help: map keys are `Str` or a sum type whose variants have no fields
+error[E0413]: options cannot be nested
+  --> app/main.stav:6:6
+  help: use a single `Option`
+error[E0412]: a field cannot hold `Fn(Int) -> Int`
+  --> app/main.stav:7:6
+  help: functions and parts are not data, so pass them as parameters instead
+error[E0412]: a field cannot hold `List<Part<Root>>`
+  --> app/main.stav:8:6
+  help: functions and parts are not data, so pass them as parameters instead
+error[E0444]: `Int` takes no type arguments
+  --> app/main.stav:9:6
+error[E0401]: `Ref` needs a struct type, found `Int`
+  --> app/main.stav:10:10

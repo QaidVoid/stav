@@ -1,0 +1,8 @@
+struct Root { a: Int = 0 }
+let a = b + 1
+let b = 2
+let c = c
+let d = let x = y, y = 1 in x
+let e = let z = z in z
+a = later
+let later = 1

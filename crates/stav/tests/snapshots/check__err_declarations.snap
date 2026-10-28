@@ -1,0 +1,35 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0301]: `Str` is the name of a built-in type
+  --> app/main.stav:1:8
+  help: choose another name
+error[E0301]: `Option` is the name of a built-in type
+  --> app/main.stav:2:6
+  help: choose another name
+error[E0306]: `a` is declared more than once
+  --> app/main.stav:5:3
+  label: app/main.stav:4:3: first declared here
+  help: rename or remove one of the declarations
+error[E0306]: `debug` is declared more than once
+  --> app/main.stav:7:22
+  label: app/main.stav:7:14: first declared here
+  help: rename or remove one of the declarations
+error[E0306]: `x` is declared more than once
+  --> app/main.stav:8:14
+  label: app/main.stav:8:6: first declared here
+  help: rename or remove one of the declarations
+error[E0306]: `f` is declared more than once
+  --> app/main.stav:9:4
+  label: app/main.stav:8:4: first declared here
+  help: rename or remove one of the declarations
+error[E0306]: `f` is declared more than once
+  --> app/main.stav:10:5
+  label: app/main.stav:8:4: first declared here
+  help: rename or remove one of the declarations
+error[E0306]: `Root` is declared more than once
+  --> app/main.stav:11:8
+  label: app/main.stav:3:8: first declared here
+  help: rename or remove one of the declarations

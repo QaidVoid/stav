@@ -1,0 +1,5 @@
+struct Root { version: Str = "1", url: Str = "", ok: Bool = true }
+let v = self.version
+fn f() -> Str = v
+url = "x#{v}"
+if v == "1" { ok = false }

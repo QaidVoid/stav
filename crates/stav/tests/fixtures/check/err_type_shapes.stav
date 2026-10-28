@@ -1,0 +1,11 @@
+struct Root {
+  a: List
+  b: Map<Str>
+  c: Set<Float>
+  d: Map<Int, Str>
+  e: Option<Option<Int>>
+  f: Fn(Int) -> Int
+  g: List<Part<Root>>
+  h: Int<Str>
+  i: Ref<Int>
+}

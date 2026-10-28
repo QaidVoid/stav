@@ -1,0 +1,28 @@
+type Build = cargo(features: List<Str> = []) | make
+type VendorKind = cargo | go
+struct Gc { keep: Int = 10 }
+struct Step { run: Str }
+struct Vendor { hash: Str }
+struct Job {
+  build:   Build
+  gc:      Gc = {}
+  env:     Map<Str, Str> = {}
+  steps:   Map<Str, Step> = {} block step
+  vendors: Map<VendorKind, Vendor> = {} block vendor
+  count:   Int = 0
+}
+struct Root { jobs: Map<Str, Job> = {} block job }
+
+job a {
+  step { run = "x" }
+  gc main { keep = 1 }
+  env main { A = "b" }
+  build carg { }
+  build { }
+  vendor npm { hash = "x" }
+  servise x { }
+  count.value = 1
+  gc.kepe = 2
+  build make { x = 1 }
+  vendors.npm = { hash = "y" }
+}

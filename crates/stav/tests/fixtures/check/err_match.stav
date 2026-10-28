@@ -1,0 +1,41 @@
+type Level = debug | info | warn | error
+type Ready = immediate | check(cmd: List<Str>, interval: Int = 1)
+struct Root { a: Int = 1 }
+
+fn verbose(l: Level) -> Bool = match l {
+  debug => true
+  info => true
+}
+
+fn fields(r: Ready) -> Int = match r {
+  immediate => 0
+  check(cmd) => 1
+}
+
+fn alternatives(r: Ready) -> Int = match r {
+  immediate | check(cmd, ..) => 1
+}
+
+fn numbers(i: Int) -> Int = match i {
+  0 => 0
+  1 => 1
+}
+
+fn options(o: Option<Level>) -> Int = match o {
+  debug => 0
+  info | warn | error => 1
+}
+
+fn payload(r: Ready) -> Int = match r {
+  immediate => 0
+  check => 1
+}
+
+fn unknown(r: Ready) -> Int = match r {
+  immediat => 0
+  chek(..) => 1
+}
+
+fn bools(b: Bool) -> Int = match b {
+  true => 1
+}

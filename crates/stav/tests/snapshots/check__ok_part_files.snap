@@ -9,3 +9,25 @@ file 1 app/hardware.stav (part)
   import disks -> file 2
 file 2 app/lib/disks.stav (module)
 entries 0
+root Root
+let root_device: Str in app/lib/disks.stav
+let order root_device
+bodies unit 0
+unit 0 app/main.stav
+  12:1 block system (field system) -> System
+  13:3   include unit 2 app/hardware.stav
+  14:3   include unit 2 app/hardware.stav
+unit 1 app/lib/disks.stav
+  1:1 let root_device (top level)
+unit 2 app/hardware.stav as System
+  3:1 let root: Str
+  4:1 block boot (field boot) -> Boot
+  5:3   kernel: Str (plain)
+  6:3   modules: List<Str> (plain)
+  9:1 block fs "/" (clause fs) -> Fs
+  9:10   device: Str (plain)
+--- warnings
+warning[W0703]: `app/hardware.stav` is already included into this body
+  --> app/main.stav:14:3
+  label: app/main.stav:13:3: first included here
+  help: remove one of the includes

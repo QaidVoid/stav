@@ -1,0 +1,23 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+file 0 app/main.stav (entry)
+entries 0
+root Root
+fn key_of(t: Option<Tls>) -> Str in app/main.stav
+fn start(cmd: Str, user: Option<Str>) -> List<Str> in app/main.stav
+fn first_ref(r: Ref<Unit>) -> Str in app/main.stav
+bodies unit 0
+ref Unit -> units
+unit 0 app/main.stav
+  11:1 block unit "db" (clause units) -> Unit
+  11:11   exec: List<Str> (plain)
+  12:1 block unit "api" (clause units) -> Unit
+  13:3   exec: List<Str> (plain)
+  14:3   after: List<Ref<Unit>> (plain)
+  15:3   block tls (field tls) -> Tls
+  15:9     cert: Str (plain)
+  16:3   tls.key: Option<Str> (plain)
+  18:1 first: Option<Ref<Unit>> (plain)
+  19:1 note: Str (plain)

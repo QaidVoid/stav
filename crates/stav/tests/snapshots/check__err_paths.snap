@@ -1,0 +1,9 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0702]: the path `../outside.conf` leaves its import root
+  --> app/main.stav:2:5
+error[E0702]: the path `./sub/../../../escape.patch` leaves its import root
+  --> app/main.stav:3:37

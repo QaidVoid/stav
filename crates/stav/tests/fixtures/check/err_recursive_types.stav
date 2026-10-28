@@ -1,0 +1,6 @@
+struct A { b: List<A> = [] }
+struct B { c: Option<C> }
+struct C { b: Map<Str, B> = {} }
+type T = leaf | node(children: List<T>)
+struct Unit { after: List<Ref<Unit>> = [] }
+struct Root { units: Map<Str, Unit> = {} block unit }

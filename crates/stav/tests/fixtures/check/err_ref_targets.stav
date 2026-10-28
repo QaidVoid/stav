@@ -1,0 +1,8 @@
+struct Unit { exec: Str }
+struct Group { name: Str }
+struct Root {
+  units: Map<Str, Unit> = {} block unit
+  more: Map<Str, Unit> = {} block other
+  first: Ref<Unit>
+  owner: Ref<Group>
+}

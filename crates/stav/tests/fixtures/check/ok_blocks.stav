@@ -1,0 +1,46 @@
+type Build =
+  | cargo(features: List<Str> = [], bins: List<Str> = [])
+  | meson(options: List<Str> = [])
+  | custom(build: Str, install: Str)
+type VendorKind = cargo | go
+struct Gc { keep: Int where 2.. = 10 }
+struct Step { run: Str }
+struct Vendor { hash: Str }
+struct Tls { cert: Str }
+struct Job {
+  build:   Build
+  gc:      Gc = {}
+  env:     Map<Str, Str> = {}
+  steps:   Map<Str, Step> = {} block step
+  vendors: Map<VendorKind, Vendor> = {} block vendor
+  tls:     Option<Tls>
+  limits:  Map<VendorKind, Int> = {}
+}
+struct Root { jobs: Map<Str, Job> = {} block job, flags: Map<Str, Bool> = {} }
+
+job lint {
+  build cargo { features = ["x"] }
+  gc { keep = 5 }
+  env { RUST_LOG = "info", "A.B" = "c" }
+  step lint { run = "cargo clippy" }
+  vendor cargo { hash = "abc" }
+  tls { cert = "x.pem" }
+  limits.go = 3
+  env."PATH" = "/bin"
+}
+
+job "build-#{1 + 1}" {
+  build = force(meson(options = []))
+  for name in ["a", "b"] {
+    step "#{name}" { run = name }
+  }
+  if true {
+    gc.keep = default(3)
+  } else if false {
+    gc.keep = 4
+  } else {
+    gc = { keep = 6 }
+  }
+}
+
+flags.verbose = true

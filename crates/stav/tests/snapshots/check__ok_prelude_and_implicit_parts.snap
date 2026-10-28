@@ -8,3 +8,17 @@ file 2 app/main.stav (entry)
 prelude files 0
 implicit parts 1
 entries 2
+root Root
+fn hostname(s: Str) -> Bool in system.stav
+uses System defaults -> hostname
+bodies unit 2, unit 1
+unit 1 app/main.stav
+  1:1 block system (field system) -> System
+  2:3   hostname: Str (plain)
+  3:3   block service "sshd" (clause services) -> Service
+  3:18     exec: List<Str> (plain)
+unit 2 base.stav as Root
+  1:1 block system (field system) -> System
+  2:3   hostname: Str (default)
+  3:3   block service "getty" (clause services) -> Service
+  3:19     exec: List<Str> (default)

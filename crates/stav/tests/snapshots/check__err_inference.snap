@@ -1,0 +1,20 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0430]: cannot infer the type of `[]`
+  --> app/main.stav:2:10
+  help: add an annotation: `let xs: List<Str> = []`
+error[E0430]: cannot infer the type of `{}`
+  --> app/main.stav:3:9
+  help: add an annotation: `let m: Map<Str, Int> = {}`
+error[E0430]: cannot infer the type of `none`
+  --> app/main.stav:4:9
+  help: add a type annotation
+error[E0435]: the struct of this `part` is unknown
+  --> app/main.stav:5:9
+  help: give the binding or the function a type such as `Part<S>`
+error[E0430]: cannot infer the type of `fail(...)`
+  --> app/main.stav:6:9
+  help: use `fail` where a type is expected

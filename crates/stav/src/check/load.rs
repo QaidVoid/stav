@@ -64,6 +64,7 @@ pub(crate) enum Role {
 #[derive(Debug, Clone)]
 pub(crate) struct ImportLink {
     pub(crate) alias: String,
+    pub(crate) alias_span: Span,
     /// The imported module, or `None` when it could not be loaded.
     pub(crate) target: Option<FileId>,
 }
@@ -87,6 +88,12 @@ pub(crate) struct Program {
     pub(crate) prelude: Vec<FileId>,
     pub(crate) implicit_parts: Vec<FileId>,
     pub(crate) entries: Vec<FileId>,
+}
+
+impl Program {
+    pub(crate) fn file(&self, id: FileId) -> &File {
+        &self.files[id.index()]
+    }
 }
 
 struct Loader<'h> {
@@ -352,7 +359,7 @@ impl Loader<'_> {
                     let path = import
                         .path()
                         .and_then(|p| p.value().map(|v| (v, p.syntax().span())));
-                    let alias = import.alias().map(|a| a.text().to_owned());
+                    let alias = import.alias().map(|a| (a.text().to_owned(), a.span()));
                     imports.push((path, alias, import.syntax().span()));
                 }
             }
@@ -380,14 +387,18 @@ impl Loader<'_> {
         }
         let mut links = Vec::new();
         for (path, alias, span) in imports {
-            let Some(alias) = alias else {
+            let Some((alias, alias_span)) = alias else {
                 continue;
             };
             let target = path.and_then(|(path, path_span)| {
                 self.follow(file, &path, path_span, Role::Module, roots)
                     .inspect(|&target| self.edges[file.index()].push((target.index(), span)))
             });
-            links.push(ImportLink { alias, target });
+            links.push(ImportLink {
+                alias,
+                alias_span,
+                target,
+            });
         }
         let mut resolved = BTreeMap::new();
         for (node, (path, path_span, span)) in includes {

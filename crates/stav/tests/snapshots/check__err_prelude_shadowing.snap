@@ -1,0 +1,14 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0304]: `Service` is already declared by the prelude
+  --> app/main.stav:1:8
+  help: choose another name
+error[E0304]: `Pkg` is already declared by the prelude
+  --> app/main.stav:2:8
+  help: choose another name
+error[E0304]: `helper` is already declared by the prelude
+  --> app/main.stav:3:4
+  help: choose another name

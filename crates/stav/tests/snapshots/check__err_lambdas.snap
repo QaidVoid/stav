@@ -1,0 +1,12 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0444]: the lambda parameter `x` cannot have a default
+  --> app/main.stav:2:12
+  help: a function value is always called with every argument
+error[E0401]: expected `Str`, found `Int`
+  --> app/main.stav:3:38
+error[E0401]: expected `Str`, found `Int`
+  --> app/main.stav:4:29

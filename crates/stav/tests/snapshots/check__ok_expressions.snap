@@ -1,0 +1,33 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+file 0 app/main.stav (entry)
+entries 0
+root Root
+fn twice(f: Fn(Int) -> Int, x: Int) -> Int in app/main.stav
+fn inc(x: Int) -> Int in app/main.stav
+fn label(l: Level) -> Str in app/main.stav
+let base: Int in app/main.stav
+let add: Fn(Int, Int) -> Int in app/main.stav
+let adder: Fn(Int) -> Int in app/main.stav
+uses adder -> base
+let order base, add, adder
+bodies unit 0
+unit 0 app/main.stav
+  20:1 let base (top level)
+  21:1 let add (top level)
+  22:1 let adder (top level)
+  24:1 level: Level (plain)
+  25:1 maybe: Option<Int> (plain)
+  26:1 ratio: Float (plain)
+  27:1 names: List<Str> (plain)
+  28:1 tags: Set<Level> (plain)
+  29:1 scores: Map<Str, Int> (plain) late(Root.names@0)
+  30:1 points: List<Point> (plain)
+  31:1 text: Str (plain) late(Root.level@0)
+  32:7   let a: Int
+  33:7   let b: Int
+  34:7   let c: Int
+  36:1 point.y: Int (plain) late(Root.maybe@0)
+  37:1 data: Data (plain)

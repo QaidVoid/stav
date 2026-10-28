@@ -1,0 +1,3 @@
+struct Root { a: Path, b: Path = ./files/b.conf, c: List<Path> = [] }
+a = ../outside.conf
+c = [./ok.patch, ./sub/../ok.patch, ./sub/../../../escape.patch]

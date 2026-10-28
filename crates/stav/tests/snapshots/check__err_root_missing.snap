@@ -1,0 +1,8 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0710]: there is no root struct `Config`
+  --> app/main.stav:1:1
+  help: declare `struct Config { ... }` in the entry file

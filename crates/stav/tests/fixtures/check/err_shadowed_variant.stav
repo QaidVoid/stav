@@ -1,0 +1,4 @@
+type Level = debug | info | warn | error
+struct Root { log_level: Level = info }
+let warn = 1
+log_level = warn

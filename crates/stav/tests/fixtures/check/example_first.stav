@@ -1,0 +1,23 @@
+## A tiny application schema.
+type Level = debug | info | warn | error
+
+struct Upstream {
+  url:    Str where matches(r"^https?://")
+  weight: Int where 1..=100 = 10
+}
+
+struct Root {
+  listen:    Str = "127.0.0.1:8080"
+  log_level: Level = info
+  upstreams: Map<Str, Upstream> = {} block upstream
+}
+
+fn local(port: Int where 1..=65535) -> Upstream =
+  Upstream { url = "http://127.0.0.1:#{port}" }
+
+log_level = warn
+
+upstream primary { url = "https://a.example.org", weight = 90 }
+upstream backup { url = "https://b.example.org" }
+
+upstreams.dev = local(9000)

@@ -1,0 +1,11 @@
+#! symbol Pkg pkg words
+#! symbol Spdx spdx strings
+struct Root {
+  packages: Set<Pkg> = []
+  license: List<Spdx> = []
+  names: List<Str> = []
+}
+packages = [neovim, llvm@19.1:static, pkg("0ad"), ripgrep:static]
+license = [MIT, "Apache-2.0", spdx("0BSD")]
+names = ["#{neovim_pkg()}"]
+fn neovim_pkg() -> Pkg = neovim

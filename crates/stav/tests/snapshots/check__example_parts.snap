@@ -1,0 +1,19 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+file 0 app/main.stav (entry)
+entries 0
+root Root
+fn web(name: Str, replicas: Int) -> Part<Root> in app/main.stav
+bodies unit 0
+unit 0 app/main.stav
+  10:3 block server <dynamic> (clause servers) -> Server
+  11:5   name: Str (plain)
+  12:5   replicas: Int (default)
+  13:5   block env (map env) -> Map<Str, Str>
+  13:11     RUST_LOG: Str (plain)
+  17:1 include value
+  18:1 include value
+  20:1 block server "api" (clause servers) -> Server
+  20:14   replicas: Int (plain)

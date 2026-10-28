@@ -1,0 +1,17 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0410]: `A` contains itself
+  --> app/main.stav:1:12
+  note: cycle: A -> A
+  help: values must be finite trees, so refer to other values by label with `Ref<T>`
+error[E0410]: `B` contains itself
+  --> app/main.stav:2:12
+  note: cycle: B -> C -> B
+  help: values must be finite trees, so refer to other values by label with `Ref<T>`
+error[E0410]: `T` contains itself
+  --> app/main.stav:4:22
+  note: cycle: T -> T
+  help: values must be finite trees, so refer to other values by label with `Ref<T>`

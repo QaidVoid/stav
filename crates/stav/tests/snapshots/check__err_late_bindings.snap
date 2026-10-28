@@ -1,0 +1,9 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0606]: `v` reads `self`, which cannot be used in a function body
+  --> app/main.stav:3:17
+error[E0606]: `v` reads `self`, which cannot be used in an `if` condition
+  --> app/main.stav:5:4

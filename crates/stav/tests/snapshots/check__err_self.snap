@@ -1,0 +1,31 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0303]: no enclosing block has a field `nmae`
+  --> app/main.stav:4:39
+  help: did you mean `name`?
+error[E0606]: `self` cannot be used in a function body
+  --> app/main.stav:7:17
+  help: pass the value as a parameter instead
+error[E0606]: `self` cannot be used in a lambda
+  --> app/main.stav:8:22
+  help: pass the value as a parameter instead
+error[E0303]: no enclosing block has a field `missing`
+  --> app/main.stav:11:17
+error[E0606]: `self` cannot be used in an `if` condition
+  --> app/main.stav:12:6
+  help: pass the value as a parameter instead
+error[E0606]: `self` cannot be used in a `for` collection
+  --> app/main.stav:13:13
+  help: pass the value as a parameter instead
+error[E0606]: `self` cannot be used in a block label
+  --> app/main.stav:15:12
+  help: pass the value as a parameter instead
+error[E0606]: `self` cannot be used in an `include` expression
+  --> app/main.stav:16:9
+  help: pass the value as a parameter instead
+error[E0303]: `self` must be followed by a field
+  --> app/main.stav:17:9
+  help: write `self.<field>`

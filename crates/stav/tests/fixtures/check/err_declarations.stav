@@ -1,0 +1,11 @@
+struct Str { a: Int }
+type Option = some | none_
+struct Root {
+  a: Int
+  a: Str
+}
+type Level = debug | debug
+fn f(x: Int, x: Int) -> Int = x
+fn f() -> Int = 1
+let f = 2
+struct Root { b: Int }

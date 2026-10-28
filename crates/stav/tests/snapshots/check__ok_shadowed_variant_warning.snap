@@ -1,0 +1,17 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+file 0 app/main.stav (entry)
+entries 0
+root Root
+let warn: Level in app/main.stav
+let order warn
+bodies unit 0
+unit 0 app/main.stav
+  3:1 let warn (top level)
+  4:1 log_level: Level (plain)
+--- warnings
+warning[W0302]: `warn` refers to a binding, not to the variant of `Level`
+  --> app/main.stav:4:13
+  help: rename the binding, or write `Level.warn` for the variant

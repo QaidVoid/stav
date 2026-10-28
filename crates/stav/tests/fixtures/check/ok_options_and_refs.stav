@@ -1,0 +1,20 @@
+struct Tls { cert: Str, key: Option<Str> }
+struct Unit { exec: List<Str>, after: List<Ref<Unit>> = [], tls: Option<Tls> }
+struct Root { units: Map<Str, Unit> = {} block unit, first: Option<Ref<Unit>>, note: Str = "" }
+
+fn key_of(t: Option<Tls>) -> Str = t?.key ?? "none"
+fn start(cmd: Str, user: Option<Str>) -> List<Str> = match user {
+  none => [cmd]
+  u => ["su", u, "-c", cmd]
+}
+
+unit db { exec = start("postgres") }
+unit api {
+  exec = start("api", user = "www")
+  after = ["db", db]
+  tls { cert = "c.pem" }
+  tls.key = "k.pem"
+}
+first = db
+note = "#{key_of(none)} #{first_ref(db)}"
+fn first_ref(r: Ref<Unit>) -> Str = "#{r}"

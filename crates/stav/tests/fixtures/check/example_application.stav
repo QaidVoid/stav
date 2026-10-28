@@ -1,0 +1,28 @@
+type Provider = openai | anthropic | local
+
+struct Model {
+  id:          Str where nonEmpty
+  provider:    Provider
+  context:     Int where 1.. = 128_000
+  temperature: Float where 0.0..=2.0 = 0.7
+}
+
+struct Root {
+  listen:    Str = "127.0.0.1:8080"
+  models:    List<Model> = []
+  endpoints: List<Str> = []
+}
+
+fn base_url(p: Provider) -> Str = match p {
+  openai    => "https://api.openai.com/v1"
+  anthropic => "https://api.anthropic.com"
+  local     => "http://localhost:11434"
+}
+
+let models = [
+  Model { id = "claude-opus", provider = anthropic, context = 200_000 },
+  Model { id = "llama", provider = local, temperature = 0.2 },
+]
+
+models    = models
+endpoints = [for m in models -> "#{base_url(m.provider)} #{m.id}"]

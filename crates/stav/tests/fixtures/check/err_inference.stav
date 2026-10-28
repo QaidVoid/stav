@@ -1,0 +1,7 @@
+struct Root { a: Int = 1 }
+let xs = []
+let m = {}
+let n = none
+let p = part { a = 1 }
+let f = fail("x")
+let ys: List<Str> = []

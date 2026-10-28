@@ -1,0 +1,9 @@
+struct Server { name: Str }
+struct Root { server: Server, n: Int = 0 }
+fn root_part() -> Part<Root> = part { n = 1 }
+server {
+  include root_part()
+  include 1
+}
+let p: Part<Server> = part { name = "x" }
+include p

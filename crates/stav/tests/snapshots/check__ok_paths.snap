@@ -1,0 +1,11 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+file 0 app/main.stav (entry)
+entries 0
+root Root
+bodies unit 0
+unit 0 app/main.stav
+  2:1 a: Path (plain)
+  3:1 c: List<Path> (plain)

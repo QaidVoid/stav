@@ -1,0 +1,4 @@
+struct Root { a: Int = 0 }
+let g = fn(x: Int = 1) = x
+let h: Fn(Int) -> Str = fn(x: Int) = x
+let k = fn(x: Int) -> Str = x

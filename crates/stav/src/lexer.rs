@@ -1010,7 +1010,9 @@ fn is_invisible_format(c: char) -> bool {
     )
 }
 
-fn parse_int(text: &str) -> Option<i64> {
+/// Returns the value of an integer literal, or `None` when it is out of
+/// range or malformed.
+pub(crate) fn parse_int(text: &str) -> Option<i64> {
     let (digits, radix) = match text.get(..2) {
         Some("0x") => (&text[2..], 16),
         Some("0o") => (&text[2..], 8),
@@ -1020,7 +1022,9 @@ fn parse_int(text: &str) -> Option<i64> {
     i64::from_str_radix(&digits.replace('_', ""), radix).ok()
 }
 
-fn parse_float(text: &str) -> Option<f64> {
+/// Returns the value of a float literal, or `None` when it is malformed or
+/// not finite.
+pub(crate) fn parse_float(text: &str) -> Option<f64> {
     text.replace('_', "")
         .parse::<f64>()
         .ok()

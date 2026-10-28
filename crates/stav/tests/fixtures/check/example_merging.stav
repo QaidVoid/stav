@@ -1,0 +1,12 @@
+#! entries base.stav prod.stav
+#- file base.stav
+struct Root {
+  name: Str = "service"
+  tags: Set<Str> = []
+  port: Int where 1..=65535 = 80
+}
+tags = ["web"]
+port = default(8080)
+#- file prod.stav
+tags = ["prod"]
+port = 443

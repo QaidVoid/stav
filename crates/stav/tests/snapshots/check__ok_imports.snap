@@ -12,3 +12,23 @@ file 2 std/desktop (module)
 file 3 ns/target (module)
 file 4 app/lib/util.stav (module)
 entries 0
+root Root
+fn server(port: Int) -> Server in app/lib/net.stav
+let default_level: Level in app/lib/net.stav
+let variant: Variant in ns/target
+let localhost: Str in app/lib/util.stav
+uses server -> Server defaults
+uses Server defaults -> localhost
+let order localhost, default_level, variant
+bodies unit 0
+unit 0 app/main.stav
+  12:1 server: Server (plain)
+  13:1 compositor: Compositor (plain)
+  14:1 level: Level (plain)
+  15:1 variant: Variant (plain)
+unit 1 app/lib/net.stav
+  9:1 let default_level (top level)
+unit 2 app/lib/util.stav
+  1:1 let localhost (top level)
+unit 4 ns/target
+  2:1 let variant (top level)

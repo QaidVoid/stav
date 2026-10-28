@@ -1,0 +1,40 @@
+type Ready =
+  | immediate
+  | notify(fd: Int where 0..=1023)
+  | check(cmd: List<Str>, interval: Int = 1, timeout: Int = 60)
+type Level = debug | info | warn | error
+struct Root { text: Str = describe(Ready.notify(fd = 3)), verbose: Bool = verbose(info) }
+
+fn describe(r: Ready) -> Str = match r {
+  immediate => "ready at start"
+  notify(fd) => "notifies on fd #{fd}"
+  check(cmd, interval = i, ..) if i > 10 => "slow check: #{join(cmd, " ")}"
+  check(cmd, ..) => "checks with #{join(cmd, " ")}"
+}
+
+fn verbose(l: Level) -> Bool = match l {
+  debug | info => true
+  _ => false
+}
+
+fn size(o: Option<Int>) -> Str = match o {
+  none => "nothing"
+  0 => "zero"
+  -1 | 1 => "one"
+  n => "#{n}"
+}
+
+fn flag(b: Bool) -> Int = match b {
+  true => 1
+  false => 0
+}
+
+fn qualified(l: Level) -> Int = match l {
+  Level.debug => 0
+  Level.info | Level.warn | Level.error => 1
+}
+
+fn names(s: Str) -> Int = match s {
+  "a" => 1
+  other => len(other)
+}

@@ -1,0 +1,15 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+file 0 app/main.stav (entry)
+entries 0
+root Root
+bodies unit 0
+unit 0 app/main.stav
+  12:1 block job "rg" (clause jobs) -> Job
+  13:3   block build "cargo" (tagged build) -> Build.cargo
+  13:17     features: List<Str> (plain)
+  16:1 block job "hello" (clause jobs) -> Job
+  17:3   block build "make" (tagged build) -> Build.make
+  18:3   timeout: Int (plain)

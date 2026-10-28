@@ -1,0 +1,13 @@
+struct Root { a: Int = 0, b: Str = "", c: Bool = false }
+let xs = [1, 2]
+a = len(1)
+b = join(xs, ",")
+c = matches("a", "(")
+a = map(xs, fn(s: Str) = 1)[0]
+b = toStr(xs)
+a = fold(xs, "", fn(acc: Int, x: Int) = acc)
+a = abs(1, 2)
+c = contains(1, 1)
+a = min("a", "b")
+b = force("x") ++ default("y")
+a = len(s = "x")

@@ -1,0 +1,34 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+file 0 app/main.stav (entry)
+entries 0
+root Root
+bodies unit 0
+unit 0 app/main.stav
+  21:1 block job "lint" (clause jobs) -> Job
+  22:3   block build "cargo" (tagged build) -> Build.cargo
+  22:17     features: List<Str> (plain)
+  23:3   block gc (field gc) -> Gc
+  23:8     keep: Int (plain)
+  24:3   block env (map env) -> Map<Str, Str>
+  24:9     RUST_LOG: Str (plain)
+  24:28     "A.B": Str (plain)
+  25:3   block step "lint" (clause steps) -> Step
+  25:15     run: Str (plain)
+  26:3   block vendor "cargo" (clause vendors) -> Vendor
+  26:18     hash: Str (plain)
+  27:3   block tls (field tls) -> Tls
+  27:9     cert: Str (plain)
+  28:3   limits.go: Int (plain)
+  29:3   env."PATH": Str (plain)
+  32:1 block job <dynamic> (clause jobs) -> Job
+  33:3   build: Build (force)
+  34:3   for name: Str
+  35:5     block step <dynamic> (clause steps) -> Step
+  35:22       run: Str (plain)
+  38:5   gc.keep: Int (default)
+  40:5   gc.keep: Int (plain)
+  42:5   gc: Gc (plain)
+  46:1 flags.verbose: Bool (plain)

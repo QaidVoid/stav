@@ -181,6 +181,12 @@ impl SyntaxTree {
         }
     }
 
+    /// Returns the number of nodes in the tree. Node indexes run from zero
+    /// up to this number, and the root has the largest index.
+    pub(crate) fn node_count(&self) -> usize {
+        self.nodes.len()
+    }
+
     /// Returns the node with the given index, as returned by
     /// [`SyntaxNode::index`].
     pub(crate) fn node(&self, index: usize) -> Option<SyntaxNode<'_>> {

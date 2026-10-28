@@ -1,0 +1,18 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+file 0 app/main.stav (entry)
+entries 0
+root Root
+fn local(port: Int) -> Upstream in app/main.stav
+uses local -> Upstream defaults
+bodies unit 0
+unit 0 app/main.stav
+  18:1 log_level: Level (plain)
+  20:1 block upstream "primary" (clause upstreams) -> Upstream
+  20:20   url: Str (plain)
+  20:51   weight: Int (plain)
+  21:1 block upstream "backup" (clause upstreams) -> Upstream
+  21:19   url: Str (plain)
+  23:1 upstreams.dev: Upstream (plain)

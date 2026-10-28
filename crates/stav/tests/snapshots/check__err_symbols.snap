@@ -1,0 +1,12 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0401]: `Pkg` does not accept string literals
+  --> app/main.stav:6:51
+  help: convert the string with `pkg(...)`
+error[E0420]: `Spdx` does not accept symbol words
+  --> app/main.stav:7:45
+error[E0420]: the symbol word `llvm@19` is only valid where a symbol type is expected
+  --> app/main.stav:8:8
