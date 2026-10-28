@@ -72,8 +72,9 @@ fn codes(source: &str) -> Vec<&'static str> {
 }
 
 /// Checks the invariants every tree must hold, whatever the input: the
-/// tokens reproduce the source, node spans match their tokens, nesting is
-/// bounded and diagnostics point into the source. Returns the depth.
+/// tokens reproduce the source, every node spans exactly its tokens, the
+/// children of a node are ordered and disjoint, nesting is bounded and
+/// diagnostics point into the source. Returns the depth.
 fn assert_valid_tree(source: &str) -> usize {
     let parsed = parse(source);
     let root = parsed.tree.root();
@@ -82,32 +83,7 @@ fn assert_valid_tree(source: &str) -> usize {
 
     let mut text = String::new();
     let mut max_depth = 0;
-    let mut stack = vec![(root, 0usize)];
-    while let Some((node, depth)) = stack.pop() {
-        max_depth = max_depth.max(depth);
-        let mut first = None;
-        let mut last = None;
-        for element in node.children_with_tokens() {
-            let span = element.span();
-            first.get_or_insert(span.start);
-            last = Some(span.end);
-        }
-        if let (Some(start), Some(end)) = (first, last) {
-            if node.parent().is_some() {
-                assert_eq!((node.span().start, node.span().end), (start, end));
-            }
-        } else {
-            assert_eq!(node.span().start, node.span().end);
-        }
-        let children: Vec<_> = node.children_with_tokens().collect();
-        for element in children.into_iter().rev() {
-            if let SyntaxElement::Node(child) = element {
-                assert_eq!(child.parent().map(|p| p.span()), Some(node.span()));
-                stack.push((child, depth + 1));
-            }
-        }
-    }
-    collect_text(root, &mut text);
+    check_node(root, 0, &mut max_depth, &mut text);
     assert_eq!(text, source);
 
     for d in &parsed.diagnostics {
@@ -122,21 +98,50 @@ fn assert_valid_tree(source: &str) -> usize {
     max_depth
 }
 
-/// Concatenates the tokens of the tree in order, without recursion.
-fn collect_text(root: SyntaxNode<'_>, out: &mut String) {
-    let mut stack = vec![SyntaxElement::Node(root)];
-    while let Some(element) = stack.pop() {
-        match element {
+/// Checks that `node` spans exactly the tokens under it, from the start of
+/// the first to the end of the last, or is empty when it has none, and that
+/// its children follow each other without overlapping. Appends the text of
+/// its tokens to `text` and returns their extent.
+fn check_node(
+    node: SyntaxNode<'_>,
+    depth: usize,
+    max_depth: &mut usize,
+    text: &mut String,
+) -> Option<(usize, usize)> {
+    *max_depth = (*max_depth).max(depth);
+    let mut extent: Option<(usize, usize)> = None;
+    let mut previous_end = 0;
+    for element in node.children_with_tokens() {
+        let span = element.span();
+        assert!(span.start <= span.end, "{element:?}");
+        assert!(
+            previous_end <= span.start,
+            "{element:?} overlaps in {node:?}"
+        );
+        previous_end = span.end;
+        let tokens = match element {
             SyntaxElement::Token(token) => {
-                assert_eq!(token.parent().kind(), token.parent().kind());
-                out.push_str(token.text());
+                let parent = token.parent();
+                assert_eq!((parent.kind(), parent.span()), (node.kind(), node.span()));
+                text.push_str(token.text());
+                Some((span.start, span.end))
             }
-            SyntaxElement::Node(node) => {
-                let children: Vec<_> = node.children_with_tokens().collect();
-                stack.extend(children.into_iter().rev());
+            SyntaxElement::Node(child) => {
+                let parent = child.parent().expect("a child node has a parent");
+                assert_eq!((parent.kind(), parent.span()), (node.kind(), node.span()));
+                check_node(child, depth + 1, max_depth, text)
             }
+        };
+        if let Some((start, end)) = tokens {
+            extent = Some((extent.map_or(start, |(first, _)| first), end));
         }
     }
+    let span = node.span();
+    match extent {
+        Some(extent) => assert_eq!((span.start, span.end), extent, "{node:?}"),
+        None => assert_eq!(span.start, span.end, "{node:?}"),
+    }
+    extent
 }
 
 #[test]
@@ -1876,6 +1881,53 @@ fn lexical_errors_do_not_cascade() {
     error[E0108] 31..32: unterminated string
       help: close the string with `"` before the end of the line
     "#);
+}
+
+#[test]
+fn cut_off_interpolation_ends_at_its_last_token() {
+    assert_valid_tree("a = \"x#{y");
+    assert_snapshot!(render("a = \"x#{y"), @r##"
+    File@0..9
+      Attr@0..9
+        AttrPath@0..1
+          Ident "a"
+        Eq "="
+        Str@4..9
+          StrStart "\""
+          StrText "x"
+          Interp@6..9
+            InterpStart "#{"
+            Name@8..9
+              Ident "y"
+    error[E0108] 4..5: unterminated string
+      help: close the string with `"` before the end of the line
+    "##);
+    let source = "a = \"x#{y\nb = 2\n";
+    assert_valid_tree(source);
+    assert_snapshot!(render(source), @r##"
+    File@0..16
+      Attr@0..9
+        AttrPath@0..1
+          Ident "a"
+        Eq "="
+        Str@4..9
+          StrStart "\""
+          StrText "x"
+          Interp@6..9
+            InterpStart "#{"
+            Name@8..9
+              Ident "y"
+      Newline "\n"
+      Attr@10..15
+        AttrPath@10..11
+          Ident "b"
+        Eq "="
+        Literal@14..15
+          Int "2"
+      Newline "\n"
+    error[E0108] 4..5: unterminated string
+      help: close the string with `"` before the end of the line
+    "##);
 }
 
 #[test]

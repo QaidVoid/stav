@@ -1,6 +1,7 @@
 //! Parses arbitrary UTF-8 and checks that the tree reproduces the input,
-//! that node spans match their tokens, that nesting stays bounded and that
-//! the typed view can read every node.
+//! that every node spans exactly its tokens, that children are ordered and
+//! disjoint, that nesting stays bounded and that the typed view can read
+//! every node.
 
 #![no_main]
 #![forbid(unsafe_code)]
@@ -13,6 +14,7 @@ fuzz_target!(|source: &str| {
     let parsed = stav::parse(source);
     let root = parsed.tree.root();
     assert_eq!((root.span().start, root.span().end), (0, source.len()));
+    check_spans(root);
 
     let mut text = String::with_capacity(source.len());
     let mut stack = vec![(SyntaxElement::Node(root), 0usize)];
@@ -21,7 +23,6 @@ fuzz_target!(|source: &str| {
             SyntaxElement::Token(token) => text.push_str(token.text()),
             SyntaxElement::Node(node) => {
                 assert!(depth <= 5 * MAX_DEPTH);
-                check_spans(node);
                 read_typed(node);
                 let children: Vec<_> = node.children_with_tokens().collect();
                 stack.extend(children.into_iter().rev().map(|child| (child, depth + 1)));
@@ -40,16 +41,31 @@ fuzz_target!(|source: &str| {
     }
 });
 
-fn check_spans(node: SyntaxNode<'_>) {
-    let mut elements = node.children_with_tokens();
-    match (elements.next(), elements.last()) {
-        (Some(first), last) if node.parent().is_some() => {
-            let end = last.unwrap_or(first).span().end;
-            assert_eq!((node.span().start, node.span().end), (first.span().start, end));
+/// Checks that `node` spans exactly the tokens under it, or is empty when
+/// it has none, and that its children follow each other without
+/// overlapping. Returns the extent of its tokens.
+fn check_spans(node: SyntaxNode<'_>) -> Option<(usize, usize)> {
+    let mut extent: Option<(usize, usize)> = None;
+    let mut previous_end = 0;
+    for element in node.children_with_tokens() {
+        let span = element.span();
+        assert!(span.start <= span.end);
+        assert!(previous_end <= span.start);
+        previous_end = span.end;
+        let tokens = match element {
+            SyntaxElement::Token(_) => Some((span.start, span.end)),
+            SyntaxElement::Node(child) => check_spans(child),
+        };
+        if let Some((start, end)) = tokens {
+            extent = Some((extent.map_or(start, |(first, _)| first), end));
         }
-        (None, _) => assert_eq!(node.span().start, node.span().end),
-        _ => {}
     }
+    let span = node.span();
+    match extent {
+        Some(extent) => assert_eq!((span.start, span.end), extent),
+        None => assert_eq!(span.start, span.end),
+    }
+    extent
 }
 
 /// Calls the accessors of whatever typed view matches the node.
