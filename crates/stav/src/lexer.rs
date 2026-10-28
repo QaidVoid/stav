@@ -84,6 +84,7 @@ pub fn lex(source: &str) -> Lexed {
         tokens: Vec::new(),
         diagnostics: Vec::new(),
         modes: Vec::new(),
+        single_line_from: None,
         layout_splits: Vec::new(),
     };
     lexer.run();
@@ -105,6 +106,9 @@ struct Lexer<'a> {
     /// last. Nesting is tracked here rather than by recursion so that deeply
     /// nested input cannot overflow the stack.
     modes: Vec<Mode>,
+    /// The index in `modes` of the outermost open single-line string. Every
+    /// mode from there on ends at the next line feed.
+    single_line_from: Option<usize>,
     /// Layout tokens of multi-line strings whose start must become literal
     /// text, given as the token start and the length of the layout that
     /// stays. They are applied in one pass at the end, because rewriting
@@ -186,6 +190,10 @@ impl<'a> Lexer<'a> {
             );
         }
         while self.pos < self.bytes.len() {
+            if self.single_line_from.is_some() && self.peek(0) == Some(b'\n') {
+                self.end_single_line_strings();
+                continue;
+            }
             match self.modes.last() {
                 Some(Mode::Str(frame)) => match frame.form {
                     StrForm::Plain | StrForm::Raw => self.lex_single_line(frame.form),
@@ -194,7 +202,7 @@ impl<'a> Lexer<'a> {
                 _ => self.lex_code(),
             }
         }
-        while let Some(mode) = self.modes.pop() {
+        while let Some(mode) = self.pop_mode() {
             if let Mode::Str(frame) = mode {
                 self.unterminated(&frame);
             }
@@ -218,12 +226,6 @@ impl<'a> Lexer<'a> {
                 self.eat_while(|b| b == b' ' || b == b'\t');
                 return self.push(T::Whitespace, start);
             }
-            '\n' if self.in_single_line_interp() => {
-                if let (Some(_), Some(Mode::Str(frame))) = (self.modes.pop(), self.modes.pop()) {
-                    self.unterminated(&frame);
-                }
-                return;
-            }
             '\n' => (T::Newline, 1),
             '#' => return self.lex_comment(),
             '"' if self.at("\"\"\"") => return self.open_string(StrForm::Multi),
@@ -240,13 +242,13 @@ impl<'a> Lexer<'a> {
             '?' if next == Some(b'?') => (T::QuestionQuestion, 2),
             '{' => {
                 if let Some(Mode::Interp { open_braces }) = self.modes.last_mut() {
-                    *open_braces += 1;
+                    *open_braces = open_braces.saturating_add(1);
                 }
                 (T::LBrace, 1)
             }
             '}' => match self.modes.last_mut() {
                 Some(Mode::Interp { open_braces: 0 }) => {
-                    self.modes.pop();
+                    self.pop_mode();
                     (T::InterpEnd, 1)
                 }
                 Some(Mode::Interp { open_braces }) => {
@@ -498,18 +500,41 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn in_single_line_interp(&self) -> bool {
-        matches!(
-            self.modes.as_slice(),
-            [
-                ..,
-                Mode::Str(StrFrame {
-                    form: StrForm::Plain,
-                    ..
-                }),
-                Mode::Interp { .. }
-            ]
-        )
+    fn push_mode(&mut self, mode: Mode) {
+        let single_line = matches!(
+            mode,
+            Mode::Str(StrFrame {
+                form: StrForm::Plain | StrForm::Raw,
+                ..
+            })
+        );
+        if single_line && self.single_line_from.is_none() {
+            self.single_line_from = Some(self.modes.len());
+        }
+        self.modes.push(mode);
+    }
+
+    fn pop_mode(&mut self) -> Option<Mode> {
+        let mode = self.modes.pop();
+        if self.single_line_from == Some(self.modes.len()) {
+            self.single_line_from = None;
+        }
+        mode
+    }
+
+    /// Ends, at a line feed, every string and interpolation from the
+    /// outermost open single-line string inward. Each of those strings is
+    /// unterminated, even a multi-line string nested inside an
+    /// interpolation, because it lies within a single line.
+    fn end_single_line_strings(&mut self) {
+        let Some(from) = self.single_line_from else {
+            return;
+        };
+        while self.modes.len() > from {
+            if let Some(Mode::Str(frame)) = self.pop_mode() {
+                self.unterminated(&frame);
+            }
+        }
     }
 
     fn open_string(&mut self, form: StrForm) {
@@ -528,7 +553,9 @@ impl<'a> Lexer<'a> {
             bad_opener: false,
         };
         self.push(kind, start);
-        if form.is_multi() {
+        // Inside a single-line string, the line feed after the opener ends
+        // the enclosing string instead of starting the content.
+        if form.is_multi() && self.single_line_from.is_none() {
             if self.peek(0) != Some(b'\n') {
                 frame.bad_opener = true;
                 self.error(
@@ -553,14 +580,14 @@ impl<'a> Lexer<'a> {
                 frame.lines.push(self.begin_line());
             }
         }
-        self.modes.push(Mode::Str(frame));
+        self.push_mode(Mode::Str(frame));
     }
 
     fn open_interp(&mut self) {
         let start = self.pos;
         self.pos += 2;
         self.push(TokenKind::InterpStart, start);
-        self.modes.push(Mode::Interp { open_braces: 0 });
+        self.push_mode(Mode::Interp { open_braces: 0 });
     }
 
     fn lex_single_line(&mut self, form: StrForm) {
@@ -572,13 +599,9 @@ impl<'a> Lexer<'a> {
             Some(b'"') => {
                 self.pos += 1;
                 self.push(TokenKind::StrEnd, start);
-                self.modes.pop();
+                self.pop_mode();
             }
-            Some(b'\n') => {
-                if let Some(Mode::Str(frame)) = self.modes.pop() {
-                    self.unterminated(&frame);
-                }
-            }
+            Some(b'\n') => self.end_single_line_strings(),
             Some(b'\\') if plain => self.lex_escape(),
             Some(b'#') if plain && interp_follows(self) => self.open_interp(),
             Some(_) => {
@@ -696,7 +719,7 @@ impl<'a> Lexer<'a> {
         let start = self.pos;
         self.pos += 3;
         self.push(TokenKind::MStrEnd, start);
-        let Some(Mode::Str(mut frame)) = self.modes.pop() else {
+        let Some(Mode::Str(mut frame)) = self.pop_mode() else {
             return;
         };
         match frame.lines.last().copied() {

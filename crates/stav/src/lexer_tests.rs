@@ -659,6 +659,58 @@ fn single_line_interpolation_ends_at_line_feed() {
 }
 
 #[test]
+fn single_line_string_ends_at_line_feed_inside_nested_multi_line_string() {
+    assert_snapshot!(render("x = \"#{ \"\"\"\n  y\n  \"\"\" }\""), @r##"
+    0..1     "x" Ident
+    1..2     " " Whitespace
+    2..3     "=" Eq
+    3..4     " " Whitespace
+    4..5     "\"" StrStart
+    5..7     "#{" InterpStart
+    7..8     " " Whitespace
+    8..11    "\"\"\"" MStrStart
+    11..12   "\n" Newline
+    12..14   "  " Whitespace
+    14..15   "y" Ident
+    15..16   "\n" Newline
+    16..18   "  " Whitespace
+    18..21   "\"\"\"" MStrStart
+    21..24   " }\"" Error
+    24..24   "" Eof
+    error[E0108] 4..5: unterminated string
+      help: close the string with `"` before the end of the line
+    error[E0108] 8..11: unterminated string
+      help: close the string with `"""` on a line of its own
+    error[E0110] 18..21: the opening `"""` must be followed directly by a line break
+      help: start the content of the string on the next line
+    error[E0108] 18..21: unterminated string
+      help: close the string with `"""` on a line of its own
+    "##);
+}
+
+#[test]
+fn single_line_string_ends_at_line_feed_inside_nested_single_line_string() {
+    assert_snapshot!(render("\"a #{ \"b #{ c\nd"), @r##"
+    0..1     "\"" StrStart
+    1..3     "a " StrText
+    3..5     "#{" InterpStart
+    5..6     " " Whitespace
+    6..7     "\"" StrStart
+    7..9     "b " StrText
+    9..11    "#{" InterpStart
+    11..12   " " Whitespace
+    12..13   "c" Ident
+    13..14   "\n" Newline
+    14..15   "d" Ident
+    15..15   "" Eof
+    error[E0108] 0..1: unterminated string
+      help: close the string with `"` before the end of the line
+    error[E0108] 6..7: unterminated string
+      help: close the string with `"` before the end of the line
+    "##);
+}
+
+#[test]
 fn strings_unterminated_at_end_of_input_are_reported() {
     assert_snapshot!(render("\"a #{ \"b"), @r##"
     0..1     "\"" StrStart
