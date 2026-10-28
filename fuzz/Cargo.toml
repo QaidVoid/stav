@@ -22,6 +22,13 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "formatter"
+path = "fuzz_targets/formatter.rs"
+test = false
+doc = false
+bench = false
+
 [dependencies]
 libfuzzer-sys = "0.4.13"
 stav = { version = "0.1.0", path = "../crates/stav" }
