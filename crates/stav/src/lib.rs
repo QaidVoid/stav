@@ -41,7 +41,6 @@ mod de;
 mod diagnostic;
 mod eval;
 mod format;
-mod hash;
 mod lexer;
 mod parser;
 mod render;

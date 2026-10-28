@@ -1,10 +1,8 @@
 //! Checks that a checked program lists the sources it was read from.
 
-use std::path::PathBuf;
-
 use stav::{Host, HostModule, ImportRoot, MemoryLoader, RootSpec, check};
 
-fn inputs(variant: &str) -> Vec<(PathBuf, [u8; 32])> {
+fn inputs(variant: &str) -> Vec<(String, String)> {
     let loader = MemoryLoader::new()
         .with_file(
             "app/main.stav",
@@ -26,17 +24,14 @@ fn inputs(variant: &str) -> Vec<(PathBuf, [u8; 32])> {
     check(&host, &root)
         .expect("the program checks")
         .inputs()
-        .to_vec()
+        .map(|(path, text)| (path.display().to_string(), text.to_owned()))
+        .collect()
 }
 
 #[test]
-fn inputs_list_every_source_once_with_its_hash() {
+fn inputs_list_every_source_once_by_path_with_its_text() {
     let found = inputs("static");
-    let mut names: Vec<String> = found
-        .iter()
-        .map(|(path, _)| path.display().to_string())
-        .collect();
-    names.sort();
+    let names: Vec<&str> = found.iter().map(|(path, _)| path.as_str()).collect();
     assert_eq!(
         names,
         [
@@ -46,16 +41,20 @@ fn inputs_list_every_source_once_with_its_hash() {
             "ns/target"
         ]
     );
+    assert_eq!(found[0].1, "let x = 1\n");
     assert_eq!(found, inputs("static"));
 }
 
 #[test]
-fn host_module_sources_change_their_hash() {
-    let hash = |found: &[(PathBuf, [u8; 32])]| {
+fn inputs_carry_the_exact_host_module_source() {
+    let target = |found: Vec<(String, String)>| {
         found
-            .iter()
-            .find(|(path, _)| path == &PathBuf::from("ns/target"))
-            .map(|(_, hash)| *hash)
+            .into_iter()
+            .find(|(path, _)| path == "ns/target")
+            .map(|(_, text)| text)
     };
-    assert_ne!(hash(&inputs("static")), hash(&inputs("dynamic")));
+    assert_eq!(
+        target(inputs("dynamic")).as_deref(),
+        Some("let variant = \"dynamic\"\n")
+    );
 }

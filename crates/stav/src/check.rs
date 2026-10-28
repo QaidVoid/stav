@@ -23,7 +23,7 @@ mod totality;
 pub(crate) mod types;
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub use host::{
     Host, HostModule, ImplicitRefs, ImportRoot, LoadError, Loader, MemoryLoader, RelPath, RootSpec,
@@ -60,7 +60,7 @@ pub struct Checked {
     calls: CallGraph,
     pub(crate) ref_targets: BTreeMap<StructId, Vec<model::Step>>,
     warnings: Diagnostics,
-    inputs: Vec<(PathBuf, [u8; 32])>,
+    inputs: BTreeMap<PathBuf, FileId>,
     pub(crate) symbols: Vec<SymbolType>,
     pub(crate) implicit_refs: Vec<ImplicitRefs>,
     pub(crate) import_roots: Vec<ImportRoot>,
@@ -90,16 +90,20 @@ impl Checked {
             .map(|f| f.parsed.tree.root().text())
     }
 
-    /// Returns every source file the program was read from, with the
-    /// BLAKE3 hash of its text, in the order the files were loaded.
+    /// Returns every source file the program was read from, with its exact
+    /// source text, once each and ordered by path.
     ///
     /// A file inside an import root is named by the import root joined with
     /// its relative path, a standard module by `std/<name>`, a host module
     /// by its import path such as `ns/target`, and a prelude file or
-    /// implicit part by the name the host gave it. A cache keyed by these
-    /// inputs tells apart every evaluation whose sources differ.
-    pub fn inputs(&self) -> &[(PathBuf, [u8; 32])] {
-        &self.inputs
+    /// implicit part by the name the host gave it. The program depends only
+    /// on these texts and on the configuration of the host, so a host can
+    /// key a cache of evaluations by hashing both with a hash function of
+    /// its choice.
+    pub fn inputs(&self) -> impl Iterator<Item = (&Path, &str)> {
+        self.inputs
+            .iter()
+            .filter_map(|(path, &file)| self.source(file).map(|text| (path.as_path(), text)))
     }
 
     /// Returns the names and texts of the files, for diagnostics.
@@ -132,12 +136,11 @@ impl Checked {
     }
 }
 
-/// Returns every distinct source file of the program with the hash of its
-/// text.
-fn inputs(program: &Program, spec: &RootSpec) -> Vec<(PathBuf, [u8; 32])> {
-    let mut seen = BTreeSet::new();
-    let mut out = Vec::new();
-    for file in &program.files {
+/// Returns the path of every distinct source file of the program. The
+/// first file loaded from a path stands for it.
+fn inputs(program: &Program, spec: &RootSpec) -> BTreeMap<PathBuf, FileId> {
+    let mut out = BTreeMap::new();
+    for (i, file) in program.files.iter().enumerate() {
         let path = match &file.origin {
             Origin::Path { root, rel } => spec
                 .import_roots
@@ -145,10 +148,7 @@ fn inputs(program: &Program, spec: &RootSpec) -> Vec<(PathBuf, [u8; 32])> {
                 .map_or_else(|| rel.to_path(), |r| r.path().join(rel.to_path())),
             _ => PathBuf::from(&file.name),
         };
-        if seen.insert(path.clone()) {
-            let text = file.parsed.tree.root().text();
-            out.push((path, crate::hash::blake3(text.as_bytes())));
-        }
+        out.entry(path).or_insert(FileId::new(i));
     }
     out
 }
