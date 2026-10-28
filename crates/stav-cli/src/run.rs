@@ -3,7 +3,7 @@
 
 use std::fs;
 use std::io::{self, Write};
-use std::path::{self, Path, PathBuf};
+use std::path::{Path, PathBuf};
 
 use stav::{
     AttrPath, Checked, Diagnostic, Diagnostics, Evaluated, FileDiagnostic, Format, Host,
@@ -115,10 +115,7 @@ pub(crate) fn eval(args: &EvalArgs, emitter: &Emitter) -> io::Result<Status> {
 fn checked(args: &RootArgs, emitter: &Emitter) -> io::Result<Option<Checked>> {
     fs::metadata(&args.entry).map_err(|e| read_error(&args.entry, &e))?;
     let (import_root, entry) = match &args.root_dir {
-        Some(dir) if dir.is_absolute() != args.entry.is_absolute() => {
-            (path::absolute(dir)?, path::absolute(&args.entry)?)
-        }
-        Some(dir) => (dir.clone(), args.entry.clone()),
+        Some(dir) => (dir.clone(), entry_in(dir, &args.entry)?),
         None => (
             args.entry.parent().unwrap_or(Path::new("")).to_owned(),
             args.entry.clone(),
@@ -139,6 +136,38 @@ fn checked(args: &RootArgs, emitter: &Emitter) -> io::Result<Option<Checked>> {
             Ok(None)
         }
     }
+}
+
+/// Returns the entry file as a path below the root directory `dir`, so
+/// that the two compare by their real locations rather than by how they
+/// were written. The file name of the entry is kept, so that the loader
+/// still confines an entry that is a symbolic link. An entry outside `dir`
+/// is returned unchanged, for the checker to report.
+///
+/// # Errors
+///
+/// Returns an error when `dir` does not exist or is not a directory.
+fn entry_in(dir: &Path, entry: &Path) -> io::Result<PathBuf> {
+    let real_dir = fs::canonicalize(dir).map_err(|e| read_error(dir, &e))?;
+    if !real_dir.is_dir() {
+        return Err(io::Error::new(
+            io::ErrorKind::NotADirectory,
+            format!("`{}` is not a directory", dir.display()),
+        ));
+    }
+    let (Some(parent), Some(name)) = (entry.parent(), entry.file_name()) else {
+        return Ok(entry.to_owned());
+    };
+    let parent = if parent.as_os_str().is_empty() {
+        Path::new(".")
+    } else {
+        parent
+    };
+    let real_parent = fs::canonicalize(parent).map_err(|e| read_error(parent, &e))?;
+    Ok(match real_parent.strip_prefix(&real_dir) {
+        Ok(rest) => dir.join(rest).join(name),
+        Err(_) => entry.to_owned(),
+    })
 }
 
 fn render(evaluated: &Evaluated, args: &EvalArgs) -> Result<String, Diagnostics> {

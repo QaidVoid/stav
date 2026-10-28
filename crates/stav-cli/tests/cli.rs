@@ -539,3 +539,55 @@ fn directories_are_not_source_files() {
     );
     assert_snapshot!(output);
 }
+
+#[test]
+fn relative_root_dir_may_name_a_parent_directory() {
+    let files = [
+        (
+            "app/main.stav",
+            "import \"../lib.stav\" as lib\nstruct Root { a: Int = lib.a }\n",
+        ),
+        ("lib.stav", "let a = 1\n"),
+    ];
+    let dir = fixture("relative_root_dir_may_name_a_parent_directory", &files);
+    let output = stav(
+        &dir.join("app"),
+        &["eval", "--root-dir", "..", "main.stav"],
+        "",
+    );
+    assert_snapshot!(output, @r#"
+    status: 0
+    --- stdout
+    {
+      "a": 1
+    }
+    --- stderr
+    "#);
+}
+
+#[test]
+fn missing_root_dir_is_reported_as_the_root_dir() {
+    let files = [("app.stav", "struct Root { a: Int = 1 }\n")];
+    let missing = run(
+        "missing_root_dir_is_reported_as_the_root_dir",
+        &files,
+        &["check", "--root-dir", "nope", "app.stav"],
+    );
+    assert_snapshot!(missing, @r"
+    status: 3
+    --- stdout
+    --- stderr
+    error: cannot read `nope`: no such file or directory
+    ");
+    let file = run(
+        "root_dir_must_be_a_directory",
+        &files,
+        &["check", "--root-dir", "app.stav", "app.stav"],
+    );
+    assert_snapshot!(file, @r"
+    status: 3
+    --- stdout
+    --- stderr
+    error: `app.stav` is not a directory
+    ");
+}
