@@ -36,6 +36,13 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "evaluator"
+path = "fuzz_targets/evaluator.rs"
+test = false
+doc = false
+bench = false
+
 [dependencies]
 libfuzzer-sys = "0.4.13"
 stav = { version = "0.1.0", path = "../crates/stav" }
