@@ -351,3 +351,202 @@ fn deeply_nested_programs_check_without_overflowing_the_stack() {
         assert!(result.is_ok(), "checking panicked for {source}");
     }
 }
+
+mod random {
+    use proptest::prelude::*;
+    use proptest::sample::select;
+
+    use super::*;
+
+    fn name() -> impl Strategy<Value = String> {
+        select(vec![
+            "a",
+            "b",
+            "x",
+            "f",
+            "g",
+            "lib.h",
+            "lib.c",
+            "info",
+            "debug",
+            "warn",
+            "Level.info",
+            "self.a",
+            "self.b",
+            "self.level",
+            "neovim",
+            "Root",
+            "Point",
+            "points",
+            "p",
+        ])
+        .prop_map(str::to_owned)
+    }
+
+    fn ty() -> impl Strategy<Value = String> {
+        select(vec![
+            "Int",
+            "Str",
+            "Bool",
+            "Float",
+            "Data",
+            "Path",
+            "Option<Int>",
+            "List<Str>",
+            "Map<Str, Int>",
+            "Set<Level>",
+            "Level",
+            "Point",
+            "Option<Point>",
+            "Fn(Int) -> Int",
+            "Int where 1..=5",
+            "Str where nonEmpty && matches(r\"^a\")",
+            "Part<Root>",
+            "Ref<Point>",
+            "Pkg",
+            "lib.Mode",
+            "List<Point>",
+        ])
+        .prop_map(str::to_owned)
+    }
+
+    fn expr() -> impl Strategy<Value = String> {
+        let leaf = prop_oneof![
+            (0i64..50).prop_map(|i| i.to_string()),
+            select(vec![
+                "1.5",
+                "true",
+                "false",
+                "none",
+                "\"s\"",
+                "\"#{a}\"",
+                "./p.conf",
+                "llvm@1:static",
+                "[]",
+                "{}",
+                "self",
+                "r\"raw\"",
+            ])
+            .prop_map(str::to_owned),
+            name(),
+        ];
+        leaf.prop_recursive(4, 24, 3, |inner| {
+            let op = select(vec!["+", "-", "*", "==", "<", "&&", "++", "??", "%", "/"]);
+            prop_oneof![
+                (inner.clone(), op, inner.clone()).prop_map(|(a, o, b)| format!("({a} {o} {b})")),
+                prop::collection::vec(inner.clone(), 0..3)
+                    .prop_map(|v| format!("[{}]", v.join(", "))),
+                prop::collection::vec((name(), inner.clone()), 0..3).prop_map(|v| {
+                    let entries: Vec<String> = v
+                        .into_iter()
+                        .map(|(k, e)| format!("{} = {e}", k.replace('.', "_")))
+                        .collect();
+                    format!("{{ {} }}", entries.join(", "))
+                }),
+                (
+                    select(vec![
+                        "f", "g", "len", "map", "fold", "join", "toStr", "force", "fail", "check",
+                        "pkg", "lib.h"
+                    ]),
+                    prop::collection::vec(inner.clone(), 0..3)
+                )
+                    .prop_map(|(f, args)| format!("{f}({})", args.join(", "))),
+                (inner.clone(), inner.clone(), inner.clone())
+                    .prop_map(|(c, a, b)| format!("(if {c} {{ {a} }} else {{ {b} }})")),
+                (inner.clone(), inner.clone(), inner.clone()).prop_map(|(s, a, b)| format!(
+                    "(match {s} {{ debug => {a}, check(n, ..) => {b}, none => {a}, _ => {b} }})"
+                )),
+                (inner.clone(), inner.clone())
+                    .prop_map(|(v, b)| format!("(let x = {v}, y = x in {b})")),
+                (ty(), inner.clone()).prop_map(|(t, b)| format!("(fn(x: {t}) = {b})")),
+                (inner.clone(), name()).prop_map(|(e, n)| format!("({e}).{}", n.replace('.', "_"))),
+                (inner.clone(), inner.clone())
+                    .prop_map(|(s, v)| format!("[for x in {s} if x -> {v}]")),
+                (inner.clone(), inner.clone())
+                    .prop_map(|(s, v)| format!("{{for k, v in {s} -> k = {v}}}")),
+                inner.clone().prop_map(|e| format!("(part {{ a = {e} }})")),
+                inner.clone().prop_map(|e| format!("Point {{ x = {e} }}")),
+                (inner.clone(), inner).prop_map(|(a, b)| format!("{a}[{b}]")),
+            ]
+        })
+    }
+
+    fn declaration() -> impl Strategy<Value = String> {
+        prop_oneof![
+            (ty(), expr(), ty())
+                .prop_map(|(t, e, u)| format!("struct Extra {{ x: {t} = {e}, y: {u} }}")),
+            ty().prop_map(|t| format!("type Kind = one | two(n: {t})")),
+            (ty(), ty(), expr(), ty(), expr())
+                .prop_map(|(a, b, d, r, e)| format!("fn f(a: {a}, b: {b} = {d}) -> {r} = {e}")),
+            (ty(), expr()).prop_map(|(t, e)| format!("fn g(x: {t}) -> Int = {e}")),
+            expr().prop_map(|e| format!("let a = {e}")),
+            (ty(), expr()).prop_map(|(t, e)| format!("let b: {t} = {e}")),
+        ]
+    }
+
+    fn item() -> impl Strategy<Value = String> {
+        prop_oneof![
+            declaration(),
+            (
+                select(vec![
+                    "a",
+                    "b",
+                    "level",
+                    "p.x",
+                    "points.k.y",
+                    "data.k",
+                    "a.b"
+                ]),
+                expr()
+            )
+                .prop_map(|(p, e)| format!("{p} = {e}")),
+            expr().prop_map(|e| format!("a = force({e})")),
+            (expr(), expr())
+                .prop_map(|(l, e)| format!("points \"#{{{l}}}\" {{ x = {e}\n let z = self.x }}")),
+            (expr(), expr())
+                .prop_map(|(c, e)| format!("if {c} {{ b = {e} }} else {{ level = info }}")),
+            (expr(), expr()).prop_map(|(c, e)| format!("for x, y in {c} {{ a = {e} }}")),
+            expr().prop_map(|e| format!("include {e}")),
+            Just("include \"./part.stav\"".to_owned()),
+            Just("p { x = 1 }".to_owned()),
+            Just("check n { }".to_owned()),
+        ]
+    }
+
+    fn program() -> impl Strategy<Value = (String, String)> {
+        (
+            prop::collection::vec(item(), 0..8),
+            prop::collection::vec(declaration(), 0..4),
+        )
+            .prop_map(|(main, lib)| {
+                let main = format!(
+                    "#! symbol Pkg pkg words\n#- file main.stav\nimport \"./lib.stav\" as lib\n\
+                     struct Root {{ a: Int = 0, b: Str = \"\", level: Level = info, data: Data = none, \
+                     points: Map<Str, Point> = {{}} block points, p: Option<Point>, check: Level = info }}\n\
+                     struct Point {{ x: Int = 0, y: Str = \"\" }}\n\
+                     type Level = debug | info | warn | check(n: Int = 0)\n{}\n\
+                     #- file lib.stav\ntype Mode = on | off\nlet c = 1\nfn h(x: Int) -> Int = x\n{}\n\
+                     #- file part.stav\na = 1\n",
+                    main.join("\n"),
+                    lib.join("\n")
+                );
+                (main, String::new())
+            })
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(256))]
+
+        #[test]
+        fn checking_never_panics_and_is_deterministic((text, _) in program()) {
+            let first = run(&text);
+            let second = run(&text);
+            prop_assert_eq!(first, second);
+        }
+
+        #[test]
+        fn checking_arbitrary_text_never_panics(text in "[ -~\n]{0,200}") {
+            let _ = run(&text.replace("#-", "# -"));
+        }
+    }
+}
