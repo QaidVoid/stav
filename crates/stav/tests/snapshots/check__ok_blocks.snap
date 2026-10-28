@@ -5,6 +5,7 @@ expression: output
 file 0 app/main.stav (entry)
 entries 0
 root Root
+uses Job defaults -> Gc defaults
 bodies unit 0
 unit 0 app/main.stav
   21:1 block job "lint" (clause jobs) -> Job

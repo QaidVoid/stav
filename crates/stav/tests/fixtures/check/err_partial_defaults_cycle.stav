@@ -1,0 +1,5 @@
+struct Root { a: Int = 0 }
+struct Inner { x: Int = 1, y: Int = f() }
+struct Outer { inner: Inner = { x = 2 } }
+fn f() -> Int = Outer {}.inner.x
+a = f()

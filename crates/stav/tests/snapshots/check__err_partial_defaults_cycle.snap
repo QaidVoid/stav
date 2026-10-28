@@ -1,0 +1,10 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0610]: functions may not call each other in a cycle
+  --> app/main.stav:4:17
+  note: cycle: `f` -> the defaults of `Outer` -> the defaults of `Inner` -> `f`
+  note: evaluation must terminate, so functions cannot recurse
+  help: iterate with `fold` over `range(...)`, for example `fold(range(1, n + 1), 1, fn(acc: Int, i: Int) = acc * i)`

@@ -1,0 +1,13 @@
+import "./lib.stav" as lib
+struct Root { a: Int = 0 }
+fn apply(g: Fn(Int) -> Int) -> Int = g(1)
+fn direct(x: Int) -> Int = apply(direct)
+fn through_let(x: Int) -> Int = apply(alias)
+let alias = through_let
+fn through_lambda(x: Int) -> Int = apply(fn(y: Int) = through_lambda(y))
+fn through_list(x: Int) -> Int = apply([through_list][0])
+fn first(x: Int) -> Int = apply(second)
+fn second(x: Int) -> Int = apply(first)
+#- file lib.stav
+fn twice(g: Fn(Int) -> Int) -> Int = g(g(1))
+fn qualified(x: Int) -> Int = twice(qualified)

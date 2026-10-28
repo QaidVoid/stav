@@ -1,0 +1,33 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0610]: `direct` calls itself
+  --> app/main.stav:4:34
+  note: cycle: `direct` -> `direct`
+  note: evaluation must terminate, so functions cannot recurse
+  help: iterate with `fold` over `range(...)`, for example `fold(range(1, n + 1), 1, fn(acc: Int, i: Int) = acc * i)`
+error[E0305]: `alias` depends on itself
+  --> app/main.stav:6:13
+  note: cycle: `through_let` -> `alias` -> `through_let`
+error[E0610]: `through_lambda` calls itself
+  --> app/main.stav:7:55
+  note: cycle: `through_lambda` -> `through_lambda`
+  note: evaluation must terminate, so functions cannot recurse
+  help: iterate with `fold` over `range(...)`, for example `fold(range(1, n + 1), 1, fn(acc: Int, i: Int) = acc * i)`
+error[E0610]: `through_list` calls itself
+  --> app/main.stav:8:41
+  note: cycle: `through_list` -> `through_list`
+  note: evaluation must terminate, so functions cannot recurse
+  help: iterate with `fold` over `range(...)`, for example `fold(range(1, n + 1), 1, fn(acc: Int, i: Int) = acc * i)`
+error[E0610]: functions may not call each other in a cycle
+  --> app/main.stav:9:33
+  note: cycle: `first` -> `second` -> `first`
+  note: evaluation must terminate, so functions cannot recurse
+  help: iterate with `fold` over `range(...)`, for example `fold(range(1, n + 1), 1, fn(acc: Int, i: Int) = acc * i)`
+error[E0610]: `qualified` calls itself
+  --> app/lib.stav:2:37
+  note: cycle: `qualified` -> `qualified`
+  note: evaluation must terminate, so functions cannot recurse
+  help: iterate with `fold` over `range(...)`, for example `fold(range(1, n + 1), 1, fn(acc: Int, i: Int) = acc * i)`

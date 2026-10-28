@@ -83,23 +83,24 @@ impl Checker<'_> {
         }
         for cycle in graph::cycles(&adj) {
             let nodes: Vec<Node> = cycle.iter().map(|&i| self.index_node(i)).collect();
-            let from = nodes[0];
-            let to = nodes.get(1).copied().unwrap_or(from);
-            let Some(&(file, span)) = self.calls.edges.get(&(from, to)) else {
-                continue;
-            };
-            let mut chain: Vec<String> = nodes.iter().map(|n| self.node_name(*n)).collect();
-            chain.push(self.node_name(from));
-            let note = format!("cycle: {}", chain.join(" -> "));
             let is_let = |n: &Node| match n {
                 Node::Global(g) => matches!(self.globals[g.index()].kind, GlobalKind::Let(_)),
                 _ => false,
             };
-            let diagnostic = if let Some(n) = nodes.iter().find(|n| is_let(n)) {
+            let named = nodes.iter().position(is_let);
+            let at = named.unwrap_or(0);
+            let (from, to) = (nodes[at], nodes[(at + 1) % nodes.len()]);
+            let Some(&(file, span)) = self.calls.edges.get(&(from, to)) else {
+                continue;
+            };
+            let mut chain: Vec<String> = nodes.iter().map(|n| self.node_name(*n)).collect();
+            chain.push(self.node_name(nodes[0]));
+            let note = format!("cycle: {}", chain.join(" -> "));
+            let diagnostic = if named.is_some() {
                 Diagnostic::error(
                     "E0305",
                     span,
-                    format!("{} depends on itself", self.node_name(*n)),
+                    format!("{} depends on itself", self.node_name(from)),
                 )
                 .with_note(note)
             } else {

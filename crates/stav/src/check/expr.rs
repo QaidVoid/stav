@@ -1041,12 +1041,12 @@ impl<'p> Checker<'p> {
                 self.expr(cx, v, Some(field_ty.unwrap_or(TypeId::ERROR)));
             }
         }
-        if partial {
-            return;
-        }
         if let Some(owner) = cx.owner {
             self.calls
                 .depend(owner, Node::StructDefaults(s), cx.file, span);
+        }
+        if partial {
+            return;
         }
         let def = self.types.structure(s);
         let missing: Vec<String> = def

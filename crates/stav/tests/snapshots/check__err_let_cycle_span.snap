@@ -1,0 +1,8 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0305]: `b` depends on itself
+  --> app/main.stav:3:9
+  note: cycle: `f` -> `b` -> `f`

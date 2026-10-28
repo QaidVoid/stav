@@ -12,6 +12,7 @@ let base: Int in app/main.stav
 let add: Fn(Int, Int) -> Int in app/main.stav
 let adder: Fn(Int) -> Int in app/main.stav
 uses adder -> base
+uses Root defaults -> Point defaults
 let order base, add, adder
 bodies unit 0
 unit 0 app/main.stav
