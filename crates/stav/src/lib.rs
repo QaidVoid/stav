@@ -20,9 +20,11 @@ mod format;
 mod hash;
 mod lexer;
 mod parser;
+mod render;
 mod span;
 mod syntax;
 mod token;
+mod value;
 
 pub use check::{
     Checked, FileId, Host, HostModule, ImportRoot, LoadError, Loader, MemoryLoader, RelPath,
@@ -33,6 +35,8 @@ pub use diagnostic::{Diagnostic, Diagnostics, FileDiagnostic, Label, Severity};
 pub use format::format;
 pub use lexer::{Lexed, lex};
 pub use parser::{MAX_DEPTH, Parsed, parse};
+pub use render::{Format, RenderError};
 pub use span::Span;
 pub use syntax::{NodeKind, SyntaxElement, SyntaxNode, SyntaxToken, SyntaxTree};
 pub use token::{Token, TokenKind};
+pub use value::{AttrPath, Value};
