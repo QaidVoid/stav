@@ -84,6 +84,7 @@ pub fn lex(source: &str) -> Lexed {
         tokens: Vec::new(),
         diagnostics: Vec::new(),
         modes: Vec::new(),
+        layout_splits: Vec::new(),
     };
     lexer.run();
     let mut diagnostics = lexer.diagnostics;
@@ -104,6 +105,11 @@ struct Lexer<'a> {
     /// last. Nesting is tracked here rather than by recursion so that deeply
     /// nested input cannot overflow the stack.
     modes: Vec<Mode>,
+    /// Layout tokens of multi-line strings whose start must become literal
+    /// text, given as the token start and the length of the layout that
+    /// stays. They are applied in one pass at the end, because rewriting
+    /// tokens when each string closes is quadratic in the nesting depth.
+    layout_splits: Vec<(usize, usize)>,
 }
 
 enum Mode {
@@ -144,7 +150,6 @@ impl StrForm {
 struct StrFrame {
     form: StrForm,
     start: usize,
-    first_token: usize,
     /// The lines of a multi-line string that started inside its literal
     /// text, in order.
     lines: Vec<Line>,
@@ -194,6 +199,7 @@ impl<'a> Lexer<'a> {
                 self.unterminated(&frame);
             }
         }
+        self.apply_layout_splits();
         let end = self.bytes.len();
         self.tokens.push(Token {
             kind: TokenKind::Eof,
@@ -518,7 +524,6 @@ impl<'a> Lexer<'a> {
         let mut frame = StrFrame {
             form,
             start,
-            first_token: self.tokens.len(),
             lines: Vec::new(),
             bad_opener: false,
         };
@@ -711,11 +716,11 @@ impl<'a> Lexer<'a> {
     }
 
     /// Checks that every line of a multi-line string starts with the
-    /// indentation of the closing line, and splits that indentation off as
-    /// layout so that only the deeper indentation remains literal text.
+    /// indentation of the closing line, and schedules that indentation to be
+    /// split off as layout so that only the deeper indentation remains
+    /// literal text.
     fn strip_indentation(&mut self, frame: &StrFrame, closing: Line) {
         let prefix = self.slice(closing.start, closing.indent_end);
-        let mut splits = Vec::new();
         for line in &frame.lines {
             if self.bytes.get(line.indent_end) == Some(&b'\n') {
                 continue;
@@ -738,21 +743,31 @@ impl<'a> Lexer<'a> {
                     )),
                 );
             } else if indent.len() > prefix.len() {
-                splits.push(line.start);
+                self.layout_splits.push((line.start, prefix.len()));
             }
         }
-        if splits.is_empty() {
+    }
+
+    fn apply_layout_splits(&mut self) {
+        if self.layout_splits.is_empty() {
             return;
         }
-        let tail = self.tokens.split_off(frame.first_token);
-        for token in tail {
+        self.layout_splits.sort_unstable();
+        let mut splits = self.layout_splits.iter().peekable();
+        let old = std::mem::take(&mut self.tokens);
+        self.tokens.reserve(old.len() + self.layout_splits.len());
+        for token in old {
             let Span { start, end } = token.span;
-            if token.kind != TokenKind::StrLayout || splits.binary_search(&start).is_err() {
-                self.tokens.push(token);
-                continue;
-            }
-            let mid = start + prefix.len();
-            if mid > start {
+            let keep = match splits.peek() {
+                Some(&&(at, keep)) if at == start && token.kind == TokenKind::StrLayout => keep,
+                _ => {
+                    self.tokens.push(token);
+                    continue;
+                }
+            };
+            splits.next();
+            let mid = start + keep;
+            if keep > 0 {
                 self.tokens.push(Token {
                     kind: TokenKind::StrLayout,
                     span: Span { start, end: mid },
