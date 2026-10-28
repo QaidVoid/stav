@@ -5,16 +5,21 @@
 //! contributions of every file by priority, and produces a value that can be
 //! rendered or converted to Rust types.
 //!
-//! The entry point so far is [`lex`], which splits source text into tokens.
+//! The entry points so far are [`lex`], which splits source text into
+//! tokens, and [`parse`], which builds a lossless [`SyntaxTree`].
 
 #![forbid(unsafe_code)]
 
 mod diagnostic;
 mod lexer;
+mod parser;
 mod span;
+mod syntax;
 mod token;
 
 pub use diagnostic::Diagnostic;
 pub use lexer::{Lexed, lex};
+pub use parser::{MAX_DEPTH, Parsed, parse};
 pub use span::Span;
+pub use syntax::{NodeKind, SyntaxElement, SyntaxNode, SyntaxToken, SyntaxTree};
 pub use token::{Token, TokenKind};
