@@ -28,6 +28,7 @@ use std::rc::Rc;
 
 use serde::de::DeserializeOwned;
 
+use self::env::Env;
 use self::merge::{NodeId, SpanTree};
 use self::val::{FnVal, MapVal, Seq, StructVal, Val, VariantVal, canonical, depth_of};
 use crate::check::model::{Fact, UnitId};
@@ -46,9 +47,13 @@ use crate::value::{AttrPath, Value};
 /// in a loop. Crossing a limit stops evaluation with an error instead.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Limits {
-    /// The number of evaluation steps: one per expression evaluated, plus
-    /// one per element or 64 bytes that a built-in function or operator
-    /// produces. Crossing it is `E0611`.
+    /// The number of evaluation steps. Evaluation counts one per
+    /// expression and per statement evaluated, one per element of every
+    /// collection it builds and per 64 bytes that `value_bytes` counts, one
+    /// per key it checks for duplicates in a map literal or comprehension,
+    /// one per entry of the `Data` maps it merges, one per byte of every
+    /// regular expression it compiles and one per 64 bytes of every string
+    /// matched against one. Crossing it is `E0611`.
     pub steps: u64,
     /// The total size in bytes of the strings and collections evaluation
     /// builds, counting every intermediate value. This bounds the memory
@@ -658,7 +663,7 @@ impl<'c> Eval<'c> {
         let cx = expr::Cx {
             unit,
             file,
-            env: None,
+            env: Env::default(),
             frames,
         };
         let val = self.expr(&cx, value)?;

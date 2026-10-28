@@ -10,7 +10,7 @@
 
 use std::rc::Rc;
 
-use super::env::{LateLet, Slot, bind};
+use super::env::{Env, LateLet, Slot, bind};
 use super::expr::Cx;
 use super::merge::{Frame, Seg};
 use super::val::{PartVal, Val};
@@ -176,7 +176,7 @@ impl<'c> Eval<'c> {
                 file,
                 base: Vec::new(),
                 frames: vec![Vec::new()],
-                env: None,
+                env: Env::default(),
                 via: None,
             };
             let statements = self
@@ -215,7 +215,7 @@ impl<'c> Eval<'c> {
             file,
             frames: vec![base.clone()],
             base,
-            env: None,
+            env: Env::default(),
             via,
         };
         let statements: Vec<Stmt<'c>> = self
@@ -274,7 +274,7 @@ impl<'c> Eval<'c> {
                 };
                 let source = self.expr(&body.cx(), collection)?;
                 let env = body.env.clone();
-                for (key, value) in self.elements(&source) {
+                for (key, value) in elements(&source) {
                     body.env = env.clone();
                     let mut binds = fact.binds.iter();
                     if let (Some(&id), Some(value)) = (binds.next(), key) {
@@ -290,20 +290,6 @@ impl<'c> Eval<'c> {
                 body.env = env;
                 Ok(())
             }
-        }
-    }
-
-    /// Returns the elements of a collection: the values of a list or set,
-    /// or the keys and values of a map.
-    pub(crate) fn elements(&self, source: &Val) -> Vec<(Option<Val>, Option<Val>)> {
-        match source {
-            Val::List(s) | Val::Set(s) => s.items.iter().map(|v| (Some(v.clone()), None)).collect(),
-            Val::Map(m) => m
-                .entries
-                .iter()
-                .map(|(k, v)| (Some(k.clone()), Some(v.clone())))
-                .collect(),
-            _ => Vec::new(),
         }
     }
 
@@ -683,4 +669,20 @@ impl<'c> Eval<'c> {
         self.contribute(&cx, Vec::new(), deferred.ty, e, template, &mut out)?;
         Ok(out)
     }
+}
+
+/// Returns the elements of a collection: the values of a list or set, or
+/// the keys and values of a map. The elements are shared with the
+/// collection, not copied.
+pub(crate) fn elements(source: &Val) -> impl Iterator<Item = (Option<Val>, Option<Val>)> + '_ {
+    let (items, entries): (&[Val], &[(Val, Val)]) = match source {
+        Val::List(s) | Val::Set(s) => (&s.items, &[]),
+        Val::Map(m) => (&[], &m.entries),
+        _ => (&[], &[]),
+    };
+    let items = items.iter().map(|v| (Some(v.clone()), None));
+    let entries = entries
+        .iter()
+        .map(|(k, v)| (Some(k.clone()), Some(v.clone())));
+    items.chain(entries)
 }

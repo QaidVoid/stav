@@ -130,6 +130,32 @@ pub(crate) fn depth_of<'a>(items: impl IntoIterator<Item = &'a Val>) -> u32 {
         .saturating_add(1)
 }
 
+/// A value ordered by [`Val::order`], so that map keys can be found in
+/// ordered collections. Keys are strings and variants without payload,
+/// whose order agrees with [`Val::equals`].
+#[derive(Debug, Clone)]
+pub(crate) struct Key(pub(crate) Val);
+
+impl PartialEq for Key {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other) == Ordering::Equal
+    }
+}
+
+impl Eq for Key {}
+
+impl PartialOrd for Key {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Key {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.0.order(&other.0)
+    }
+}
+
 impl Val {
     /// Returns how deeply collections nest inside the value.
     pub(crate) fn depth(&self) -> u32 {

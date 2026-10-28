@@ -1,7 +1,7 @@
 //! Calls of functions, variants, constructors and function values, and
 //! complete struct values with their defaults.
 
-use super::env::{Slot, bind};
+use super::env::{Env, Slot, bind};
 use super::expr::Cx;
 use super::merge::Frame;
 use super::val::{FnVal, Val};
@@ -119,7 +119,7 @@ impl<'c> Eval<'c> {
                         let inner = Cx {
                             unit,
                             file: declared_in,
-                            env: None,
+                            env: Env::default(),
                             frames: &[],
                         };
                         (self.expr(&inner, e)?, at)
@@ -151,7 +151,7 @@ impl<'c> Eval<'c> {
         let Some(body) = body else {
             return Err(self.bug(at.file, at.span, "a function has no body"));
         };
-        let mut env = None;
+        let mut env = Env::default();
         for (&id, value) in sig.binds.iter().zip(args) {
             env = bind(&env, id, Slot::Ready(value));
         }
@@ -337,7 +337,7 @@ impl<'c> Eval<'c> {
                     let cx = Cx {
                         unit,
                         file,
-                        env: None,
+                        env: Env::default(),
                         frames: &frames,
                     };
                     self.expr(&cx, e)?
@@ -393,7 +393,7 @@ impl<'c> Eval<'c> {
         let cx = Cx {
             unit,
             file,
-            env: None,
+            env: Env::default(),
             frames: &[],
         };
         let value = self.expr(&cx, e)?;
@@ -431,7 +431,7 @@ impl<'c> Eval<'c> {
         let cx = Cx {
             unit,
             file,
-            env: None,
+            env: Env::default(),
             frames: &[],
         };
         let value = self.expr(&cx, e)?;

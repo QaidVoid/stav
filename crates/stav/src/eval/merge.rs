@@ -17,7 +17,8 @@ use std::rc::Rc;
 
 use super::body::{Contrib, Deferred, Kind, Pending, Prio};
 use super::call::Building;
-use super::val::Val;
+use super::env::Env;
+use super::val::{Key, Val};
 use super::{Eval, MAX_VALUE_DEPTH, R, Stop};
 use crate::check::FileId;
 use crate::check::graph;
@@ -559,7 +560,7 @@ impl<'c> Eval<'c> {
                 let deferred = Deferred {
                     unit,
                     node,
-                    env: None,
+                    env: Env::default(),
                     frames: vec![instance],
                     ty: field.ty,
                     reads: reads.to_vec(),
@@ -598,7 +599,7 @@ impl<'c> Eval<'c> {
         let cx = super::expr::Cx {
             unit,
             file: template.file,
-            env: None,
+            env: Env::default(),
             frames: &[],
         };
         let mut out = Vec::new();
@@ -1075,17 +1076,16 @@ impl<'c> Eval<'c> {
                     }
                     return self.new_struct(id, fields, at);
                 }
-                let mut grouped: Vec<(Val, Vec<(Val, u32)>)> = Vec::new();
+                let mut grouped: BTreeMap<Key, Vec<(Val, u32)>> = BTreeMap::new();
                 for (value, id) in &values {
-                    for (key, item) in self.entries(value) {
-                        match grouped.iter_mut().find(|(k, _)| k.equals(&key)) {
-                            Some((_, items)) => items.push((item, *id)),
-                            None => grouped.push((key, vec![(item, *id)])),
-                        }
+                    let entries = self.entries(value);
+                    self.charge(u64::try_from(entries.len()).unwrap_or(u64::MAX), at)?;
+                    for (key, item) in entries {
+                        grouped.entry(Key(key)).or_default().push((item, *id));
                     }
                 }
                 let mut entries = Vec::with_capacity(grouped.len());
-                for (key, items) in grouped {
+                for (Key(key), items) in grouped {
                     keys.push(key.text(&self.c.types));
                     let merged = self.merge_data(n, keys, items, at);
                     keys.pop();

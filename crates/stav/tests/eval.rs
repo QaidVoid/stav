@@ -432,6 +432,44 @@ fn spans_and_symbols_point_at_the_source() {
     assert_eq!(symbols, ["vim"]);
 }
 
+/// Asserts that a program evaluates within a few seconds, far above what
+/// its size needs when no step is quadratic.
+fn evaluates_quickly(text: &str) {
+    let start = std::time::Instant::now();
+    evaluate(text);
+    let elapsed = start.elapsed();
+    assert!(elapsed < std::time::Duration::from_secs(10), "{elapsed:?}");
+}
+
+#[test]
+fn large_maps_evaluate_in_linear_time() {
+    let n = 100_000;
+    evaluates_quickly(&format!(
+        "struct Root {{ m: Map<Str, Int> = {{}} }}\nm = {{for i in range(0, {n}) -> \"k#{{i}}\" = i}}\n"
+    ));
+    let entries: Vec<String> = (0..n).map(|i| format!("k{i} = {i}")).collect();
+    evaluates_quickly(&format!(
+        "struct Root {{ m: Map<Str, Int> = {{}} }}\nm = {{ {} }}\n",
+        entries.join(", ")
+    ));
+    evaluates_quickly(&format!(
+        "struct Root {{ d: Data = none }}\n\
+         d = {{for i in range(0, {n}) -> \"a#{{i}}\" = i}}\n\
+         d = {{for i in range(0, {n}) -> \"b#{{i}}\" = i}}\n"
+    ));
+}
+
+#[test]
+fn long_scopes_evaluate_in_linear_time() {
+    let n = 150_000;
+    let bindings: Vec<String> = (1..n).map(|i| format!("v{i} = v0")).collect();
+    evaluates_quickly(&format!(
+        "struct Root {{ a: Int = 0 }}\na = (let v0 = 1, {} in v{})\n",
+        bindings.join(", "),
+        n - 1
+    ));
+}
+
 #[test]
 fn deeply_nested_evaluation_stops_without_overflowing_the_stack() {
     let mut functions = String::from("fn f0(x: Int) -> Int = x + 1\n");

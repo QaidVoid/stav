@@ -4,6 +4,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::builtins::length;
+use super::env::Env;
 use super::expr::Cx;
 use super::merge::{NodeId, SpanTree};
 use super::val::{RefVal, Val};
@@ -240,7 +241,7 @@ impl<'c> Eval<'c> {
                 let cx = Cx {
                     unit,
                     file: declared_in,
-                    env: None,
+                    env: Env::default(),
                     frames: &[],
                 };
                 for &node in args {

@@ -1,10 +1,13 @@
 //! Evaluating expressions.
 
+use std::collections::BTreeMap;
+use std::collections::btree_map::Entry;
 use std::rc::Rc;
 
+use super::body::elements;
 use super::env::{Env, Slot, bind, lookup};
 use super::merge::{Frame, Seg};
-use super::val::{FnVal, PathVal, RefVal, SymbolVal, Val};
+use super::val::{FnVal, Key as MapKey, PathVal, RefVal, SymbolVal, Val};
 use super::{Eval, R};
 use crate::ast::{self, BinaryOp, Expr, Key, LiteralKind, StrPart, UnaryOp};
 use crate::check::FileId;
@@ -171,7 +174,7 @@ impl<'c> Eval<'c> {
         };
         let source = self.expr(cx, source)?;
         let mut items = Vec::new();
-        for element in self.elements(&source) {
+        for element in elements(&source) {
             let inner = cx.with_env(bind_element(&cx.env, binds, element));
             if let Some(guard) = comp.guard()
                 && !self.truth(&inner, guard)?
@@ -465,7 +468,7 @@ impl<'c> Eval<'c> {
             Type::Map(k, _) => self.c.types.as_sum(*k),
             _ => None,
         };
-        let mut entries: Vec<(Val, Val)> = Vec::new();
+        let mut entries: BTreeMap<MapKey, Val> = BTreeMap::new();
         for entry in map.entries() {
             let (Some(key), Some(value)) = (entry.key(), entry.value()) else {
                 continue;
@@ -473,19 +476,24 @@ impl<'c> Eval<'c> {
             let text = self.key_text(cx, key)?;
             let key = self.map_key(key_sum, text, cx.at(key.span()))?;
             let value = self.expr(cx, value)?;
-            if entries.iter().any(|(k, _)| k.equals(&key)) {
-                return Err(self.fail(
-                    at,
-                    "E0605",
-                    format!(
-                        "the key `{}` is given more than once",
-                        key.text(&self.c.types)
-                    ),
-                ));
+            self.step(at)?;
+            match entries.entry(MapKey(key)) {
+                Entry::Vacant(slot) => {
+                    slot.insert(value);
+                }
+                Entry::Occupied(slot) => {
+                    return Err(self.fail(
+                        at,
+                        "E0605",
+                        format!(
+                            "the key `{}` is given more than once",
+                            slot.key().0.text(&self.c.types)
+                        ),
+                    ));
+                }
             }
-            entries.push((key, value));
         }
-        self.new_map(entries, at)
+        self.new_map(entries.into_iter().map(|(k, v)| (k.0, v)).collect(), at)
     }
 
     /// Returns the key of a map entry: the variant of that name for a map
@@ -526,8 +534,8 @@ impl<'c> Eval<'c> {
             return self.new_map(Vec::new(), at);
         };
         let source = self.expr(cx, source)?;
-        let mut entries: Vec<(Val, Val)> = Vec::new();
-        for element in self.elements(&source) {
+        let mut entries: BTreeMap<MapKey, Val> = BTreeMap::new();
+        for element in elements(&source) {
             let inner = cx.with_env(bind_element(&cx.env, binds, element));
             if let Some(guard) = comp.guard()
                 && !self.truth(&inner, guard)?
@@ -546,19 +554,24 @@ impl<'c> Eval<'c> {
                 }
             };
             let value = self.expr(&inner, value)?;
-            if entries.iter().any(|(k, _)| k.equals(&key)) {
-                return Err(self.fail(
-                    key_at,
-                    "E0605",
-                    format!(
-                        "the comprehension produces the key `{}` more than once",
-                        key.text(&self.c.types)
-                    ),
-                ));
+            self.step(key_at)?;
+            match entries.entry(MapKey(key)) {
+                Entry::Vacant(slot) => {
+                    slot.insert(value);
+                }
+                Entry::Occupied(slot) => {
+                    return Err(self.fail(
+                        key_at,
+                        "E0605",
+                        format!(
+                            "the comprehension produces the key `{}` more than once",
+                            slot.key().0.text(&self.c.types)
+                        ),
+                    ));
+                }
             }
-            entries.push((key, value));
         }
-        self.new_map(entries, at)
+        self.new_map(entries.into_iter().map(|(k, v)| (k.0, v)).collect(), at)
     }
 
     fn binary(&mut self, cx: &Cx<'_>, binary: ast::BinaryExpr<'c>, at: SourceSpan) -> R<Val> {
