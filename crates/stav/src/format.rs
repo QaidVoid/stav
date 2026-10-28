@@ -105,7 +105,7 @@ fn is_token(part: Part<'_>, kind: T) -> bool {
 fn any(node: SyntaxNode<'_>) -> Doc<'_> {
     match node.kind() {
         N::File => file(node),
-        N::Str | N::Interp => Doc::Text(node.text()),
+        N::Str => Doc::Text(node.text()),
         N::Struct => struct_decl(node),
         N::TypeDecl => type_decl(node),
         N::FnDecl => fn_decl(node),
@@ -227,9 +227,9 @@ fn spaced(parent: N, previous: Part<'_>, next: Part<'_>) -> bool {
     }
 }
 
-/// Returns whether `part` ends in a path or a symbol word with a version.
-/// Both may contain `.`, so a field access after them needs a space to keep
-/// the `.` out of the word.
+/// Returns whether `part` ends in a path or a symbol word. Either can absorb
+/// a `.` that follows it, so a field access after them needs a space to
+/// keep the `.` out of the word.
 fn ends_in_dotted_word(part: Part<'_>) -> bool {
     let last = match part {
         Part::Token(token) => Some(token),
