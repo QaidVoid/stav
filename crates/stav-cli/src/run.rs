@@ -53,13 +53,13 @@ pub(crate) struct EvalArgs {
     pub(crate) canonical: bool,
     /// Prints only the attribute at this path, written the way
     /// diagnostics print paths, for example `server.port` or
-    /// `sysctl."vm.swappiness"`. Keys other than ASCII letters, digits, `_`
+    /// `labels."app.tier"`. Keys other than ASCII letters, digits, `_`
     /// and `-` go in double quotes, with the escapes of a string literal.
     #[arg(long, value_name = "ATTR")]
     pub(crate) path: Option<AttrPath>,
     /// The number of evaluation steps after which evaluation stops.
-    #[arg(long, value_name = "STEPS")]
-    pub(crate) fuel: Option<u64>,
+    #[arg(long, value_name = "STEPS", default_value_t = Limits::default().steps)]
+    pub(crate) fuel: u64,
 }
 
 /// Type checks the program and reports its diagnostics.
@@ -90,10 +90,9 @@ pub(crate) fn eval(args: &EvalArgs, emitter: &Emitter) -> io::Result<Status> {
         return Ok(Status::Failure);
     };
     emitter.diagnostics(checked.warnings())?;
-    let defaults = Limits::default();
     let limits = Limits {
-        steps: args.fuel.unwrap_or(defaults.steps),
-        ..defaults
+        steps: args.fuel,
+        ..Limits::default()
     };
     let rendered = checked
         .eval(&limits)
