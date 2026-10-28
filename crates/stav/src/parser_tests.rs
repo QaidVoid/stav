@@ -3,6 +3,7 @@ use std::fmt::Write;
 use insta::assert_snapshot;
 use proptest::prelude::*;
 
+use crate::ast::FileKind;
 use crate::{MAX_DEPTH, SyntaxElement, SyntaxNode, TokenKind, parse};
 
 fn render(source: &str) -> String {
@@ -1769,6 +1770,25 @@ fn declarations_and_imports_belong_at_the_top_of_a_file() {
       help: move it to the top level of the file
     "
     );
+}
+
+#[test]
+fn file_kinds_restrict_their_items() {
+    let source = "import \"a\" as a\nstruct A {}\nlet x = 1\nport = 1\nservice s {}\n";
+    let parsed = parse(source);
+    assert!(parsed.diagnostics.is_empty());
+    let file = parsed.file();
+    assert!(file.validate(FileKind::Entry).is_empty());
+    assert_snapshot!(render_diagnostics(&file.validate(FileKind::Library)), @"
+    error[E0209] 38..42: a library cannot contain statements
+      help: move the statement into an entry file or a part file
+    error[E0209] 47..54: a library cannot contain statements
+      help: move the statement into an entry file or a part file
+    ");
+    assert_snapshot!(render_diagnostics(&file.validate(FileKind::Part)), @"
+    error[E0208] 16..22: a part file cannot contain a `struct` declaration
+      help: move the declaration into a library and import it
+    ");
 }
 
 #[test]

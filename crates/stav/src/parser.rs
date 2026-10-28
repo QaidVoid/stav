@@ -36,6 +36,7 @@
 mod expressions;
 mod items;
 
+use crate::ast::SourceFile;
 use crate::diagnostic::Diagnostic;
 use crate::lexer::lex;
 use crate::span::Span;
@@ -58,24 +59,36 @@ pub struct Parsed {
     pub diagnostics: Vec<Diagnostic>,
 }
 
+impl Parsed {
+    /// Returns the typed view of the root of the tree.
+    pub fn file(&self) -> SourceFile<'_> {
+        SourceFile::from_root(self.tree.root())
+    }
+}
+
 /// Parses `source` into a lossless syntax tree.
 ///
 /// Parsing never fails and never panics. Every byte of the source ends up in
 /// the tree, and every lexical and syntax error comes back as a diagnostic.
-/// The grammar accepts everything that any kind of file may contain.
+/// The grammar accepts everything that any kind of file may contain. Use
+/// [`SourceFile::validate`] to check the items allowed in a particular kind
+/// of file.
 ///
 /// # Examples
 ///
 /// ```
-/// use stav::NodeKind;
+/// use stav::ast::{Item, Stmt};
 ///
 /// let source = "port = 8080\nservice web { exec = [\"/bin/web\"] }\n";
 /// let parsed = stav::parse(source);
 /// assert!(parsed.diagnostics.is_empty());
 /// assert_eq!(parsed.tree.root().text(), source);
 ///
-/// let kinds: Vec<NodeKind> = parsed.tree.root().children().map(|n| n.kind()).collect();
-/// assert_eq!(kinds, [NodeKind::Attr, NodeKind::Block]);
+/// let items: Vec<Item> = parsed.file().items().collect();
+/// let Item::Stmt(Stmt::Block(block)) = items[1] else {
+///     panic!("expected a block");
+/// };
+/// assert_eq!(block.kind().map(|t| t.text()), Some("service"));
 /// ```
 pub fn parse(source: &str) -> Parsed {
     let lexed = lex(source);
