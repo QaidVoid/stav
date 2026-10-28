@@ -1,0 +1,3 @@
+struct Root { a: Int = 0 }
+#- prelude base.stav
+let conf = ./x.conf

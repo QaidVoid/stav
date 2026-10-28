@@ -1,0 +1,10 @@
+---
+source: crates/stav/tests/check.rs
+expression: "rendered.join(\"\")"
+---
+error[E0705]: `app/lib.stav` is not a regular file
+  --> app/main.stav:1:8
+error[E0706]: `app/lib.stav` is larger than 4 MiB
+  --> app/main.stav:1:8
+error[E0701]: cannot read `app/lib.stav`: permission denied
+  --> app/main.stav:1:8

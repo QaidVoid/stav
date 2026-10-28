@@ -91,9 +91,12 @@ impl RelPath {
         Self::from_parts(parts)
     }
 
+    /// Returns the path with the components `parts`, or `None` when there
+    /// are none or one is empty, `.`, `..` or contains a `/`.
     pub(crate) fn from_parts<'a>(parts: impl IntoIterator<Item = &'a str>) -> Option<Self> {
-        let text = parts.into_iter().collect::<Vec<_>>().join("/");
-        (!text.is_empty()).then_some(Self(text))
+        let parts: Vec<&str> = parts.into_iter().collect();
+        let valid = |part: &&str| !matches!(*part, "" | "." | "..") && !part.contains('/');
+        (!parts.is_empty() && parts.iter().all(valid)).then(|| Self(parts.join("/")))
     }
 
     /// Returns the path as text, with `/` between components.

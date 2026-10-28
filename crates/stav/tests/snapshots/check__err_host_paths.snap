@@ -1,0 +1,7 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0702]: the path `./x.conf` in `base.stav` has no import root
+  --> base.stav:1:12

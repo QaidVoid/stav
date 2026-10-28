@@ -125,10 +125,24 @@ pub(crate) fn load(host: &Host, spec: &RootSpec) -> (Program, Vec<FileDiagnostic
         .filter_map(|i| loader.open(Origin::Host(i), Role::Part, None))
         .collect();
     let mut entries = Vec::new();
+    let mut listed = BTreeMap::new();
     for entry in &spec.entries {
         match locate(&spec.import_roots, entry) {
             Some((root, rel)) => {
                 let origin = Origin::Path { root, rel };
+                if let Some(first) = listed.insert(origin.clone(), entry) {
+                    loader.diagnostics.push(FileDiagnostic {
+                        file: None,
+                        diagnostic: Diagnostic::error(
+                            "E0708",
+                            Span { start: 0, end: 0 },
+                            format!("entry file `{}` is listed more than once", entry.display()),
+                        )
+                        .with_note(format!("it is the same file as `{}`", first.display()))
+                        .with_help("list every entry file once"),
+                    });
+                    continue;
+                }
                 entries.extend(loader.open_root_file(
                     origin,
                     Role::Entry,
@@ -164,7 +178,9 @@ pub(crate) fn load(host: &Host, spec: &RootSpec) -> (Program, Vec<FileDiagnostic
 }
 
 /// Returns the import root that contains `path`, the innermost one when
-/// several do, and the path relative to it.
+/// several do, and the path relative to it. A root that `path` only
+/// reaches by leaving it, such as `.` for `../main.stav`, does not contain
+/// it.
 fn locate(roots: &[ImportRoot], path: &Path) -> Option<(usize, RelPath)> {
     let path = normalize(path)?;
     roots
@@ -559,7 +575,7 @@ fn too_large(name: &str) -> Diagnostic {
     Diagnostic::error(
         "E0706",
         Span { start: 0, end: 0 },
-        format!("`{name}` is larger than 4 MiB"),
+        format!("`{name}` is larger than {} MiB", MAX_SOURCE_LEN >> 20),
     )
 }
 

@@ -238,6 +238,46 @@ fn loader_errors_have_their_own_codes() {
 }
 
 #[test]
+fn loader_errors_render_their_file_and_reason() {
+    let cases = [
+        stav::LoadError::NotAFile,
+        stav::LoadError::TooLarge,
+        stav::LoadError::Other("permission denied".to_owned()),
+    ];
+    let rendered: Vec<String> = cases
+        .into_iter()
+        .map(
+            |error| match check(&Host::new(Failing(error)), &app_root()) {
+                Ok(_) => "the program checks\n".to_owned(),
+                Err(diagnostics) => diagnostics.to_string(),
+            },
+        )
+        .collect();
+    insta::assert_snapshot!("loader_errors", rendered.join(""));
+}
+
+#[test]
+fn entries_outside_their_import_root_are_refused() {
+    let loader = MemoryLoader::new().with_file("./../main.stav", "struct Root { a: Int = 1 }\n");
+    let root = RootSpec {
+        root_struct: "Root".to_owned(),
+        entries: vec!["../main.stav".into()],
+        import_roots: vec![ImportRoot::new(".")],
+    };
+    assert_eq!(codes(&Host::new(loader), &root), vec!["E0702"]);
+}
+
+#[test]
+fn entries_listed_twice_are_refused() {
+    let loader = MemoryLoader::new().with_file("app/main.stav", "struct Root { a: Int = 1 }\n");
+    let root = RootSpec {
+        entries: vec!["app/main.stav".into(), "app/./main.stav".into()],
+        ..app_root()
+    };
+    assert_eq!(codes(&Host::new(loader), &root), vec!["E0708"]);
+}
+
+#[test]
 fn sources_larger_than_four_mebibytes_are_refused() {
     let big = format!(
         "struct Root {{ a: Int = 1 }}\n{}",
