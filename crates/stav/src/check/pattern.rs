@@ -39,6 +39,10 @@ enum Ctor {
     Variant(usize),
     Int(i64),
     Str(String),
+    /// A literal pattern in error, by node index. It matches nothing that
+    /// another pattern matches, so an error neither covers the arms after
+    /// it nor makes the `match` exhaustive.
+    Invalid(usize),
 }
 
 /// A pattern reduced to what exhaustiveness needs.
@@ -72,6 +76,10 @@ struct Arm {
 }
 
 impl<'p> Checker<'p> {
+    /// Checks a `match` expression: the scrutinee, the patterns and guards
+    /// of its arms against the scrutinee type, the arm values against the
+    /// expected type or the type of the first arm, and that the arms are
+    /// exhaustive and reachable.
     pub(super) fn match_expr(
         &mut self,
         cx: &mut Cx,
@@ -199,14 +207,16 @@ impl<'p> Checker<'p> {
                     return Pat::Wild;
                 };
                 let span = literal.syntax().span();
+                let invalid = Pat::Ctor(Ctor::Invalid(node), Vec::new());
                 let (ctor, lit_ty) = match literal_ctor(expr) {
                     Some(found) => found,
                     None => {
-                        self.error(
-                            cx.file,
-                            Diagnostic::error("E0401", span, "a string pattern cannot interpolate"),
-                        );
-                        return Pat::Wild;
+                        let message = match expr {
+                            Expr::Str(_) => "a string pattern cannot interpolate".to_owned(),
+                            _ => format!("`{}` cannot be a pattern", expr.syntax().text()),
+                        };
+                        self.error(cx.file, Diagnostic::error("E0401", span, message));
+                        return invalid;
                     }
                 };
                 if ctor == Ctor::None {
@@ -225,7 +235,7 @@ impl<'p> Checker<'p> {
                 }
                 if !self.types.fits(lit_ty, inner) {
                     self.mismatch(cx.file, span, inner, lit_ty);
-                    return Pat::Wild;
+                    return invalid;
                 }
                 some(Pat::Ctor(ctor, Vec::new()))
             }
@@ -566,41 +576,37 @@ impl<'p> Checker<'p> {
         }
         let mut missing = Vec::new();
         let complete = search.missing(&mut matrix, ty, &mut missing);
-        let complete = match complete {
-            Some(complete) => complete,
-            None => {
-                self.error(
-                    cx.file,
-                    Diagnostic::error(
-                        "E0434",
-                        span,
-                        "cannot prove that this `match` is exhaustive",
-                    )
-                    .with_help("add a `_ => ...` arm"),
-                );
-                return;
-            }
-        };
-        if !complete {
-            let ty_name = self.types.render_plain(ty);
-            let mut diagnostic = Diagnostic::error(
-                "E0434",
-                span,
-                format!("non-exhaustive `match` on `{ty_name}`"),
-            )
-            .with_help("add the missing arms or a `_ => ...` arm");
-            if !missing.is_empty() {
-                diagnostic = diagnostic.with_note(format!("missing: {}", missing.join(", ")));
-            }
-            self.error(cx.file, diagnostic);
-            return;
-        }
         for span in unreachable {
             self.report(
                 Some(cx.file),
                 Diagnostic::warning("W0434", span, "this arm can never match")
                     .with_help("remove it, or move it before the arms that cover it"),
             );
+        }
+        match complete {
+            Some(true) => {}
+            Some(false) => {
+                let ty_name = self.types.render_plain(ty);
+                let mut diagnostic = Diagnostic::error(
+                    "E0434",
+                    span,
+                    format!("non-exhaustive `match` on `{ty_name}`"),
+                )
+                .with_help("add the missing arms or a `_ => ...` arm");
+                if !missing.is_empty() {
+                    diagnostic = diagnostic.with_note(format!("missing: {}", missing.join(", ")));
+                }
+                self.error(cx.file, diagnostic);
+            }
+            None => self.error(
+                cx.file,
+                Diagnostic::error(
+                    "E0434",
+                    span,
+                    "this `match` is too complex to check for exhaustiveness",
+                )
+                .with_help("split it into several `match` expressions, or use fewer alternatives"),
+            ),
         }
     }
 }
@@ -929,6 +935,7 @@ impl<'a> Search<'_, '_> {
             },
             Ctor::Int(i) => format!("`{i}`"),
             Ctor::Str(s) => format!("`{s:?}`"),
+            Ctor::Invalid(_) => "`_`".to_owned(),
         }
     }
 }

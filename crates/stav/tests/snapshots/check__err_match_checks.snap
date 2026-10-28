@@ -1,0 +1,18 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0432]: the variant `on` has no payload fields
+  --> app/main.stav:6:3
+  help: write `on` without parentheses
+error[E0434]: non-exhaustive `match` on `Mode`
+  --> app/main.stav:10:46
+  note: missing: `off(..)`
+  help: add the missing arms or a `_ => ...` arm
+warning[W0434]: this arm can never match
+  --> app/main.stav:12:3
+  help: remove it, or move it before the arms that cover it
+error[E0434]: this `match` is too complex to check for exhaustiveness
+  --> app/main.stav:15:34
+  help: split it into several `match` expressions, or use fewer alternatives

@@ -1,0 +1,15 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0401]: a string pattern cannot interpolate
+  --> app/main.stav:4:3
+error[E0401]: expected `Int`, found `Str`
+  --> app/main.stav:10:3
+error[E0434]: non-exhaustive `match` on `Str`
+  --> app/main.stav:15:43
+  note: missing: `_`
+  help: add the missing arms or a `_ => ...` arm
+error[E0401]: a string pattern cannot interpolate
+  --> app/main.stav:16:3

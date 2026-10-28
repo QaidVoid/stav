@@ -1,0 +1,17 @@
+struct Root { a: Int = 0 }
+
+fn interpolated(s: Str, t: Str) -> Int = match s {
+  "#{t}" => 1
+  "x" => 2
+  _ => 0
+}
+
+fn mismatched(x: Int) -> Int = match x {
+  "one" => 1
+  2 => 2
+  _ => 0
+}
+
+fn still_missing(s: Str, t: Str) -> Int = match s {
+  "#{t}" => 1
+}
