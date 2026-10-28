@@ -1,0 +1,4 @@
+struct Point { x: Int = 0 }
+struct Root { a: Int = 0 }
+fn f() -> Int = (let r: Ref<Point> = "p" in 1)
+let g = fn(r: Ref<Point>) -> Int = 1

@@ -5,7 +5,7 @@ use std::rc::Rc;
 use super::expr::{Cx, map_get};
 use super::val::Val;
 use super::{Eval, R};
-use crate::check::builtins::Builtin;
+use crate::check::builtins::{Builtin, whole_match_regex};
 use crate::diagnostic::Diagnostic;
 use crate::span::SourceSpan;
 
@@ -439,11 +439,7 @@ impl<'c> Eval<'c> {
             return Ok(found.clone());
         }
         self.charge(u64::try_from(pattern.len()).unwrap_or(u64::MAX), at)?;
-        let compiled = regex::RegexBuilder::new(&format!("\\A(?:{pattern})\\z"))
-            .size_limit(1 << 20)
-            .build()
-            .ok()
-            .map(Rc::new);
+        let compiled = whole_match_regex(pattern).ok().map(Rc::new);
         self.regexes.insert(pattern.to_owned(), compiled.clone());
         Ok(compiled)
     }

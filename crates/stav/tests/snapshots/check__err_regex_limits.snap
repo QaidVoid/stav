@@ -1,0 +1,9 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0415]: invalid regular expression: its compiled form is larger than 1 MiB
+  --> app/main.stav:2:26
+error[E0415]: invalid regular expression: its compiled form is larger than 1 MiB
+  --> app/main.stav:3:24

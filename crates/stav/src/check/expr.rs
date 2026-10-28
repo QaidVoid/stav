@@ -1717,9 +1717,7 @@ impl<'p> Checker<'p> {
             }
         }
         for binding in &bindings {
-            let annotation = binding
-                .ty()
-                .map(|t| self.resolve_type(cx.file, t, cx.owner));
+            let annotation = binding.ty().map(|t| self.resolve_local_type(cx, t));
             let ty = match (binding.value(), annotation) {
                 (Some(v), Some(a)) => {
                     self.expr(cx, v, Some(a));
@@ -1751,6 +1749,7 @@ impl<'p> Checker<'p> {
             Some(list) => self.resolve_params(cx.file, list, cx.owner),
             None => Vec::new(),
         };
+        self.local_types_resolved();
         for param in &params {
             if param.default.is_some() {
                 self.error(
@@ -1773,7 +1772,7 @@ impl<'p> Checker<'p> {
         });
         let ret = lambda
             .return_type()
-            .map(|t| self.resolve_type(cx.file, t, cx.owner))
+            .map(|t| self.resolve_local_type(cx, t))
             .or(expected_ret);
         let saved = std::mem::replace(&mut cx.self_mode, SelfMode::Forbidden("a lambda"));
         let mark = cx.scope.len();
@@ -1794,6 +1793,22 @@ impl<'p> Checker<'p> {
             .types
             .intern(Type::Fn(params.iter().map(|p| p.ty).collect(), ret));
         (ty, Meaning::Binds(binds))
+    }
+
+    /// Returns the type `ty` written inside a body or an expression
+    /// denotes, with the function predicates of its refinements resolved
+    /// and its references checked.
+    pub(super) fn resolve_local_type(&mut self, cx: &Cx, ty: ast::Type<'p>) -> TypeId {
+        let resolved = self.resolve_type(cx.file, ty, cx.owner);
+        self.local_types_resolved();
+        resolved
+    }
+
+    /// Resolves the function predicates and checks the references of the
+    /// types resolved inside a body, which declarations did not cover.
+    fn local_types_resolved(&mut self) {
+        self.check_pending_predicates();
+        self.check_ref_uses();
     }
 
     fn part_expr(

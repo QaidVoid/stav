@@ -1,0 +1,11 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0414]: `Ref<Point>` has no target map
+  --> app/main.stav:3:25
+  help: declare exactly one field `Map<Str, Point>` with a `block` clause reachable from the root struct
+error[E0414]: `Ref<Point>` has no target map
+  --> app/main.stav:4:15
+  help: declare exactly one field `Map<Str, Point>` with a `block` clause reachable from the root struct

@@ -1,0 +1,9 @@
+fn positive(n: Int) -> Bool = n > 0
+fn above(n: Int, limit: Int) -> Bool = n > limit
+fn local(n: Int) -> Int = (let m: Int where positiv = n in m)
+fn arguments(n: Int) -> Int = (let m: Int where above("one") = n in m)
+fn lambda(n: Int) -> Int = (fn(x: Int) -> Int where postive = x)(n)
+fn loops(n: Int) -> Bool = (let m: Int where loops = n in true)
+struct Root { a: Int = 0 }
+let b: Int where positve = 1
+a = (let c: Int where above(1, 2) = 1 in c)

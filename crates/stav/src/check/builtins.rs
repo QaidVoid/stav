@@ -10,6 +10,35 @@ use crate::ast::{self, Expr};
 use crate::diagnostic::Diagnostic;
 use crate::span::Span;
 
+/// The most memory the compiled form of a regular expression may take,
+/// in bytes.
+const REGEX_SIZE_LIMIT: usize = 1 << 20;
+
+/// Compiles `pattern` into a regular expression that matches whole
+/// strings. The checker validates literal patterns and the evaluator
+/// compiles every pattern with this one function, so both accept the same
+/// patterns.
+///
+/// # Errors
+///
+/// Returns what is wrong with the pattern: its syntax, or a compiled form
+/// larger than 1 MiB.
+pub(crate) fn whole_match_regex(pattern: &str) -> Result<regex::Regex, String> {
+    match regex_syntax::Parser::new().parse(pattern) {
+        Ok(_) => {}
+        Err(regex_syntax::Error::Parse(e)) => return Err(e.kind().to_string()),
+        Err(regex_syntax::Error::Translate(e)) => return Err(e.kind().to_string()),
+        Err(e) => return Err(e.to_string()),
+    }
+    regex::RegexBuilder::new(&format!("\\A(?:{pattern})\\z"))
+        .size_limit(REGEX_SIZE_LIMIT)
+        .build()
+        .map_err(|e| match e {
+            regex::Error::CompiledTooBig(_) => "its compiled form is larger than 1 MiB".to_owned(),
+            e => e.to_string(),
+        })
+}
+
 /// A built-in function.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum Builtin {

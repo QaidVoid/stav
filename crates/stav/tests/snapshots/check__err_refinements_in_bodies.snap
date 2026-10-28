@@ -1,0 +1,23 @@
+---
+source: crates/stav/tests/check.rs
+expression: output
+---
+--- errors
+error[E0302]: unknown predicate `positiv`
+  --> app/main.stav:3:45
+  help: did you mean `positive`?
+error[E0401]: expected `Int`, found `Str`
+  --> app/main.stav:4:55
+error[E0302]: unknown predicate `postive`
+  --> app/main.stav:5:53
+  help: did you mean `positive`?
+error[E0610]: `loops` calls itself
+  --> app/main.stav:6:46
+  note: cycle: `loops` -> `loops`
+  note: evaluation must terminate, so functions cannot recurse
+  help: iterate with `fold` over `range(...)`, for example `fold(range(1, n + 1), 1, fn(acc: Int, i: Int) = acc * i)`
+error[E0302]: unknown predicate `positve`
+  --> app/main.stav:8:18
+  help: did you mean `positive`?
+error[E0401]: the predicate `above` must be a function of type `Fn(Int, ..., ...) -> Bool`
+  --> app/main.stav:9:23

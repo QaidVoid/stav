@@ -1,0 +1,4 @@
+struct Root { n: Int = 0 }
+fn positive(n: Int) -> Bool = n > 0
+fn negate(n: Int) -> Int = (let m: Int where positive = 0 - n in m)
+n = negate(1)

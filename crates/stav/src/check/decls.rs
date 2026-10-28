@@ -93,15 +93,28 @@ pub(crate) enum LetState {
     Done { ty: TypeId, reads: Vec<SelfRead> },
 }
 
-/// A predicate that calls a function, checked once every signature is
+/// A predicate that calls a function, resolved once every signature is
 /// known.
 pub(crate) struct PendingPredicate<'p> {
+    /// The file the refinement is written in.
     pub(crate) file: FileId,
+    /// The refinement the predicate belongs to.
     pub(crate) refinement: RefinementId,
-    pub(crate) index: usize,
+    /// The type the refinement restricts.
     pub(crate) base: TypeId,
     pub(crate) node: ast::NamedPredicate<'p>,
+    /// The declaration that depends on the predicate function.
     pub(crate) owner: Option<Node>,
+}
+
+/// The arguments of a predicate call after the refined value, with the
+/// parameter types they are checked against. They are checked once every
+/// top-level `let` is, so that checking them never recurses through a
+/// chain of `let` values.
+pub(crate) struct PredicateArgs<'p> {
+    pub(crate) file: FileId,
+    pub(crate) owner: Option<Node>,
+    pub(crate) args: Vec<(Expr<'p>, TypeId)>,
 }
 
 /// Returns the doc comment directly before `node`, without the `##`
@@ -377,8 +390,6 @@ impl<'p> Checker<'p> {
     /// top-level `let`.
     pub(super) fn resolve_declarations(&mut self) {
         let program = self.program;
-        let mut struct_index = 0;
-        let mut sum_index = 0;
         for (i, file) in program.files.iter().enumerate() {
             let id = FileId::new(i);
             if file.role == Role::Part {
@@ -396,7 +407,6 @@ impl<'p> Checker<'p> {
                         if self.types.structure(sid).span != name.span() {
                             continue;
                         }
-                        struct_index += 1;
                         self.resolve_struct(id, sid, decl);
                     }
                     Item::Type(decl) => {
@@ -407,7 +417,6 @@ impl<'p> Checker<'p> {
                         if self.types.sum(sid).span != name.span() {
                             continue;
                         }
-                        sum_index += 1;
                         self.resolve_sum(id, sid, decl);
                     }
                     Item::Fn(decl) => {
@@ -442,8 +451,6 @@ impl<'p> Checker<'p> {
                 }
             }
         }
-        debug_assert!(struct_index <= self.types.structs.len());
-        debug_assert!(sum_index <= self.types.sums.len());
         self.check_pending_predicates();
     }
 
@@ -620,8 +627,8 @@ impl<'p> Checker<'p> {
                     predicates: Vec::new(),
                 });
                 let mut predicates = Vec::new();
-                for (index, predicate) in refined.predicates().enumerate() {
-                    if let Some(p) = self.predicate(file, base, predicate, id, index, owner) {
+                for predicate in refined.predicates() {
+                    if let Some(p) = self.predicate(file, base, predicate, id, owner) {
                         predicates.push(p);
                     }
                 }
@@ -864,7 +871,6 @@ impl<'p> Checker<'p> {
         base: TypeId,
         predicate: ast::Predicate<'p>,
         refinement: RefinementId,
-        index: usize,
         owner: Option<Node>,
     ) -> Option<Predicate> {
         let span = predicate.syntax().span();
@@ -969,7 +975,6 @@ impl<'p> Checker<'p> {
                         self.pending_predicates.push(PendingPredicate {
                             file,
                             refinement,
-                            index,
                             base,
                             node: named,
                             owner,
@@ -984,11 +989,8 @@ impl<'p> Checker<'p> {
     /// Reports an invalid regular expression and returns whether it is
     /// valid.
     pub(super) fn check_regex(&mut self, file: FileId, pattern: &str, span: Span) -> bool {
-        let error = match regex_syntax::Parser::new().parse(pattern) {
-            Ok(_) => return true,
-            Err(regex_syntax::Error::Parse(e)) => e.kind().to_string(),
-            Err(regex_syntax::Error::Translate(e)) => e.kind().to_string(),
-            Err(e) => e.to_string(),
+        let Err(error) = super::builtins::whole_match_regex(pattern) else {
+            return true;
         };
         self.error(
             file,
@@ -1054,9 +1056,10 @@ impl<'p> Checker<'p> {
         }
     }
 
-    /// Checks the predicates that call functions, now that every signature
-    /// is known.
-    fn check_pending_predicates(&mut self) {
+    /// Resolves the predicates that call functions, once every signature
+    /// is known. A type resolved inside a body calls it right after, so
+    /// that the predicates of its refinements are resolved too.
+    pub(super) fn check_pending_predicates(&mut self) {
         let pending = std::mem::take(&mut self.pending_predicates);
         for p in pending {
             if let Some(predicate) = self.function_predicate(&p) {
@@ -1138,8 +1141,7 @@ impl<'p> Checker<'p> {
         if let Some(owner) = p.owner {
             self.calls.depend(owner, Node::Global(g), file, span);
         }
-        let unit = self.file_unit(file);
-        let mut cx = Cx::new(unit, file, SelfMode::Forbidden("a refinement"), p.owner);
+        let mut checked = Vec::new();
         let mut nodes = Vec::new();
         for (arg, param) in args.iter().zip(sig.params.iter().skip(1)) {
             if arg.name().is_some() {
@@ -1153,15 +1155,35 @@ impl<'p> Checker<'p> {
                 );
             }
             if let Some(value) = arg.value() {
-                self.expr(&mut cx, value, Some(param.ty));
+                checked.push((value, param.ty));
                 nodes.push(value.syntax().index());
             }
         }
-        let _ = p.index;
+        self.predicate_args.push(PredicateArgs {
+            file,
+            owner: p.owner,
+            args: checked,
+        });
         Some(Predicate::Call {
             function: g,
             args: nodes,
         })
+    }
+
+    /// Checks the queued arguments of predicate calls.
+    pub(super) fn check_predicate_args(&mut self) {
+        for queued in std::mem::take(&mut self.predicate_args) {
+            let unit = self.file_unit(queued.file);
+            let mut cx = Cx::new(
+                unit,
+                queued.file,
+                SelfMode::Forbidden("a refinement"),
+                queued.owner,
+            );
+            for (value, ty) in queued.args {
+                self.expr(&mut cx, value, Some(ty));
+            }
+        }
     }
 
     /// Looks a value name up in a file and then in the prelude.
@@ -1384,8 +1406,19 @@ impl<'p> Checker<'p> {
                 }
             }
         }
-        let uses = std::mem::take(&mut self.ref_uses);
-        for (file, span, target) in uses {
+        self.target_maps = Some(targets);
+        self.check_ref_uses();
+    }
+
+    /// Checks that every `Ref<T>` resolved so far has exactly one target
+    /// map, once the target maps are known. A type resolved inside a body
+    /// calls it right after.
+    pub(super) fn check_ref_uses(&mut self) {
+        let Some(targets) = &self.target_maps else {
+            return;
+        };
+        let mut errors = Vec::new();
+        for (file, span, target) in std::mem::take(&mut self.ref_uses) {
             match targets.get(&target).map(Vec::as_slice) {
                 Some([path]) => {
                     self.ref_targets.insert(target, path.clone());
@@ -1400,12 +1433,15 @@ impl<'p> Checker<'p> {
                     let help = format!(
                         "declare exactly one field `Map<Str, {name}>` with a `block` clause reachable from the root struct"
                     );
-                    self.error(
+                    errors.push((
                         file,
                         Diagnostic::error("E0414", span, message).with_help(help),
-                    );
+                    ));
                 }
             }
+        }
+        for (file, diagnostic) in errors {
+            self.error(file, diagnostic);
         }
     }
 

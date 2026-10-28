@@ -186,7 +186,7 @@ impl<'p> Checker<'p> {
     }
 
     fn let_statement(&mut self, cx: &mut Cx, l: ast::Let<'p>) {
-        let annotation = l.ty().map(|t| self.resolve_type(cx.file, t, cx.owner));
+        let annotation = l.ty().map(|t| self.resolve_local_type(cx, t));
         let saved = std::mem::take(&mut cx.reads);
         let ty = match (l.value(), annotation) {
             (Some(v), Some(a)) => {

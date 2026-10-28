@@ -1,0 +1,5 @@
+struct Root {
+  a: Bool = matches("x", r"\w{100}")
+  b: Str where matches(r"\w{100}") = "x"
+  c: Bool = matches("x", r"\w{2}")
+}

@@ -400,6 +400,27 @@ fn long_import_chains_check_without_overflowing_the_stack() {
 }
 
 #[test]
+fn long_chains_through_predicate_arguments_check_without_overflowing_the_stack() {
+    let mut loader = MemoryLoader::new().with_file(
+        "app/main.stav",
+        "import \"./m0.stav\" as m\nstruct Root { a: Int = m.x }\n",
+    );
+    for i in 0..CHAIN {
+        let text = if i + 1 < CHAIN {
+            format!(
+                "import \"./m{}.stav\" as n\nfn above(a: Int, b: Int) -> Bool = a > b\n\
+                 let x: Int where above(n.x) = n.x\n",
+                i + 1
+            )
+        } else {
+            "let x = \"x\"\n".to_owned()
+        };
+        loader = loader.with_file(format!("app/m{i}.stav"), text);
+    }
+    assert!(codes_on_small_stack(loader).contains(&"E0401"));
+}
+
+#[test]
 fn long_let_chains_check_without_overflowing_the_stack() {
     let mut source = format!("struct Root {{ a: Int = v00001 }}\nlet v{CHAIN:05} = \"x\"\n");
     for i in (1..CHAIN).rev() {
