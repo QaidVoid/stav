@@ -42,7 +42,8 @@ enum Command {
         #[arg(long)]
         check: bool,
         /// The files to format. A directory stands for every `.stav` file
-        /// below it, and `-` for standard input.
+        /// below it, skipping entries whose names start with a dot and
+        /// symbolic links, and `-` for standard input.
         #[arg(required = true, value_name = "PATH")]
         paths: Vec<PathBuf>,
     },

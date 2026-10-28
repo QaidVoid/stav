@@ -14,9 +14,9 @@ const STDIN_NAME: &str = "<stdin>";
 /// Formats every file in `paths`, or with `check` lists the files whose
 /// layout would change on standard output and changes nothing.
 ///
-/// A directory stands for every `.stav` file below it, in path order. The
-/// path `-` reads standard input and, unless `check` is set, writes the
-/// formatted text to standard output.
+/// A directory stands for every `.stav` file below it, each directory in
+/// the order of its entry names. The path `-` reads standard input and,
+/// unless `check` is set, writes the formatted text to standard output.
 ///
 /// # Errors
 ///
@@ -38,7 +38,11 @@ pub(crate) fn run(paths: &[PathBuf], check: bool, emitter: &Emitter) -> io::Resu
 }
 
 /// Adds `path` to `files`, or every `.stav` file below it when it is a
-/// directory. Symbolic links inside a directory are not followed.
+/// directory.
+///
+/// `path` itself is followed when it is a symbolic link. Inside a
+/// directory, symbolic links and entries whose names start with a dot are
+/// skipped.
 fn collect(path: &Path, files: &mut Vec<PathBuf>) -> io::Result<()> {
     if !fs::metadata(path)
         .map_err(|e| read_error(path, &e))?
@@ -52,6 +56,9 @@ fn collect(path: &Path, files: &mut Vec<PathBuf>) -> io::Result<()> {
         .map_err(|e| read_error(path, &e))?;
     entries.sort_by_key(fs::DirEntry::path);
     for entry in entries {
+        if entry.file_name().as_encoded_bytes().starts_with(b".") {
+            continue;
+        }
         let path = entry.path();
         let kind = entry.file_type().map_err(|e| read_error(&path, &e))?;
         if kind.is_dir() {

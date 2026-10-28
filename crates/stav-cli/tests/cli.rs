@@ -591,3 +591,29 @@ fn missing_root_dir_is_reported_as_the_root_dir() {
     error: `app.stav` is not a directory
     ");
 }
+
+#[test]
+fn fmt_skips_hidden_entries_unless_named() {
+    let dir = fixture(
+        "fmt_skips_hidden_entries_unless_named",
+        &[
+            ("a.stav", "a=1\n"),
+            (".hidden.stav", "a=1\n"),
+            (".git/x.stav", "a=1\n"),
+            ("lib/.cache/y.stav", "a=1\n"),
+        ],
+    );
+    assert_snapshot!(stav(&dir, &["fmt", "--check", "."], ""), @r"
+    status: 1
+    --- stdout
+    ./a.stav
+    --- stderr
+    ");
+    assert_snapshot!(stav(&dir, &["fmt", "--check", ".hidden.stav", ".git"], ""), @r"
+    status: 1
+    --- stdout
+    .hidden.stav
+    .git/x.stav
+    --- stderr
+    ");
+}
