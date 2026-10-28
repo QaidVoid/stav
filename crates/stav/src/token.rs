@@ -61,8 +61,13 @@ pub enum TokenKind {
     /// for example a space, is a [`TokenKind::Colon`].
     SymWord,
     /// An integer such as `42`, `0x1f`, `0o755`, `0b1010` or `1_000`.
+    ///
+    /// A `_` may separate two digits. Anywhere else it makes the literal an
+    /// [`TokenKind::Error`] token.
     Int,
     /// A float such as `0.5`, `1.0e-3` or `2e10`.
+    ///
+    /// A `_` may separate two digits, as in an [`TokenKind::Int`].
     Float,
     /// A relative path such as `./fix.patch` or `../files/a.conf`.
     Path,

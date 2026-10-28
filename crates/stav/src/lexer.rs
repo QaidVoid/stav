@@ -424,7 +424,10 @@ impl<'a> Lexer<'a> {
         };
         let mut is_float = false;
         if radix != 10 {
-            if self.peek(2).is_some_and(|b| is_digit_in(b, radix)) {
+            if self
+                .peek(2)
+                .is_some_and(|b| b == b'_' || is_digit_in(b, radix))
+            {
                 self.pos += 2;
                 self.eat_while(|b| b == b'_' || is_digit_in(b, radix));
             } else {
@@ -465,14 +468,14 @@ impl<'a> Lexer<'a> {
             );
         }
         let text = self.slice(start, self.pos);
-        if text.ends_with('_') {
+        if !separators_between_digits(text, radix) {
             self.push(TokenKind::Error, start);
             return self.error(
                 "E0103",
                 start,
                 self.pos,
                 format!("`{text}` is not a valid token"),
-                Some("remove the trailing `_`".to_owned()),
+                Some("write `_` only between two digits".to_owned()),
             );
         }
         if is_float {
@@ -909,6 +912,16 @@ fn is_dec_or_underscore(b: u8) -> bool {
 
 fn is_digit_in(b: u8, radix: u32) -> bool {
     char::from(b).is_digit(radix)
+}
+
+/// Returns whether every `_` in a number literal has a digit on both sides.
+fn separators_between_digits(text: &str, radix: u32) -> bool {
+    let bytes = text.as_bytes();
+    let digit_at = |i: usize| bytes.get(i).is_some_and(|&b| is_digit_in(b, radix));
+    bytes
+        .iter()
+        .enumerate()
+        .all(|(i, &b)| b != b'_' || (i > 0 && digit_at(i - 1) && digit_at(i + 1)))
 }
 
 fn is_path_char(b: u8) -> bool {

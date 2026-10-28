@@ -283,10 +283,25 @@ fn number_glued_to_name_is_one_invalid_token() {
     error[E0103] 22..24: `1e` is not a valid token
       help: separate the number from the name, or start the name with a letter
     error[E0103] 25..27: `1_` is not a valid token
-      help: remove the trailing `_`
+      help: write `_` only between two digits
     error[E0103] 28..32: `0x_1` is not a valid token
-      help: separate the number from the name, or start the name with a letter
+      help: write `_` only between two digits
     "#);
+}
+
+#[test]
+fn digit_separators_must_sit_between_digits() {
+    for source in ["1_000", "0x1_f", "0b1_0", "1_0.2_5e1_0"] {
+        assert!(codes(source).is_empty(), "{source}");
+    }
+    for source in [
+        "1_", "1__0", "1_.5", "1_e5", "1e_5", "0x_1f", "0x1__f", "0x1f_",
+    ] {
+        let lexed = lex(source);
+        assert_eq!(codes(source), ["E0103"], "{source}");
+        assert_eq!(lexed.tokens[0].kind, TokenKind::Error, "{source}");
+        assert_eq!(lexed.tokens[0].text(source), source);
+    }
 }
 
 #[test]
