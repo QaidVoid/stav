@@ -45,3 +45,34 @@ fn long_chains_do_not_overflow_the_stack() {
     assert_eq!(found.len(), 1);
     assert_eq!(found[0].len(), n);
 }
+
+#[test]
+fn a_diamond_has_no_cycle_and_lists_its_bottom_first() {
+    let adj = vec![vec![1, 2], vec![3], vec![3], vec![]];
+    assert_eq!(cycles(&adj), Vec::<Vec<usize>>::new());
+    assert_eq!(components(&adj), vec![vec![3], vec![1], vec![2], vec![0]]);
+}
+
+#[test]
+fn duplicate_edges_change_nothing() {
+    let adj = vec![vec![1, 1], vec![0, 0, 2], vec![]];
+    assert_eq!(components(&adj), vec![vec![2], vec![0, 1]]);
+    assert_eq!(cycles(&adj), vec![vec![0, 1]]);
+}
+
+#[test]
+fn a_self_loop_inside_a_larger_component_is_not_the_cycle_reported() {
+    let adj = vec![vec![1], vec![1, 2], vec![0]];
+    assert_eq!(cycles(&adj), vec![vec![0, 1, 2]]);
+}
+
+#[test]
+fn many_small_cycles_are_found_in_linear_time() {
+    let pairs = 100_000;
+    let adj: Vec<Vec<usize>> = (0..2 * pairs).map(|i| vec![i ^ 1]).collect();
+    let start = std::time::Instant::now();
+    let found = cycles(&adj);
+    assert_eq!(found.len(), pairs);
+    assert_eq!(found[1], vec![2, 3]);
+    assert!(start.elapsed() < std::time::Duration::from_secs(5));
+}

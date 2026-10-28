@@ -80,6 +80,8 @@ pub(crate) fn cycles(adj: &[Vec<usize>]) -> Vec<Vec<usize>> {
 /// already computed by [`components`].
 pub(crate) fn cycles_of(adj: &[Vec<usize>], components: &[Vec<usize>]) -> Vec<Vec<usize>> {
     let mut out = Vec::new();
+    let mut parent = vec![usize::MAX; adj.len()];
+    let mut visited = Vec::new();
     for component in components {
         let start = component[0];
         if component.len() == 1 {
@@ -88,7 +90,6 @@ pub(crate) fn cycles_of(adj: &[Vec<usize>], components: &[Vec<usize>]) -> Vec<Ve
             }
             continue;
         }
-        let mut parent = vec![usize::MAX; adj.len()];
         let mut queue = std::collections::VecDeque::from([start]);
         let mut last = None;
         'search: while let Some(v) = queue.pop_front() {
@@ -99,18 +100,23 @@ pub(crate) fn cycles_of(adj: &[Vec<usize>], components: &[Vec<usize>]) -> Vec<Ve
                 }
                 if w < adj.len() && parent[w] == usize::MAX && component.binary_search(&w).is_ok() {
                     parent[w] = v;
+                    visited.push(w);
                     queue.push_back(w);
                 }
             }
         }
-        let Some(mut node) = last else { continue };
-        let mut cycle = vec![node];
-        while node != start {
-            node = parent[node];
-            cycle.push(node);
+        if let Some(mut node) = last {
+            let mut cycle = vec![node];
+            while node != start {
+                node = parent[node];
+                cycle.push(node);
+            }
+            cycle.reverse();
+            out.push(cycle);
         }
-        cycle.reverse();
-        out.push(cycle);
+        for w in visited.drain(..) {
+            parent[w] = usize::MAX;
+        }
     }
     out
 }
