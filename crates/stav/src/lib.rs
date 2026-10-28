@@ -64,4 +64,4 @@ pub use render::{Format, RenderError};
 pub use span::{SourceSpan, Span};
 pub use syntax::{NodeKind, SyntaxElement, SyntaxNode, SyntaxToken, SyntaxTree};
 pub use token::{Token, TokenKind};
-pub use value::{AttrPath, Value};
+pub use value::{AttrPath, AttrPathError, Value};

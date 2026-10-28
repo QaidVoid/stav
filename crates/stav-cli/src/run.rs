@@ -54,9 +54,11 @@ pub(crate) struct EvalArgs {
     /// Prints canonical JSON (RFC 8785) on one line instead.
     #[arg(long, conflicts_with = "output")]
     pub(crate) canonical: bool,
-    /// Prints only the attribute at this path, for example
-    /// `server.port` or `sysctl."vm.swappiness"`.
-    #[arg(long, value_name = "ATTR", value_parser = parse_path)]
+    /// Prints only the attribute at this path, written the way
+    /// diagnostics print paths, for example `server.port` or
+    /// `sysctl."vm.swappiness"`. Keys other than ASCII letters, digits, `_`
+    /// and `-` go in double quotes, with the escapes of a string literal.
+    #[arg(long, value_name = "ATTR")]
     pub(crate) path: Option<AttrPath>,
     /// The number of evaluation steps after which evaluation stops.
     #[arg(long, value_name = "STEPS")]
@@ -219,48 +221,3 @@ fn error(
         diagnostic: Diagnostic::error(code, span, message),
     }])
 }
-
-/// Parses an attribute path such as `server.port` or
-/// `sysctl."vm.swappiness"`.
-///
-/// Keys are separated by dots. A key in double quotes may contain any
-/// character, and a backslash in it takes the next character literally.
-///
-/// # Errors
-///
-/// Returns a message when the path is empty, has an empty key, or has an
-/// unterminated quoted key.
-pub(crate) fn parse_path(text: &str) -> Result<AttrPath, String> {
-    let mut keys = Vec::new();
-    let mut chars = text.chars().peekable();
-    loop {
-        let mut key = String::new();
-        if chars.next_if_eq(&'"').is_some() {
-            loop {
-                match chars.next() {
-                    Some('"') => break,
-                    Some('\\') => key.extend(chars.next()),
-                    Some(c) => key.push(c),
-                    None => return Err("unterminated quoted key".to_owned()),
-                }
-            }
-        } else {
-            while let Some(c) = chars.next_if(|&c| c != '.') {
-                key.push(c);
-            }
-            if key.is_empty() {
-                return Err("empty key".to_owned());
-            }
-        }
-        keys.push(key);
-        match chars.next() {
-            None => return Ok(AttrPath::new(keys)),
-            Some('.') => {}
-            Some(c) => return Err(format!("expected `.` after a quoted key, found `{c}`")),
-        }
-    }
-}
-
-#[cfg(test)]
-#[path = "run_tests.rs"]
-mod tests;

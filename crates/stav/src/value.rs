@@ -1,8 +1,11 @@
 //! The values Stav programs evaluate to.
 
 use std::fmt;
+use std::iter::Peekable;
 use std::path::PathBuf;
+use std::str::{Chars, FromStr};
 
+use crate::ast::unescape;
 use crate::render::{self, Format, RenderError};
 
 /// A value of a Stav program, as an evaluated program produces it.
@@ -232,9 +235,13 @@ fn describe(value: &Value, out: &mut String) {
 /// A path to an attribute of a value: struct field names, map keys and
 /// variant names, from the root down.
 ///
-/// The [`Display`](fmt::Display) form separates keys with dots and quotes
-/// keys that are not identifiers, the way attribute statements write them:
-/// `sysctl."vm.swappiness"`.
+/// The [`Display`](fmt::Display) form separates keys with dots and writes
+/// a key bare when it is not empty and consists of ASCII letters, digits,
+/// `_` and `-`. Any other key is written in double quotes with the escapes
+/// of a string literal: `\\`, `\"`, `\n`, `\t`, `\r`, `\0`, `\#` before
+/// `{`, and `\u{...}` for other control characters. For example the keys
+/// `sysctl` and `vm.swappiness` display as `sysctl."vm.swappiness"`.
+/// [`FromStr`] parses that form back into the same path.
 #[derive(Debug, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct AttrPath {
     keys: Vec<String>,
@@ -285,19 +292,148 @@ impl fmt::Display for AttrPath {
             if i > 0 {
                 f.write_str(".")?;
             }
-            let bare = !key.is_empty()
-                && key
-                    .chars()
-                    .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-');
-            if bare {
+            if !key.is_empty() && key.chars().all(is_bare) {
                 f.write_str(key)?;
-            } else {
-                write!(f, "{key:?}")?;
+                continue;
             }
+            f.write_str("\"")?;
+            let mut chars = key.chars().peekable();
+            while let Some(c) = chars.next() {
+                match c {
+                    '\\' => f.write_str("\\\\")?,
+                    '"' => f.write_str("\\\"")?,
+                    '\n' => f.write_str("\\n")?,
+                    '\t' => f.write_str("\\t")?,
+                    '\r' => f.write_str("\\r")?,
+                    '\0' => f.write_str("\\0")?,
+                    '#' if chars.peek() == Some(&'{') => f.write_str("\\#")?,
+                    c if c.is_control() => write!(f, "\\u{{{:x}}}", u32::from(c))?,
+                    c => write!(f, "{c}")?,
+                }
+            }
+            f.write_str("\"")?;
         }
         Ok(())
     }
 }
+
+/// Parses the [`Display`](fmt::Display) form of a path.
+///
+/// The empty string is the root path. Otherwise keys are separated by
+/// dots. A bare key consists of ASCII letters, digits, `_` and `-`. A key
+/// in double quotes may contain any character, including none, and takes
+/// the escapes of a string literal.
+///
+/// # Errors
+///
+/// Returns an [`AttrPathError`] when a bare key is empty, as in `a..b`,
+/// `.a` or `a.`, when a bare key has a character that needs quotes, when
+/// a quoted key is not terminated, has an unknown escape or an invalid
+/// `\u{...}` escape, or is followed by something other than `.`.
+///
+/// # Examples
+///
+/// ```
+/// use stav::AttrPath;
+///
+/// let path: AttrPath = r#"sysctl."vm.swappiness""#.parse()?;
+/// assert_eq!(path.keys(), ["sysctl", "vm.swappiness"]);
+/// assert_eq!(path.to_string().parse::<AttrPath>()?, path);
+/// # Ok::<(), stav::AttrPathError>(())
+/// ```
+impl FromStr for AttrPath {
+    type Err = AttrPathError;
+
+    fn from_str(text: &str) -> Result<Self, AttrPathError> {
+        let mut keys = Vec::new();
+        if text.is_empty() {
+            return Ok(Self { keys });
+        }
+        let mut chars = text.chars().peekable();
+        loop {
+            let key = if chars.next_if_eq(&'"').is_some() {
+                quoted_key(&mut chars)?
+            } else {
+                let mut key = String::new();
+                while let Some(c) = chars.next_if(|&c| c != '.') {
+                    key.push(c);
+                }
+                if key.is_empty() {
+                    return Err(error("empty key".to_owned()));
+                }
+                if !key.chars().all(is_bare) {
+                    return Err(error(format!("`{key}` must be quoted")));
+                }
+                key
+            };
+            keys.push(key);
+            match chars.next() {
+                None => return Ok(Self { keys }),
+                Some('.') => {}
+                Some(c) => {
+                    return Err(error(format!(
+                        "expected `.` after a quoted key, found `{c}`"
+                    )));
+                }
+            }
+        }
+    }
+}
+
+/// Reads a quoted key after its opening quote, up to and including its
+/// closing quote.
+fn quoted_key(chars: &mut Peekable<Chars<'_>>) -> Result<String, AttrPathError> {
+    let mut key = String::new();
+    loop {
+        match chars.next() {
+            None => return Err(error("unterminated quoted key".to_owned())),
+            Some('"') => return Ok(key),
+            Some('\\') => {
+                let mut escape = String::from("\\");
+                escape.extend(chars.next());
+                if escape == "\\u" {
+                    while let Some(c) = chars.next_if(|&c| c != '"') {
+                        escape.push(c);
+                        if c == '}' {
+                            break;
+                        }
+                    }
+                }
+                match unescape(&escape) {
+                    Some(c) => key.push(c),
+                    None if escape.starts_with("\\u") => {
+                        return Err(error(format!("invalid unicode escape `{escape}`")));
+                    }
+                    None => return Err(error(format!("unknown escape `{escape}`"))),
+                }
+            }
+            Some(c) => key.push(c),
+        }
+    }
+}
+
+fn is_bare(c: char) -> bool {
+    c.is_ascii_alphanumeric() || c == '_' || c == '-'
+}
+
+fn error(message: String) -> AttrPathError {
+    AttrPathError { message }
+}
+
+/// Why a text is not the [`Display`](fmt::Display) form of an
+/// [`AttrPath`]. Its [`Display`](fmt::Display) form says what is wrong.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AttrPathError {
+    message: String,
+}
+
+impl fmt::Display for AttrPathError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.message)
+    }
+}
+
+impl std::error::Error for AttrPathError {}
 
 #[cfg(test)]
 #[path = "value_tests.rs"]

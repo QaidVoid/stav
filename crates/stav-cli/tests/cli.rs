@@ -617,3 +617,42 @@ fn fmt_skips_hidden_entries_unless_named() {
     --- stderr
     ");
 }
+
+#[test]
+fn eval_path_takes_keys_as_diagnostics_print_them() {
+    let files = [(
+        "app.stav",
+        "struct Root { labels: Map<Str, Int> = {} }\n\
+         labels.\"say \\\"hi\\\"\" = 1\n\
+         labels.\"two\\nlines\" = 2\n",
+    )];
+    let quoted = run(
+        "eval_path_takes_quoted_keys",
+        &files,
+        &["eval", "--path", r#"labels."say \"hi\"""#, "app.stav"],
+    );
+    assert_snapshot!(quoted, @r"
+    status: 0
+    --- stdout
+    1
+    --- stderr
+    ");
+    let newline = run(
+        "eval_path_takes_escaped_newlines",
+        &files,
+        &["eval", "--path", r#"labels."two\nlines""#, "app.stav"],
+    );
+    assert_snapshot!(newline, @r"
+    status: 0
+    --- stdout
+    2
+    --- stderr
+    ");
+    let malformed = run(
+        "eval_path_rejects_malformed_paths",
+        &files,
+        &["eval", "--path", r#"labels."two\qlines""#, "app.stav"],
+    );
+    assert!(malformed.starts_with("status: 2\n"), "{malformed}");
+    assert!(malformed.contains(r"unknown escape `\q`"), "{malformed}");
+}
