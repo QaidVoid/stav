@@ -76,6 +76,7 @@ These properties define Stav. A change that breaks one is a bug, even when every
 - No narration and no obvious comments. Never restate what the code does. Write an inline comment only when the code cannot show why something is done: a non-obvious invariant, an edge case of the grammar or a deliberate trade-off.
 - Never reference other projects, languages, frameworks or applications in code, comments, docs or commit messages. That includes any program that embeds Stav. Describe the behavior itself instead of what inspired it.
 - Never reference design documents, specifications, planning notes, decision records, section numbers, milestones or task IDs in code, comments, docs, tests or commit messages. The code and its documentation must stand on their own.
+- Public standards and formats that the code implements may be named, for example an RFC, POSIX, ELF or the JSON and TOML formats, because naming them tells the reader exactly what behavior to expect.
 - Do not use em-dashes in any prose, and do not substitute them with `--`, a spaced hyphen or a semicolon. Write complete sentences.
 
 ## Tests
