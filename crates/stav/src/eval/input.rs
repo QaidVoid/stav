@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 use std::path::Component;
 use std::rc::Rc;
 
+use super::call::Field;
 use super::val::{PathVal, Val};
 use super::{Eval, MAX_VALUE_DEPTH, R};
 use crate::check::types::{GlobalId, Type, TypeId};
@@ -22,8 +23,9 @@ use crate::value::Value;
 /// files, so the same files and the same values always give the same
 /// result.
 ///
-/// A value is given in the shape of the annotated type. A struct gives
-/// every field, including those that have a default. Values for a host
+/// A value is given in the shape of the annotated type. A struct may leave
+/// out a field that has a default or an `Option` type, which then takes
+/// its default or `none` exactly as in a struct literal. Values for a host
 /// module that the program does not import are ignored, so one set of
 /// values serves every program of a host. A value for a path that is no
 /// host module, or for a name that is no annotated `let` of an imported
@@ -222,12 +224,22 @@ impl Eval<'_> {
                 }
                 let mut out = Vec::with_capacity(def.fields.len());
                 for field in &def.fields {
-                    let Some((_, item)) = fields.iter().find(|(k, _)| *k == field.name) else {
-                        return Err(Mismatch(format!("the field `{}` is missing", field.name)));
-                    };
-                    out.push(self.convert(field.ty, item, at, depth + 1)?);
+                    let given = fields.iter().find(|(k, _)| *k == field.name);
+                    out.push(match given {
+                        Some((_, item)) => {
+                            Field::Ready(self.convert(field.ty, item, at, depth + 1)?)
+                        }
+                        None if field.default.is_some()
+                            || self.c.types.unwrap_option(field.ty).is_some() =>
+                        {
+                            Field::Pending
+                        }
+                        None => {
+                            return Err(Mismatch(format!("the field `{}` is missing", field.name)));
+                        }
+                    });
                 }
-                self.new_struct(s, out, at).map_err(Stopped)?
+                self.build(s, out, at).map_err(Stopped)?
             }
             (Type::Sum(s), Value::Str(name)) => {
                 let sum = self.c.types.sum(s);

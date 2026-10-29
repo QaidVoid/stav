@@ -21,8 +21,9 @@ pub(crate) struct Building {
     fields: Vec<Field>,
 }
 
+/// A field of a struct value being built.
 #[derive(Debug, Clone)]
-enum Field {
+pub(crate) enum Field {
     Ready(Val),
     Pending,
     Busy,
@@ -270,7 +271,7 @@ impl<'c> Eval<'c> {
     /// Builds a struct value from the fields a literal sets, evaluating
     /// the defaults of the others and checking them against the
     /// refinements of their fields.
-    fn build(&mut self, id: StructId, fields: Vec<Field>, at: SourceSpan) -> R<Val> {
+    pub(crate) fn build(&mut self, id: StructId, fields: Vec<Field>, at: SourceSpan) -> R<Val> {
         let count = fields.len();
         let set: Vec<bool> = fields
             .iter()

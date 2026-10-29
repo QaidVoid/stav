@@ -698,6 +698,95 @@ fn host_values_for_modules_the_program_does_not_import_are_ignored() {
     );
 }
 
+/// Returns a program whose host module `build/target` has a struct input
+/// with defaulted fields, checked once.
+fn toolchain_program() -> stav::Checked {
+    let main = "import \"build/target\" as target\n\
+                struct Root { toolchain: target.Toolchain }\n\
+                toolchain = target.toolchain\n";
+    let module = "struct Toolchain {\n\
+                  cc: Str\n\
+                  jobs: Int where 1..=64 = 2\n\
+                  flags: List<Str> = [\"-j#{self.jobs}\"]\n\
+                  linker: Option<Str>\n\
+                  }\n\
+                  let toolchain: Toolchain = Toolchain { cc = \"cc\" }\n";
+    let mut host = Host::new(MemoryLoader::new().with_file("app/main.stav", main));
+    host.host_modules.push(HostModule {
+        path: "build/target".to_owned(),
+        source: module.to_owned(),
+    });
+    let root = RootSpec {
+        root_struct: "Root".to_owned(),
+        entries: vec!["app/main.stav".into()],
+        import_roots: vec![ImportRoot::new(ROOT_DIR)],
+    };
+    check(&host, &root).expect("the program checks")
+}
+
+fn toolchain(fields: &[(&str, Value)]) -> stav::HostValues {
+    let fields = fields
+        .iter()
+        .map(|(name, value)| ((*name).to_owned(), value.clone()))
+        .collect();
+    stav::HostValues::new().with("build/target", "toolchain", Value::Map(fields))
+}
+
+#[test]
+fn host_struct_values_take_the_defaults_of_omitted_fields() {
+    let checked = toolchain_program();
+    let cases = [
+        (
+            toolchain(&[("cc", Value::Str("clang".to_owned()))]),
+            r#"{"toolchain":{"cc":"clang","flags":["-j2"],"jobs":2,"linker":null}}"#,
+        ),
+        (
+            toolchain(&[
+                ("cc", Value::Str("clang".to_owned())),
+                ("jobs", Value::Int(8)),
+                ("linker", Value::Str("lld".to_owned())),
+            ]),
+            r#"{"toolchain":{"cc":"clang","flags":["-j8"],"jobs":8,"linker":"lld"}}"#,
+        ),
+    ];
+    for (values, expected) in cases {
+        let evaluated = checked
+            .eval_with(&Limits::default(), &values)
+            .expect("the program evaluates");
+        assert_eq!(evaluated.to_canonical_json(), expected);
+    }
+}
+
+#[test]
+fn host_struct_values_must_fit_their_fields() {
+    let checked = toolchain_program();
+    let cases = [
+        (
+            toolchain(&[("jobs", Value::Int(8))]),
+            "E0614",
+            "the field `cc` is missing",
+        ),
+        (
+            toolchain(&[("cc", Value::Int(1))]),
+            "E0614",
+            "expected `Str`, found an `Int`",
+        ),
+        (
+            toolchain(&[("cc", Value::Str("cc".to_owned())), ("jobs", Value::Int(0))]),
+            "E0803",
+            "violates a refinement",
+        ),
+    ];
+    for (values, code, message) in cases {
+        let errors = checked
+            .eval_with(&Limits::default(), &values)
+            .expect_err("the value is rejected");
+        let error = errors.iter().next().expect("there is an error");
+        assert_eq!(error.diagnostic.code, code, "{message}");
+        assert!(errors.to_string().contains(message), "{errors}");
+    }
+}
+
 /// Asserts that a program evaluates within a few seconds, far above what
 /// its size needs when no step is quadratic.
 fn evaluates_quickly(text: &str) {
