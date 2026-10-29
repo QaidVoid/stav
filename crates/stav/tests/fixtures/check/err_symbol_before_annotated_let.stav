@@ -1,0 +1,8 @@
+#! symbol Pkg pkg words
+struct Root {
+  primary: Option<Pkg>
+  packages: List<Pkg> = []
+}
+primary = editor
+packages = [editor]
+let editor: Str = "x"

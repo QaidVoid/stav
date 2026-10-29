@@ -450,7 +450,8 @@ impl<'p> Checker<'p> {
     /// `None` when there is no binding, and `Some(None)` for a binding that
     /// is not a value, such as a module. A top-level `let` that is used
     /// before its declaration or inside its own value counts as a binding
-    /// of every type, so that using it reports the error.
+    /// of every type, with or without an annotation, so that using it
+    /// reports the error instead of resolving to a symbol or reference.
     fn binding_type(&mut self, cx: &Cx, name: &str) -> Option<Option<TypeId>> {
         if let Some(id) = cx.lookup(name) {
             return Some(Some(self.units[cx.unit.index()].locals[id.index()].ty));
@@ -466,19 +467,17 @@ impl<'p> Checker<'p> {
                 let ret = sig.ret;
                 self.types.intern(Type::Fn(params, ret))
             }
-            GlobalKind::Let(l) => match (&l.state, l.annotation) {
-                (_, Some(annotation)) => annotation,
-                (LetState::Done { ty, .. }, None) => *ty,
-                (LetState::InProgress, None) => TypeId::ERROR,
-                (LetState::Pending, None) => {
-                    let start = l.start;
-                    if global.file == cx.file && cx.limit.is_some_and(|limit| start >= limit) {
-                        TypeId::ERROR
-                    } else {
-                        self.let_type(g).0
-                    }
+            GlobalKind::Let(l) => {
+                let too_early =
+                    global.file == cx.file && cx.limit.is_some_and(|limit| l.start >= limit);
+                match (&l.state, l.annotation) {
+                    _ if too_early => TypeId::ERROR,
+                    (LetState::InProgress, _) => TypeId::ERROR,
+                    (_, Some(annotation)) => annotation,
+                    (LetState::Done { ty, .. }, None) => *ty,
+                    (LetState::Pending, None) => self.let_type(g).0,
                 }
-            },
+            }
         };
         Some(Some(ty))
     }
