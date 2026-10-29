@@ -141,10 +141,7 @@ impl<'c> Eval<'c> {
     }
 
     fn list(&mut self, cx: &Cx<'_>, list: ast::List<'c>, ty: TypeId, at: SourceSpan) -> R<Val> {
-        let mut items = Vec::new();
-        for item in list.items() {
-            items.push(self.expr(cx, item)?);
-        }
+        let items = self.items(cx, list)?.into_iter().map(|(v, _)| v).collect();
         self.sequence(items, ty, at)
     }
 
@@ -162,23 +159,19 @@ impl<'c> Eval<'c> {
         let ty = fact.ty;
         self.step(at)?;
         self.enter(at)?;
-        let mut elements = Vec::new();
-        let mut result = Ok(());
-        for item in list.items() {
-            match self.expr(cx, item) {
-                Ok(value) => elements.push((value, item.syntax().span())),
-                Err(stop) => {
-                    result = Err(stop);
-                    break;
-                }
-            }
-        }
-        let value = result.and_then(|()| {
+        let result = self.items(cx, list).and_then(|elements| {
             let items = elements.iter().map(|(v, _)| v.clone()).collect();
-            self.sequence(items, ty, at)
+            Ok((self.sequence(items, ty, at)?, elements))
         });
         self.leave();
-        Ok((value?, elements))
+        result
+    }
+
+    /// Evaluates the elements of a list literal, with their spans.
+    fn items(&mut self, cx: &Cx<'_>, list: ast::List<'c>) -> R<Vec<(Val, Span)>> {
+        list.items()
+            .map(|item| Ok((self.expr(cx, item)?, item.syntax().span())))
+            .collect()
     }
 
     /// Returns the elements as a set when `ty` is a set type, and as a
