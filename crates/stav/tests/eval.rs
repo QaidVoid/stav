@@ -585,6 +585,10 @@ fn target_program() -> stav::Checked {
         path: "build/target".to_owned(),
         source: module.to_owned(),
     });
+    host.host_modules.push(HostModule {
+        path: "build/unused".to_owned(),
+        source: "let level: Int = 1\n".to_owned(),
+    });
     let root = RootSpec {
         root_struct: "Root".to_owned(),
         entries: vec!["app/main.stav".into()],
@@ -676,6 +680,21 @@ fn host_values_must_fit_their_declarations() {
     assert!(
         errors.to_string().contains("which is no host module"),
         "{errors}"
+    );
+}
+
+#[test]
+fn host_values_for_modules_the_program_does_not_import_are_ignored() {
+    let checked = target_program();
+    let values = stav::HostValues::new()
+        .with("build/unused", "level", Value::Str("not an Int".to_owned()))
+        .with("build/unused", "missing", Value::Int(1));
+    let evaluated = checked
+        .eval_with(&Limits::default(), &values)
+        .expect("the values are ignored");
+    assert_eq!(
+        evaluated.to_canonical_json(),
+        r#"{"features":[],"jobs":2,"triple":"x86_64-linux"}"#
     );
 }
 

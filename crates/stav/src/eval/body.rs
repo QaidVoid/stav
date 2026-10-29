@@ -36,7 +36,8 @@ pub enum Prio {
     Declared,
     /// A right side written as `default(...)`.
     Default,
-    /// A plain assignment, a block or an entry of a literal.
+    /// A plain assignment or a block. An entry of a struct or map literal
+    /// takes the priority of the statement that holds the literal.
     Plain,
     /// A right side written as `force(...)`.
     Force,
@@ -157,6 +158,9 @@ pub(crate) struct PartFrame {
 
 /// The `part { }` expression and the environment of an evaluated part,
 /// which decide its contributions.
+///
+/// Comparing two keys adds the steps it takes to `work` without charging
+/// them, so whoever compares keys must charge `work` afterwards.
 #[derive(Debug)]
 pub(crate) struct PartKey {
     unit: UnitId,

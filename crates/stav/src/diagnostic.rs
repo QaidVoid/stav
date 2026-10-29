@@ -162,8 +162,10 @@ impl Diagnostics {
     ///
     /// A host uses this to add diagnostics of its own, with codes of its
     /// own, or to replace a diagnostic of Stav with its own version. The
-    /// result renders exactly like the diagnostics of Stav. The file of
-    /// each item must be one of [`Diagnostics::files`].
+    /// result renders exactly like the diagnostics of Stav. An item should
+    /// name one of [`Diagnostics::files`]. An item whose file is not among
+    /// them renders like an item without a file, with the byte range of its
+    /// span in place of a line and column.
     ///
     /// # Examples
     ///

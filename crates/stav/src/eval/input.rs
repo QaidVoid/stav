@@ -22,6 +22,13 @@ use crate::value::Value;
 /// files, so the same files and the same values always give the same
 /// result.
 ///
+/// A value is given in the shape of the annotated type. A struct gives
+/// every field, including those that have a default. Values for a host
+/// module that the program does not import are ignored, so one set of
+/// values serves every program of a host. A value for a path that is no
+/// host module, or for a name that is no annotated `let` of an imported
+/// host module, is `E0614`.
+///
 /// # Examples
 ///
 /// ```

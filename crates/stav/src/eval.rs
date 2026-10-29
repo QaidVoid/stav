@@ -477,7 +477,9 @@ pub(crate) struct Eval<'c> {
     pub(crate) part_ids: BTreeMap<body::PartKey, u32>,
     /// The steps taken comparing the keys of `part_ids`, not counted yet.
     pub(crate) work: Rc<std::cell::Cell<u64>>,
-    /// Errors that do not stop evaluation, such as merge conflicts.
+    /// Errors that do not stop the current phase: host values that name no
+    /// input, found before evaluation starts, and merge conflicts. `run`
+    /// stops after the phase that reported them.
     pub(crate) errors: Vec<FileDiagnostic>,
 }
 

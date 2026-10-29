@@ -2002,7 +2002,7 @@ Write the symbol in a form the host accepts.
 
 ### E0614
 
-A host evaluated the program with a value for a host module declaration, and the value cannot be used. Either it names no top-level `let` with a type annotation in a host module of the program, or it does not fit the annotated type, for example a string where an `Int` is declared, or a variant name the sum type does not have. The `stav` command supplies no host values, so only programs that a host evaluates can report this.
+A host evaluated the program with a value for a host module declaration, and the value cannot be used. Either it names a module that the host does not provide, or a name that is no top-level `let` with a type annotation in a host module the program imports, or it does not fit the annotated type. A value does not fit when it is a string where an `Int` is declared, a variant name the sum type does not have, or a struct that leaves out a field, even one with a default. Values for a host module that the program does not import are ignored. The `stav` command supplies no host values, so only programs that a host evaluates can report this.
 
 The host gives values only for annotated declarations, in the shape of their types.
 
