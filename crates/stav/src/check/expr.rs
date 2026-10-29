@@ -123,7 +123,7 @@ impl<'p> Checker<'p> {
             Expr::Literal(literal) => self.literal(cx, literal, expected, want),
             Expr::Str(string) => self.string(cx, string, want),
             Expr::Name(name) => match name.token() {
-                Some(token) => self.name(cx, token, want),
+                Some(token) => self.name(cx, token, expected, want),
                 None => (TypeId::ERROR, Meaning::Plain),
             },
             Expr::Symbol(symbol) => self.symbol_word(cx, symbol, want),
@@ -361,15 +361,21 @@ impl<'p> Checker<'p> {
         (TypeId::ERROR, Meaning::Plain)
     }
 
-    /// Resolves an identifier in expression position.
+    /// Resolves an identifier in expression position, where `expected` is
+    /// the type the position requires and `want` the type that literals
+    /// and names resolve against.
     fn name(
         &mut self,
         cx: &mut Cx,
         token: SyntaxToken<'p>,
+        expected: Option<TypeId>,
         want: Option<TypeId>,
     ) -> (TypeId, Meaning) {
         let name = token.text();
         let span = token.span();
+        if let Some(found) = self.symbol_past_binding(cx, name, expected, want) {
+            return found;
+        }
         if let Some(found) = self.lexical(cx, name, span) {
             self.shadowed_variant(cx, name, span, want);
             return found;
@@ -415,6 +421,66 @@ impl<'p> Checker<'p> {
             self.unknown_name(cx, name, span, want);
         }
         (TypeId::ERROR, Meaning::Plain)
+    }
+
+    /// Resolves a name to a symbol or reference of the type `want` when a
+    /// lexical binding has the name but its type cannot be accepted where
+    /// `expected` is, so that the binding could not have been meant.
+    fn symbol_past_binding(
+        &mut self,
+        cx: &Cx,
+        name: &str,
+        expected: Option<TypeId>,
+        want: Option<TypeId>,
+    ) -> Option<(TypeId, Meaning)> {
+        let want = want?;
+        let meaning = match self.types.get(want) {
+            Type::Symbol(s) => Meaning::Symbol(*s),
+            Type::Ref(target) => Meaning::RefLabel(*target),
+            _ => return None,
+        };
+        let binding = self.binding_type(cx, name)?;
+        let accepted = binding.is_some_and(|ty| {
+            self.types.fits(ty, want) || expected.is_some_and(|e| self.types.fits(ty, e))
+        });
+        (!accepted).then_some((want, meaning))
+    }
+
+    /// Returns the type of the lexical binding of `name` without using it:
+    /// `None` when there is no binding, and `Some(None)` for a binding that
+    /// is not a value, such as a module. A top-level `let` that is used
+    /// before its declaration or inside its own value counts as a binding
+    /// of every type, so that using it reports the error.
+    fn binding_type(&mut self, cx: &Cx, name: &str) -> Option<Option<TypeId>> {
+        if let Some(id) = cx.lookup(name) {
+            return Some(Some(self.units[cx.unit.index()].locals[id.index()].ty));
+        }
+        let g = match self.lookup_value(cx.file, name)? {
+            ValueItem::Global(g) => g,
+            ValueItem::Module(_) => return Some(None),
+        };
+        let global = &self.globals[g.index()];
+        let ty = match &global.kind {
+            GlobalKind::Fn(sig) => {
+                let params = sig.params.iter().map(|p| p.ty).collect();
+                let ret = sig.ret;
+                self.types.intern(Type::Fn(params, ret))
+            }
+            GlobalKind::Let(l) => match (&l.state, l.annotation) {
+                (_, Some(annotation)) => annotation,
+                (LetState::Done { ty, .. }, None) => *ty,
+                (LetState::InProgress, None) => TypeId::ERROR,
+                (LetState::Pending, None) => {
+                    let start = l.start;
+                    if global.file == cx.file && cx.limit.is_some_and(|limit| start >= limit) {
+                        TypeId::ERROR
+                    } else {
+                        self.let_type(g).0
+                    }
+                }
+            },
+        };
+        Some(Some(ty))
     }
 
     /// Reports a name that resolves to nothing but is a binding of an
@@ -825,7 +891,7 @@ impl<'p> Checker<'p> {
             }
             Some(Key::Name(token)) => {
                 let want_key = want_key.map(|k| self.types.peel(k));
-                let (ty, meaning) = self.name(cx, token, want_key);
+                let (ty, meaning) = self.name(cx, token, want_key, want_key);
                 (ty, Some(meaning))
             }
             None => (TypeId::ERROR, None),

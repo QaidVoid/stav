@@ -1,0 +1,29 @@
+#! symbol Pkg pkg words
+#- file main.stav
+import "./lib.stav" as curl
+struct Unit { after: List<Ref<Unit>> = [] }
+struct Root {
+  packages: List<Pkg> = []
+  primary:  Option<Pkg>
+  units:    Map<Str, Unit> = {} block unit
+}
+
+fn dbus() -> Part<Root> = part { packages = [dbus] }
+fn tools(git: Str) -> Part<Root> = part { packages = [git] }
+fn wrapped(shell: Pkg) -> Part<Root> = part { packages = [shell] }
+let zsh: Pkg = pkg("Zsh")
+let cache: Ref<Unit> = "db"
+
+include dbus()
+include tools("ignored")
+include wrapped(bash)
+packages = [zsh, curl]
+for vim in [1] {
+  packages = [vim]
+}
+primary = dbus
+unit db {}
+unit web { after = [dbus, cache] }
+unit dbus {}
+#- file lib.stav
+let version = 8

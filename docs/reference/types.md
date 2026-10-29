@@ -356,13 +356,52 @@ error[E0431]: cannot mix `Int` and `Float` in arithmetic
 
 A bare identifier in an expression is resolved before the program runs, in this order:
 
-1. A lexical binding: a `let`, a parameter, a `for` or comprehension variable, a pattern binding, a top-level `let` or `fn` of the file, an import alias or a declaration of the host's prelude.
+1. A lexical binding: a `let`, a parameter, a `for` or comprehension variable, a pattern binding, a top-level `let` or `fn` of the file, an import alias or a declaration of the host's prelude. When the expected type is a symbol type or `Ref<T>`, a binding whose type cannot be accepted there is skipped, as described below.
 2. A variant, when the expected type is a sum type that has a variant of that name. In call position, `name(...)` is the variant with payload of that name.
 3. A symbol, when the expected type is a symbol type.
 4. A reference, when the expected type is `Ref<T>`.
 5. Otherwise the name is unknown ([E0302](/reference/error-codes#e0302)), and the diagnostic suggests the closest names in scope and the variants of the expected type.
 
-A lexical binding wins over a variant of the same name. Because shadowing a variant is almost always a mistake, the checker warns about it with [W0302](/reference/error-codes#w0302):
+Where a symbol type or `Ref<T>` is expected, the type of the binding decides. If the binding's type can be accepted there, the binding wins: a `let` of type `Ref<Unit>` passed where a `Ref<Unit>` is expected is that `let`. If it cannot, the binding could not have been meant, so the identifier is a symbol or a reference of the expected type. A function, a part, a module alias or a value of another type therefore does not hide a symbol or a reference of the same name. No warning is reported, because a name that is no real symbol or label is still caught: by the host's validation of symbols, or by [E0802](/reference/error-codes#e0802) for references.
+
+<!-- file: past.stav -->
+
+```stav
+struct Unit { after: List<Ref<Unit>> = [] }
+
+struct Root { units: Map<Str, Unit> = {} block unit }
+
+fn db() -> Part<Root> = part {
+  unit db {}
+}
+
+let primary: Ref<Unit> = "cache"
+
+include db()
+
+unit cache {}
+
+unit api {
+  after = [db, primary]
+}
+```
+
+<!-- run: eval -o toml past.stav -->
+
+```toml
+[units.api]
+after = ["db", "cache"]
+
+[units.cache]
+after = []
+
+[units.db]
+after = []
+```
+
+`db` is a function, which cannot be a `Ref<Unit>`, so it is the reference to the block `db`. `primary` has the type `Ref<Unit>`, so it is the binding, and its value is the label `cache`.
+
+Variants follow a different rule: a lexical binding always wins over a variant of the same name, whatever its type. Because shadowing a variant is almost always a mistake, the checker warns about it with [W0302](/reference/error-codes#w0302):
 
 <!-- file: shadow.stav -->
 
@@ -584,7 +623,7 @@ error[E0803]: value violates a refinement
 
 ## Symbol types
 
-A host program that embeds Stav can register symbol types: domain values, such as package references, that Stav carries without understanding them. A symbol type has a name, a constructor builtin that converts a `Str`, and a check that the host runs on every literal. Where a symbol type is expected, an identifier is a literal of it, and symbol words such as `name@1.2:static` and string literals are literals of it when the host allows them.
+A host program that embeds Stav can register symbol types: domain values, such as package references, that Stav carries without understanding them. A symbol type has a name, a constructor builtin that converts a `Str`, and a check that the host runs on every literal. Where a symbol type is expected, an identifier is a literal of it, unless a binding of that name has a type that can be accepted there ([name resolution](#name-resolution)). Symbol words such as `name@1.2:static` and string literals are literals of it when the host allows them.
 
 A symbol value is its type and its canonical text. It renders as that text and interpolates as that text. Stav does not check that a symbol names anything real. The host receives every symbol of the final value, with the place that wrote it and the path of the value that holds it, and validates them itself.
 

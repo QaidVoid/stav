@@ -1,0 +1,30 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- JSON
+{
+  "packages": [
+    "dbus",
+    "git",
+    "bash",
+    "zsh",
+    "curl",
+    "vim"
+  ],
+  "primary": "dbus",
+  "units": {
+    "db": {
+      "after": []
+    },
+    "dbus": {
+      "after": []
+    },
+    "web": {
+      "after": [
+        "dbus",
+        "db"
+      ]
+    }
+  }
+}
