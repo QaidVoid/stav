@@ -12,10 +12,10 @@
 //! memoizes it, evaluating deferred contributions after the attributes
 //! they read.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 
-use super::body::{Contrib, Deferred, Kind, Pending, Prio};
+use super::body::{Contrib, Deferred, Kind, Parts, Pending, Prio, Written};
 use super::call::Building;
 use super::env::Env;
 use super::val::{Key, Val};
@@ -549,7 +549,7 @@ impl<'c> Eval<'c> {
                 span,
                 via: None,
                 seq: 0,
-                elements: None,
+                parts: None,
             };
             let reads = self.default_reads(s, i);
             if reads.is_empty() {
@@ -625,20 +625,22 @@ impl<'c> Eval<'c> {
                 _ => continue,
             };
             self.merge.contribs[id as usize].kind = Kind::Select(variant);
-            let params: Vec<TypeId> = self
+            let params: Vec<(String, TypeId)> = self
                 .c
                 .types
                 .sum(s)
                 .variants
                 .get(variant as usize)
                 .and_then(|v| v.fields.as_ref())
-                .map(|f| f.iter().map(|p| p.ty).collect())
+                .map(|f| f.iter().map(|p| (p.name.clone(), p.ty)).collect())
                 .unwrap_or_default();
             let payload = self.merge.child_or_new(n, Seg::Variant(variant));
+            let template = contrib.payload();
             let mut out = Vec::new();
-            for (i, (ty, value)) in params.into_iter().zip(fields).enumerate() {
+            for (i, ((name, ty), value)) in params.into_iter().zip(fields).enumerate() {
                 if set.get(i).copied().unwrap_or(true) {
-                    self.decompose(vec![field_seg(i)], ty, value, &contrib, &mut out);
+                    let template = template.part(&name);
+                    self.decompose(vec![field_seg(i)], ty, value, &template, &mut out);
                 }
             }
             for p in out {
@@ -722,14 +724,21 @@ impl<'c> Eval<'c> {
                     continue;
                 };
                 let def = self.c.types.sum(s);
+                let default = def
+                    .variants
+                    .get(variant as usize)
+                    .and_then(|v| v.fields.as_ref()?.get(i)?.default);
+                let span = default
+                    .and_then(|node| self.tree(def.file).node(node))
+                    .map_or(def.span, |e| e.span());
                 let template = Contrib {
                     prio: Prio::Declared,
                     kind: Kind::Present,
                     file: def.file,
-                    span: def.span,
+                    span,
                     via: None,
                     seq: 0,
-                    elements: None,
+                    parts: None,
                 };
                 let mut out = Vec::new();
                 self.decompose(Vec::new(), ty, value, &template, &mut out);
@@ -972,17 +981,17 @@ impl<'c> Eval<'c> {
                 continue;
             };
             let out = self.run_deferred(deferred, &contrib)?;
-            let (value, elements) = out
+            let (value, parts) = out
                 .into_iter()
                 .find(|p| p.path.is_empty())
                 .and_then(|p| match p.contrib.kind {
-                    Kind::Value(v) => Some((v, p.contrib.elements)),
+                    Kind::Value(v) => Some((v, p.contrib.parts)),
                     _ => None,
                 })
                 .unwrap_or((Val::None, None));
             let slot = &mut self.merge.contribs[id as usize];
             slot.kind = Kind::Value(value);
-            slot.elements = elements;
+            slot.parts = parts;
         }
         let values: Vec<(Val, u32)> = winners
             .iter()
@@ -1490,13 +1499,8 @@ impl<'c> Eval<'c> {
                 children.push((key, index));
                 stack.push((c, index));
             }
-            for (i, spans) in self.element_spans(n).into_iter().enumerate() {
-                children.push((i.to_string(), tree.nodes.len()));
-                tree.nodes.push(SpanNode {
-                    spans,
-                    prio,
-                    ..SpanNode::default()
-                });
+            if let Shape::Leaf = node.shape {
+                children.extend(self.leaf_spans(&mut tree, n, prio));
             }
             if let Shape::Tagged(Some(_)) = node.shape {
                 tree.nodes[slot].transparent = true;
@@ -1508,58 +1512,226 @@ impl<'c> Eval<'c> {
     }
 }
 
+/// A place that wrote a value: its span, and where the parts inside it
+/// were written when a literal recorded them.
+#[derive(Debug, Clone, Copy)]
+struct Origin<'a> {
+    at: SourceSpan,
+    parts: Option<&'a Parts>,
+}
+
+impl<'a> Origin<'a> {
+    fn new(file: FileId, written: &'a Written) -> Self {
+        Self {
+            at: SourceSpan {
+                file,
+                span: written.span,
+            },
+            parts: written.parts.as_deref(),
+        }
+    }
+}
+
 impl Eval<'_> {
-    /// Returns the spans of each element of the list or set at `n`: the
-    /// element of a list literal that wrote it, or else the contribution
-    /// it came from. An element of a set has the spans of every element
-    /// equal to it.
-    fn element_spans(&self, n: NodeId) -> Vec<Vec<SourceSpan>> {
-        let (set, items) = match self.final_value(n) {
-            Some(Val::List(s)) => (false, s),
-            Some(Val::Set(s)) => (true, s),
+    /// Adds the span nodes inside the attribute `n` that holds a whole
+    /// value, and returns them keyed for its node.
+    ///
+    /// The elements of a list concatenate the winning contributions. Each
+    /// element has the span of the element of the list literal that wrote
+    /// it, or else of the contribution it came from. An element of a set
+    /// has the spans of every element equal to it. Inside an element, and
+    /// inside any other value, the fields, keys, elements and variant
+    /// payloads that literals wrote have the spans of their entries,
+    /// arguments, elements and calls.
+    fn leaf_spans(
+        &self,
+        tree: &mut SpanTree,
+        n: NodeId,
+        prio: Option<Prio>,
+    ) -> Vec<(String, usize)> {
+        let Some(value) = self.final_value(n) else {
+            return Vec::new();
+        };
+        let winners = self.merge.node(n).winners.iter().filter_map(|&id| {
+            let c = self.merge.contrib(id);
+            match &c.kind {
+                Kind::Value(v) => Some((c, v)),
+                _ => None,
+            }
+        });
+        let (set, items) = match &value {
+            Val::List(s) => (false, s),
+            Val::Set(s) => (true, s),
+            _ => {
+                let origins: Vec<Origin<'_>> = winners
+                    .map(|(c, _)| Origin {
+                        at: c.at(),
+                        parts: c.parts.as_deref(),
+                    })
+                    .collect();
+                return self.add_spans(tree, self.inner_origins(&value, &origins), prio);
+            }
+        };
+        let mut written = Vec::new();
+        for (c, v) in winners {
+            match c.parts.as_deref() {
+                Some(Parts::Elements(elements)) if set || elements.len() == v.items().len() => {
+                    written.extend(elements.iter().map(|(v, w)| (v, Origin::new(c.file, w))));
+                }
+                _ => written.extend(v.items().iter().map(|v| {
+                    let origin = Origin {
+                        at: c.at(),
+                        parts: None,
+                    };
+                    (v, origin)
+                })),
+            }
+        }
+        let children = element_origins(set, &items.items, vec![written]);
+        self.add_spans(tree, children, prio)
+    }
+
+    /// Adds a span node for each part of a value with the places that
+    /// wrote it, and the nodes inside each, and returns them keyed for
+    /// the node of the value. A part that no place wrote gets no node.
+    fn add_spans(
+        &self,
+        tree: &mut SpanTree,
+        children: Vec<(String, &Val, Vec<Origin<'_>>)>,
+        prio: Option<Prio>,
+    ) -> Vec<(String, usize)> {
+        let mut out = Vec::new();
+        for (key, value, origins) in children {
+            if origins.is_empty() {
+                continue;
+            }
+            let mut seen = BTreeSet::new();
+            let spans = origins
+                .iter()
+                .map(|o| o.at)
+                .filter(|&at| seen.insert(at))
+                .collect();
+            let index = tree.nodes.len();
+            tree.nodes.push(SpanNode {
+                spans,
+                prio,
+                ..SpanNode::default()
+            });
+            let mut inner = self.add_spans(tree, self.inner_origins(value, &origins), prio);
+            inner.sort();
+            tree.nodes[index].children = inner;
+            out.push((key, index));
+        }
+        out
+    }
+
+    /// Returns the parts of `value` with the places that wrote each,
+    /// given the places that wrote `value`: the elements of a list or
+    /// set, the fields of a struct, the entries of a map, and the variant
+    /// of a value with payload, whose parts are its payload fields.
+    fn inner_origins<'v, 'a>(
+        &self,
+        value: &'v Val,
+        origins: &[Origin<'a>],
+    ) -> Vec<(String, &'v Val, Vec<Origin<'a>>)> {
+        let types = &self.c.types;
+        let named: Vec<(String, &Val)> = match value {
+            Val::List(s) | Val::Set(s) => {
+                let groups = origins
+                    .iter()
+                    .filter_map(|o| match o.parts {
+                        Some(Parts::Elements(elements)) => Some(
+                            elements
+                                .iter()
+                                .map(|(v, w)| (v, Origin::new(o.at.file, w)))
+                                .collect(),
+                        ),
+                        _ => None,
+                    })
+                    .collect();
+                return element_origins(matches!(value, Val::Set(_)), &s.items, groups);
+            }
+            Val::Variant(v) => {
+                let Some(variant) = types.sum(v.sum).variants.get(v.index as usize) else {
+                    return Vec::new();
+                };
+                let calls: Vec<Origin<'a>> = origins
+                    .iter()
+                    .filter_map(|o| match o.parts {
+                        Some(Parts::Payload(call)) => Some(Origin::new(o.at.file, call)),
+                        _ => None,
+                    })
+                    .collect();
+                if !calls.is_empty() {
+                    return vec![(variant.name.clone(), value, calls)];
+                }
+                let params = variant.fields.iter().flatten();
+                params.map(|p| p.name.clone()).zip(&v.fields).collect()
+            }
+            Val::Struct(s) => {
+                let fields = &types.structure(s.id).fields;
+                fields
+                    .iter()
+                    .map(|f| f.name.clone())
+                    .zip(&s.fields)
+                    .collect()
+            }
+            Val::Map(m) => m.entries.iter().map(|(k, v)| (k.text(types), v)).collect(),
             _ => return Vec::new(),
         };
-        let mut written: Vec<(Val, SourceSpan)> = Vec::new();
-        for &id in &self.merge.node(n).winners {
-            let c = self.merge.contrib(id);
-            let Kind::Value(value) = &c.kind else {
-                continue;
-            };
-            match &c.elements {
-                Some(elements) if set || elements.len() == value.items().len() => {
-                    written.extend(elements.iter().map(|(v, span)| {
-                        let at = SourceSpan {
-                            file: c.file,
-                            span: *span,
-                        };
-                        (v.clone(), at)
-                    }));
-                }
-                _ => written.extend(value.items().iter().map(|v| (v.clone(), c.at()))),
-            }
-        }
-        if !set {
-            if written.len() != items.items.len() {
-                return Vec::new();
-            }
-            return written.into_iter().map(|(_, at)| vec![at]).collect();
-        }
-        written.sort_by(|a, b| a.0.order(&b.0));
-        items
-            .items
-            .iter()
-            .map(|item| {
-                let start = written.partition_point(|(v, _)| v.order(item).is_lt());
-                let mut spans: Vec<SourceSpan> = Vec::new();
-                for (_, at) in written[start..].iter().take_while(|(v, _)| v.equals(item)) {
-                    if !spans.contains(at) {
-                        spans.push(*at);
-                    }
-                }
-                spans
+        named
+            .into_iter()
+            .map(|(name, inner)| {
+                let found = origins
+                    .iter()
+                    .filter_map(|o| match o.parts {
+                        Some(Parts::Entries(entries)) => {
+                            let i = entries
+                                .binary_search_by(|(k, _)| k.as_str().cmp(&name))
+                                .ok()?;
+                            Some(Origin::new(o.at.file, &entries[i].1))
+                        }
+                        _ => None,
+                    })
+                    .collect();
+                (name, inner, found)
             })
             .collect()
     }
+}
+
+/// Returns the elements of a list or set, keyed by position, with the
+/// places that wrote each. Each group holds the written elements that
+/// make up the whole value. An element of a list gets its element of each
+/// group as long as the value, and an element of a set every written
+/// element equal to it.
+fn element_origins<'v, 'a>(
+    set: bool,
+    items: &'v [Val],
+    groups: Vec<Vec<(&Val, Origin<'a>)>>,
+) -> Vec<(String, &'v Val, Vec<Origin<'a>>)> {
+    let mut found: Vec<Vec<Origin<'a>>> = vec![Vec::new(); items.len()];
+    if set {
+        let mut written: Vec<(&Val, Origin<'a>)> = groups.into_iter().flatten().collect();
+        written.sort_by(|a, b| a.0.order(b.0));
+        for (slot, item) in found.iter_mut().zip(items) {
+            let start = written.partition_point(|(v, _)| v.order(item).is_lt());
+            let equal = written[start..].iter().take_while(|(v, _)| v.equals(item));
+            slot.extend(equal.map(|(_, o)| *o));
+        }
+    } else {
+        for group in groups.into_iter().filter(|g| g.len() == items.len()) {
+            for (slot, (_, origin)) in found.iter_mut().zip(group) {
+                slot.push(origin);
+            }
+        }
+    }
+    items
+        .iter()
+        .zip(found)
+        .enumerate()
+        .map(|(i, (item, origins))| (i.to_string(), item, origins))
+        .collect()
 }
 
 fn field_seg(i: usize) -> Seg {

@@ -178,19 +178,34 @@ impl Evaluated {
     /// An element of a list or set, named by its position as in
     /// `packages.3`, returns the span of the element of the list literal
     /// that wrote it, or else of the contribution it came from. An element
-    /// of a set returns the spans of every element equal to it. A path
-    /// further inside a value, such as a field of a struct in a list or a
-    /// key of a `Data` map, returns the spans of the deepest attribute or
-    /// element on the path. A path that names nothing in the value returns
-    /// no spans.
+    /// of a set returns the spans of every element equal to it.
+    ///
+    /// A payload field of a variant is named through the name of the
+    /// variant, the way [`Value::at`] steps into it and the variant
+    /// renders, as in `ready.check.cmd` for the field `cmd` of
+    /// `ready = check(cmd = ["probe"])`. The variant returns the span of
+    /// the call that wrote it, and a payload field the span of its
+    /// argument. Inside a value, the fields and keys that a struct or map
+    /// literal sets return the spans of their entries, the elements of a
+    /// list literal their own spans, and nested variants and payload
+    /// fields the spans of their calls and arguments, at any depth.
+    ///
+    /// A path further inside a value than the literals recorded, such as
+    /// a payload field left to its default or a key of a `Data` map,
+    /// returns the spans of the deepest attribute, element, entry or
+    /// argument on the path. A path that names nothing in the value
+    /// returns no spans.
     ///
     /// # Examples
     ///
     /// ```
     /// use stav::{AttrPath, Host, ImportRoot, Limits, MemoryLoader, RootSpec};
     ///
-    /// let source = "struct Root { ports: List<Int> = [], env: Map<Str, Str> = {} }\n\
-    ///               ports = [80, 443]\nenv = { LANG = \"C\", TZ = \"UTC\" }\n";
+    /// let source = "type Ready = manual | check(cmd: List<Str>, interval: Int = 5)\n\
+    ///               struct Root { ports: List<Int> = [], env: Map<Str, Str> = {}, \
+    ///               ready: Ready = manual }\n\
+    ///               ports = [80, 443]\nenv = { LANG = \"C\", TZ = \"UTC\" }\n\
+    ///               ready = check(cmd = [\"probe\", \"-q\"])\n";
     /// let host = Host::new(MemoryLoader::new().with_file("app/main.stav", source));
     /// let root = RootSpec {
     ///     root_struct: "Root".to_owned(),
@@ -204,6 +219,9 @@ impl Evaluated {
     /// };
     /// assert_eq!(text("ports.1"), ["443"]);
     /// assert_eq!(text("env.TZ"), ["TZ = \"UTC\""]);
+    /// assert_eq!(text("ready.check.cmd"), ["cmd = [\"probe\", \"-q\"]"]);
+    /// assert_eq!(text("ready.check.cmd.1"), ["\"-q\""]);
+    /// assert_eq!(text("ready.check.interval"), ["check(cmd = [\"probe\", \"-q\"])"]);
     /// # Ok::<(), stav::Diagnostics>(())
     /// ```
     pub fn spans(&self, path: &AttrPath) -> Vec<SourceSpan> {
@@ -259,7 +277,9 @@ impl Evaluated {
     /// value that holds it, so that a host can name it in a diagnostic.
     /// An element of a list or set is named by its position, as in
     /// `packages.3`, and a payload field of a variant through the name of
-    /// the variant, as [`Value::at`] describes.
+    /// the variant, as in `jobs.web.build.native.deps.0`, the way
+    /// [`Value::at`] steps into it. [`Evaluated::spans`] takes the same
+    /// paths.
     ///
     /// # Examples
     ///

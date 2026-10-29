@@ -1,6 +1,7 @@
 //! Calls of functions, variants, constructors and function values, and
 //! complete struct values with their defaults.
 
+use super::body::Written;
 use super::env::{Env, Slot, bind};
 use super::expr::Cx;
 use super::merge::Frame;
@@ -12,6 +13,7 @@ use crate::check::model::{CallFact, Callee, Fact, Meaning};
 use crate::check::types::{GlobalId, ParamDef, StructId, SumId, Type, TypeId};
 use crate::diagnostic::{Diagnostic, Label};
 use crate::span::SourceSpan;
+use crate::syntax::NodeKind;
 
 /// A struct value being built, whose defaults may read its other fields
 /// through `self`.
@@ -30,12 +32,15 @@ pub(crate) enum Field {
 }
 
 impl<'c> Eval<'c> {
+    /// Evaluates a call. With `parts`, a call of a variant with payload
+    /// also records where each argument was written.
     pub(crate) fn call(
         &mut self,
         cx: &Cx<'_>,
         call: ast::Call<'c>,
         fact: &CallFact,
         at: SourceSpan,
+        parts: Option<&mut Vec<(String, Written)>>,
     ) -> R<Val> {
         match fact.callee {
             Callee::Global(g) => {
@@ -50,7 +55,7 @@ impl<'c> Eval<'c> {
                     }
                 };
                 let file = self.c.globals[g.index()].file;
-                let (args, _) = self.arguments(cx, params, &fact.args, file, at)?;
+                let (args, _) = self.arguments(cx, params, &fact.args, file, at, None)?;
                 self.call_global(g, args, at)
             }
             Callee::Variant { sum, variant } => {
@@ -59,7 +64,7 @@ impl<'c> Eval<'c> {
                     return self.new_variant(sum, variant, None, at);
                 };
                 let file = self.c.types.sum(sum).file;
-                let payload = self.arguments(cx, params, &fact.args, file, at)?;
+                let payload = self.arguments(cx, params, &fact.args, file, at, parts)?;
                 self.new_variant_set(sum, variant, Some(payload), at)
             }
             Callee::Builtin(b) => self.builtin(cx, b, &fact.args, at),
@@ -93,7 +98,8 @@ impl<'c> Eval<'c> {
     /// Evaluates the arguments of a call in parameter order, filling in the
     /// defaults of the parameters without arguments, and checks each
     /// against the refinements of its parameter. Returns the values and
-    /// whether each was given.
+    /// whether each was given. With `parts`, it also records where each
+    /// argument was written, by the name of its parameter.
     fn arguments(
         &mut self,
         cx: &Cx<'_>,
@@ -101,6 +107,7 @@ impl<'c> Eval<'c> {
         args: &[Option<usize>],
         declared_in: crate::check::FileId,
         at: SourceSpan,
+        mut parts: Option<&mut Vec<(String, Written)>>,
     ) -> R<(Vec<Val>, Vec<bool>)> {
         let mut values = Vec::with_capacity(params.len());
         let mut given = Vec::with_capacity(params.len());
@@ -109,7 +116,20 @@ impl<'c> Eval<'c> {
             let (value, value_at) = match args.get(i).copied().flatten() {
                 Some(node) => {
                     let e = self.expr_at(cx.unit, node)?;
-                    (self.expr(cx, e)?, cx.at(e.syntax().span()))
+                    let value = match parts.as_deref_mut() {
+                        Some(parts) => {
+                            let (value, inner) = self.written(cx, e)?;
+                            let span = e
+                                .syntax()
+                                .parent()
+                                .filter(|arg| arg.kind() == NodeKind::Arg)
+                                .map_or(e.syntax().span(), |arg| arg.span());
+                            parts.push((param.name.clone(), Written { span, parts: inner }));
+                            value
+                        }
+                        None => self.expr(cx, e)?,
+                    };
+                    (value, cx.at(e.syntax().span()))
                 }
                 None => match param.default {
                     Some(node) => {
@@ -238,12 +258,16 @@ impl<'c> Eval<'c> {
     /// Builds a complete struct value: the fields a literal sets, and the
     /// declared defaults of the others, which may read the value through
     /// `self`.
+    ///
+    /// With `parts`, it also records where each field the literal sets was
+    /// written.
     pub(crate) fn struct_value(
         &mut self,
         cx: &Cx<'_>,
         id: StructId,
         entries: Vec<ast::MapEntry<'c>>,
         at: SourceSpan,
+        mut parts: Option<&mut Vec<(String, Written)>>,
     ) -> R<Val> {
         let count = self.c.types.structure(id).fields.len();
         let mut fields = vec![Field::Pending; count];
@@ -261,7 +285,15 @@ impl<'c> Eval<'c> {
             };
             let ty = self.c.types.structure(id).fields[index].ty;
             let value_at = cx.at(value.syntax().span());
-            let value = self.expr(cx, value)?;
+            let value = match parts.as_deref_mut() {
+                Some(parts) => {
+                    let (value, inner) = self.written(cx, value)?;
+                    let span = entry.syntax().span();
+                    parts.push((name, Written { span, parts: inner }));
+                    value
+                }
+                None => self.expr(cx, value)?,
+            };
             self.refine(ty, &value, value_at)?;
             fields[index] = Field::Ready(value);
         }

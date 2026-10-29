@@ -497,7 +497,8 @@ fn spans_point_at_list_elements_and_literal_entries() {
         ("zones.1", &["\"west\""]),
         ("env.TZ", &["TZ = \"UTC\""]),
         ("servers.0", &["{ host = \"x\" }"]),
-        ("servers.0.host", &["{ host = \"x\" }"]),
+        ("servers.0.host", &["host = \"x\""]),
+        ("servers.0.port", &["{ host = \"x\" }"]),
         ("servers.0.nothing", &[]),
         ("server.port", &["port = 8", "80"]),
         ("d.a.0", &["{ a = [1] }", "none"]),
@@ -558,11 +559,68 @@ fn symbol_paths_name_the_value_that_holds_each_symbol() {
     );
     for (_, path, at) in evaluated.symbol_paths("Pkg") {
         assert!(evaluated.value().at(path).is_some(), "{path}");
-        let spans = evaluated.spans(path);
-        assert!(!spans.is_empty(), "{path}");
-        if path.keys()[0] != "jobs" {
-            assert_eq!(spans, [at], "{path}");
-        }
+        assert_eq!(evaluated.spans(path), [at], "{path}");
+    }
+}
+
+#[test]
+fn spans_point_inside_variant_payloads() {
+    let text = "struct Target { host: Str, port: Int = 80 }\n\
+                type Retry = never | backoff(limit: Int, delays: List<Int> = [])\n\
+                type Ready = manual | check(cmd: List<Str>, interval: Int = 5, \
+                retry: Retry = never, env: Map<Str, Str> = {}, tags: Set<Str> = [], \
+                targets: List<Target> = [])\n\
+                type Build = native(features: List<Str> = []) | script\n\
+                struct Service { ready: Ready = manual, build: Build = script }\n\
+                struct Root { services: Map<Str, Service> = {} block service }\n\
+                service x {\n  ready = check(cmd = [\"serve\", \"-p\"], interval = 1, \
+                retry = backoff(limit = 3, delays = [1, 2]), env = { A = \"1\" }, \
+                tags = [\"b\", \"a\"], targets = [{ host = \"h\" }])\n}\n\
+                service y { ready = check([\"probe\"]), build = native(features = [\"x\"]) }\n\
+                service w {\n  build native { }\n  build = native(features = [\"v\"])\n}\n";
+    let evaluated = evaluate(text);
+    let ready = "check(cmd = [\"serve\", \"-p\"], interval = 1, \
+                 retry = backoff(limit = 3, delays = [1, 2]), env = { A = \"1\" }, \
+                 tags = [\"b\", \"a\"], targets = [{ host = \"h\" }])";
+    let x = "services.x.ready.check";
+    let cases: &[(&str, &[&str])] = &[
+        ("services.x.ready", &[ready, "manual"]),
+        (x, &[ready]),
+        ("services.x.ready.check.cmd", &["cmd = [\"serve\", \"-p\"]"]),
+        ("services.x.ready.check.cmd.1", &["\"-p\""]),
+        ("services.x.ready.check.interval", &["interval = 1"]),
+        (
+            "services.x.ready.check.retry.backoff",
+            &["backoff(limit = 3, delays = [1, 2])"],
+        ),
+        ("services.x.ready.check.retry.backoff.limit", &["limit = 3"]),
+        ("services.x.ready.check.retry.backoff.delays.1", &["2"]),
+        ("services.x.ready.check.env.A", &["A = \"1\""]),
+        ("services.x.ready.check.tags.0", &["\"a\""]),
+        ("services.x.ready.check.targets.0.host", &["host = \"h\""]),
+        (
+            "services.x.ready.check.targets.0.port",
+            &["{ host = \"h\" }"],
+        ),
+        ("services.x.ready.check.nothing", &[]),
+        ("services.x.ready.cmd", &[]),
+        ("services.y.ready.check.cmd.0", &["\"probe\""]),
+        ("services.y.ready.check.interval", &["check([\"probe\"])"]),
+        ("services.y.build.native.features.0", &["\"x\""]),
+        (
+            "services.w.build.native.features",
+            &["features = [\"v\"]", "[]"],
+        ),
+        ("services.w.build.native.features.0", &["\"v\""]),
+    ];
+    for (path, expected) in cases {
+        assert_eq!(&span_texts(&evaluated, path), expected, "{path}");
+        let path: stav::AttrPath = path.parse().expect("the path parses");
+        assert_eq!(
+            evaluated.value().at(&path).is_some(),
+            !expected.is_empty(),
+            "{path}"
+        );
     }
 }
 

@@ -151,7 +151,7 @@ primary: https://a.example.org (weight 90)
 | `Ref<T>`, `Path`, symbol types | `String`, or a type of your own that deserializes from a string |
 | `Data` | any type that matches its shape |
 
-`AttrPath::root()` names the whole value, and `AttrPath::new(["upstreams", "primary"])` names an attribute inside it. An element of a list or set is named by its position, counted from zero, so `AttrPath::new(["servers", "0"])` is the first element of `servers`. A path that names no attribute, or a value that does not convert, is the error `E0805`.
+`AttrPath::root()` names the whole value, and `AttrPath::new(["upstreams", "primary"])` names an attribute inside it. An element of a list or set is named by its position, counted from zero, so `AttrPath::new(["servers", "0"])` is the first element of `servers`. A payload field of a variant follows the name of the variant, the way the variant renders, so the field `cmd` of `ready = check(cmd = ["probe"])` is `ready.check.cmd`. A path that names no attribute, or a value that does not convert, is the error `E0805`.
 
 `Evaluated` can also render the value with `render(Format::Json)`, `Format::Toml` or `Format::Yaml`, give its canonical JSON with `to_canonical_json`, or hand out the `Value` tree itself with `value()`.
 
@@ -402,7 +402,7 @@ for arch in ["x86_64", "aarch64"] {
     print!("{}", evaluated.render(Format::Json)?);
 }
 ```
-- **Host validation.** Rules that relate several fields, or that need outside knowledge such as a package index, belong to the host. `Evaluated::spans` returns where each attribute was written, down to the entry of a struct or map literal and the element of a list. `Evaluated::priority` says whether the winning value was set with `force(...)`, `default(...)`, a plain assignment or only the declared default, for rules that treat a forced value differently. `Evaluated::diagnostics` wraps the host's own diagnostics so that they render exactly like those of Stav. Choose codes that cannot be confused with the `E` and `W` codes of the language.
+- **Host validation.** Rules that relate several fields, or that need outside knowledge such as a package index, belong to the host. `Evaluated::spans` returns where each attribute was written, down to the entry of a struct or map literal, the element of a list, and the call and the arguments of a variant with payload, at any depth. The paths are those of `Value::at`, so `spans` of `ready.check.cmd.0` is the first element of the list written as the `cmd` argument of `check(...)`. A part of a value that no literal wrote, such as a payload field left to its default, returns the spans of the closest part around it that was written. `Evaluated::priority` says whether the winning value was set with `force(...)`, `default(...)`, a plain assignment or only the declared default, for rules that treat a forced value differently. `Evaluated::diagnostics` wraps the host's own diagnostics so that they render exactly like those of Stav. Choose codes that cannot be confused with the `E` and `W` codes of the language.
 - **Caching.** `Checked::inputs` lists every source text the program was read from. A host can key a cache of evaluations by hashing them together with the host values it passes.
 - **Limits.** `Limits::default()` allows 50 000 000 evaluation steps and 512 MiB of values. A host can raise or lower them for each evaluation. [Totality and limits](../reference/totality) explains how they are counted.
 

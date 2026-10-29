@@ -4,14 +4,14 @@ use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
 use std::rc::Rc;
 
-use super::body::elements;
+use super::body::{Parts, Written, elements};
 use super::env::{Env, Slot, bind, lookup};
 use super::merge::{Frame, Seg};
 use super::val::{FnVal, Key as MapKey, PathVal, RefVal, SymbolVal, Val};
 use super::{Eval, R};
 use crate::ast::{self, BinaryOp, Expr, Key, LiteralKind, StrPart, UnaryOp};
 use crate::check::FileId;
-use crate::check::model::{Fact, LetFact, LocalId, Meaning, SelfRead, UnitId};
+use crate::check::model::{Callee, Fact, LetFact, LocalId, Meaning, SelfRead, UnitId};
 use crate::check::types::{StructId, SumId, SymbolId, Type, TypeId};
 use crate::diagnostic::Diagnostic;
 use crate::lexer::{parse_float, parse_int};
@@ -77,12 +77,12 @@ impl<'c> Eval<'c> {
             Expr::List(list) => self.list(cx, list, ty, at),
             Expr::ListComp(comp) => self.list_comp(cx, comp, ty, meaning, at),
             Expr::Map(map) => match meaning {
-                Meaning::Struct(s) => self.struct_value(cx, *s, map.entries().collect(), at),
-                _ => self.map_literal(cx, map, ty, at),
+                Meaning::Struct(s) => self.struct_value(cx, *s, map.entries().collect(), at, None),
+                _ => self.map_literal(cx, map, ty, at, None),
             },
             Expr::MapComp(comp) => self.map_comp(cx, comp, ty, meaning, at),
             Expr::StructLit(lit) => match meaning {
-                Meaning::Struct(s) => self.struct_value(cx, *s, lit.entries().collect(), at),
+                Meaning::Struct(s) => self.struct_value(cx, *s, lit.entries().collect(), at, None),
                 _ => Err(self.bug(cx.file, at.span, "a struct literal has no struct")),
             },
             Expr::Paren(paren) => match paren.expr() {
@@ -90,7 +90,7 @@ impl<'c> Eval<'c> {
                 None => Err(self.bug(cx.file, at.span, "parentheses are empty")),
             },
             Expr::Call(call) => match meaning {
-                Meaning::Call(fact) => self.call(cx, call, fact, at),
+                Meaning::Call(fact) => self.call(cx, call, fact, at, None),
                 _ => Err(self.bug(cx.file, at.span, "a call has no callee")),
             },
             Expr::Field(field) => self.field(cx, field, meaning, at),
@@ -141,37 +141,96 @@ impl<'c> Eval<'c> {
     }
 
     fn list(&mut self, cx: &Cx<'_>, list: ast::List<'c>, ty: TypeId, at: SourceSpan) -> R<Val> {
-        let items = self.items(cx, list)?.into_iter().map(|(v, _)| v).collect();
+        let items = list
+            .items()
+            .map(|item| self.expr(cx, item))
+            .collect::<R<Vec<Val>>>()?;
         self.sequence(items, ty, at)
     }
 
-    /// Evaluates a list literal like [`Eval::expr`], and also returns the
-    /// value and the span of each of its elements.
-    pub(crate) fn list_elements(
-        &mut self,
-        cx: &Cx<'_>,
-        list: ast::List<'c>,
-    ) -> R<(Val, Vec<(Val, Span)>)> {
-        let at = cx.at(list.syntax().span());
-        let Fact::Expr(fact) = self.fact(cx.unit, list.syntax().index()) else {
+    /// Evaluates an expression like [`Eval::expr`], and also returns
+    /// where the parts of its value were written when it is a literal: a
+    /// list, struct or map literal, or a call of a variant with payload.
+    /// `Data` literals record nothing, because `Data` values merge by
+    /// their shape.
+    pub(crate) fn written(&mut self, cx: &Cx<'_>, e: Expr<'c>) -> R<(Val, Option<Rc<Parts>>)> {
+        let at = cx.at(e.syntax().span());
+        let Fact::Expr(fact) = self.fact(cx.unit, e.syntax().index()) else {
             return Err(self.bug(cx.file, at.span, "an expression has no facts"));
         };
         let ty = fact.ty;
+        let types = &self.c.types;
+        let shape = types.get(types.peel(ty));
+        let recorded = match (e, &fact.meaning) {
+            (Expr::Paren(_), _) => true,
+            (Expr::List(_), _) => matches!(shape, Type::List(_) | Type::Set(_)),
+            (Expr::Map(_), Meaning::Struct(_)) | (Expr::StructLit(_), Meaning::Struct(_)) => true,
+            (Expr::Map(_), _) => matches!(shape, Type::Map(..)),
+            (Expr::Call(_), Meaning::Call(call)) => match call.callee {
+                Callee::Variant { sum, variant } => types
+                    .sum(sum)
+                    .variants
+                    .get(variant)
+                    .is_some_and(|v| v.fields.is_some()),
+                _ => false,
+            },
+            _ => false,
+        };
+        if !recorded {
+            return Ok((self.expr(cx, e)?, None));
+        }
         self.step(at)?;
         self.enter(at)?;
-        let result = self.items(cx, list).and_then(|elements| {
-            let items = elements.iter().map(|(v, _)| v.clone()).collect();
-            Ok((self.sequence(items, ty, at)?, elements))
-        });
+        let result = self.written_inner(cx, e, &fact.meaning, ty, at);
         self.leave();
         result
     }
 
-    /// Evaluates the elements of a list literal, with their spans.
-    fn items(&mut self, cx: &Cx<'_>, list: ast::List<'c>) -> R<Vec<(Val, Span)>> {
-        list.items()
-            .map(|item| Ok((self.expr(cx, item)?, item.syntax().span())))
-            .collect()
+    fn written_inner(
+        &mut self,
+        cx: &Cx<'_>,
+        e: Expr<'c>,
+        meaning: &'c Meaning,
+        ty: TypeId,
+        at: SourceSpan,
+    ) -> R<(Val, Option<Rc<Parts>>)> {
+        let mut entries = Vec::new();
+        let value = match (e, meaning) {
+            (Expr::Paren(paren), _) => match paren.expr() {
+                Some(inner) => return self.written(cx, inner),
+                None => return Err(self.bug(cx.file, at.span, "parentheses are empty")),
+            },
+            (Expr::List(list), _) => {
+                let mut elements = Vec::new();
+                for item in list.items() {
+                    let (value, parts) = self.written(cx, item)?;
+                    let span = item.syntax().span();
+                    elements.push((value, Written { span, parts }));
+                }
+                let items = elements.iter().map(|(v, _)| v.clone()).collect();
+                let value = self.sequence(items, ty, at)?;
+                return Ok((value, Some(Rc::new(Parts::Elements(elements)))));
+            }
+            (Expr::Map(map), Meaning::Struct(s)) => {
+                self.struct_value(cx, *s, map.entries().collect(), at, Some(&mut entries))?
+            }
+            (Expr::StructLit(lit), Meaning::Struct(s)) => {
+                self.struct_value(cx, *s, lit.entries().collect(), at, Some(&mut entries))?
+            }
+            (Expr::Map(map), _) => self.map_literal(cx, map, ty, at, Some(&mut entries))?,
+            (Expr::Call(call), Meaning::Call(fact)) => {
+                let value = self.call(cx, call, fact, at, Some(&mut entries))?;
+                entries.sort_by(|a, b| a.0.cmp(&b.0));
+                let call = Written {
+                    span: at.span,
+                    parts: Some(Rc::new(Parts::Entries(entries))),
+                };
+                return Ok((value, Some(Rc::new(Parts::Payload(call)))));
+            }
+            _ => return Err(self.bug(cx.file, at.span, "a literal records no parts")),
+        };
+        entries.sort_by(|a, b| a.0.cmp(&b.0));
+        Ok((value, Some(Rc::new(Parts::Entries(entries)))))
     }
 
     /// Returns the elements as a set when `ty` is a set type, and as a
@@ -483,12 +542,15 @@ impl<'c> Eval<'c> {
         }
     }
 
+    /// Evaluates a map literal. With `parts`, it also records where each
+    /// entry was written.
     fn map_literal(
         &mut self,
         cx: &Cx<'_>,
         map: ast::Map<'c>,
         ty: TypeId,
         at: SourceSpan,
+        mut parts: Option<&mut Vec<(String, Written)>>,
     ) -> R<Val> {
         let key_sum = match self.c.types.get(self.c.types.peel(ty)) {
             Type::Map(k, _) => self.c.types.as_sum(*k),
@@ -500,8 +562,17 @@ impl<'c> Eval<'c> {
                 continue;
             };
             let text = self.key_text(cx, key)?;
+            let name = parts.is_some().then(|| text.clone());
             let key = self.map_key(key_sum, text, cx.at(key.span()))?;
-            let value = self.expr(cx, value)?;
+            let value = match (parts.as_deref_mut(), name) {
+                (Some(parts), Some(name)) => {
+                    let (value, inner) = self.written(cx, value)?;
+                    let span = entry.syntax().span();
+                    parts.push((name, Written { span, parts: inner }));
+                    value
+                }
+                _ => self.expr(cx, value)?,
+            };
             self.step(at)?;
             match entries.entry(MapKey(key)) {
                 Entry::Vacant(slot) => {

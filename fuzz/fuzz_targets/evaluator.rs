@@ -13,7 +13,8 @@
 
 use libfuzzer_sys::fuzz_target;
 use stav::{
-    AttrPath, Checked, Format, Host, ImportRoot, Limits, MemoryLoader, RootSpec, SymbolType,
+    AttrPath, Checked, Evaluated, Format, Host, ImportRoot, Limits, MemoryLoader, RootSpec,
+    SourceSpan, SymbolType,
 };
 
 const SCHEMA: &str = "type Level = debug | info | warn\n\
@@ -56,6 +57,13 @@ fn host(input: &str) -> Host {
     host
 }
 
+fn points_into_its_file(evaluated: &Evaluated, span: SourceSpan) -> bool {
+    let sources = evaluated.diagnostics([]);
+    sources
+        .source(span.file)
+        .is_some_and(|text| text.get(span.span.range()).is_some())
+}
+
 fn run(checked: &Checked, limits: &Limits) -> String {
     match checked.eval(limits) {
         Ok(evaluated) => {
@@ -78,14 +86,22 @@ fn run(checked: &Checked, limits: &Limits) -> String {
                 "pkgs.1",
                 "d.a.0",
                 "items.a.tags.0",
+                "items.a.build.make.target",
+                "items.a.build.cargo.features.0",
+                "opt.build.cargo.features.1",
             ] {
                 let path: AttrPath = key.parse().expect("the path parses");
-                let _ = evaluated.spans(&path);
+                for span in evaluated.spans(&path) {
+                    assert!(points_into_its_file(&evaluated, span));
+                }
                 let _ = evaluated.priority(&path);
                 let _ = evaluated.value().at(&path);
             }
             for (text, path, _) in evaluated.symbol_paths("Pkg") {
                 assert!(evaluated.value().at(path).is_some());
+                for span in evaluated.spans(path) {
+                    assert!(points_into_its_file(&evaluated, span));
+                }
                 out.push_str(&format!("{path} {text}"));
             }
             out

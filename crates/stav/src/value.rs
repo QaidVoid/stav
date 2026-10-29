@@ -247,7 +247,10 @@ fn describe(value: &Value, out: &mut String) {
 /// down.
 ///
 /// A position is written as a key in decimal, counted from zero, so the
-/// fourth element of `packages` is `packages.3`.
+/// fourth element of `packages` is `packages.3`. A payload field of a
+/// variant follows the name of the variant, the way the variant renders,
+/// so the field `cmd` of `ready = check(cmd = ["probe"])` is
+/// `ready.check.cmd`.
 ///
 /// The [`Display`](fmt::Display) form separates keys with dots and writes
 /// a key bare when it is not empty and consists of ASCII letters, digits,

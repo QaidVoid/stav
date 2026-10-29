@@ -108,10 +108,31 @@ pub(crate) struct Contrib {
     /// The order of the contribution: contributions to one attribute
     /// concatenate and are reported in this order.
     pub(crate) seq: u32,
-    /// The elements of a list literal that the contribution's value was
-    /// built from, each with its span, for the spans of list and set
-    /// elements.
-    pub(crate) elements: Option<Rc<Vec<(Val, Span)>>>,
+    /// Where the parts of the contribution's value were written, when a
+    /// literal built it, for the spans of the attributes inside the value.
+    pub(crate) parts: Option<Rc<Parts>>,
+}
+
+/// One part of a value that a literal wrote.
+#[derive(Debug, Clone)]
+pub(crate) struct Written {
+    /// The span of the element, entry or argument that wrote the part.
+    pub(crate) span: Span,
+    /// Where the parts inside it were written, when a literal built it.
+    pub(crate) parts: Option<Rc<Parts>>,
+}
+
+/// Where the parts of a value were written by the literal that built it.
+#[derive(Debug)]
+pub(crate) enum Parts {
+    /// The elements of a list literal, each with its value.
+    Elements(Vec<(Val, Written)>),
+    /// The fields or keys that a struct or map literal sets, or the
+    /// payload fields that the arguments of a variant call set, sorted by
+    /// name.
+    Entries(Vec<(String, Written)>),
+    /// A variant call: the call itself, with its arguments as entries.
+    Payload(Written),
 }
 
 impl Contrib {
@@ -128,6 +149,47 @@ impl Contrib {
         Self {
             span,
             ..self.clone()
+        }
+    }
+
+    /// Returns a copy for the contributions of the field or key `name`
+    /// of the value, at the entry that wrote it when a literal recorded
+    /// one.
+    pub(crate) fn part(&self, name: &str) -> Self {
+        let found = match self.parts.as_deref() {
+            Some(Parts::Entries(entries)) => entries
+                .binary_search_by(|(key, _)| key.as_str().cmp(name))
+                .ok()
+                .map(|i| &entries[i].1),
+            _ => None,
+        };
+        match found {
+            Some(written) => Self {
+                span: written.span,
+                parts: written.parts.clone(),
+                ..self.clone()
+            },
+            None => Self {
+                parts: None,
+                ..self.clone()
+            },
+        }
+    }
+
+    /// Returns a copy for the contributions of the payload fields of a
+    /// variant value, at the call that wrote it when a literal recorded
+    /// one.
+    pub(crate) fn payload(&self) -> Self {
+        match self.parts.as_deref() {
+            Some(Parts::Payload(call)) => Self {
+                span: call.span,
+                parts: call.parts.clone(),
+                ..self.clone()
+            },
+            _ => Self {
+                parts: None,
+                ..self.clone()
+            },
         }
     }
 
@@ -222,7 +284,7 @@ impl Body {
             span,
             via: self.via.clone(),
             seq: 0,
-            elements: None,
+            parts: None,
         }
     }
 }
@@ -501,23 +563,22 @@ impl<'c> Eval<'c> {
                 }
                 Ok(())
             }
-            (Expr::List(list), Type::List(_) | Type::Set(_)) => {
-                let (value, elements) = self.list_elements(cx, list)?;
-                let mut contrib = template.with(Kind::Value(value));
-                contrib.elements = Some(Rc::new(elements));
-                out.push(Pending { path, contrib });
-                Ok(())
-            }
             _ => {
-                let value = self.expr(cx, e)?;
-                self.decompose(path, ty, value, template, out);
+                let (value, parts) = self.written(cx, e)?;
+                let template = Contrib {
+                    parts,
+                    ..template.clone()
+                };
+                self.decompose(path, ty, value, &template, out);
                 Ok(())
             }
         }
     }
 
     /// Contributes a value at `path`: a struct or map one contribution per
-    /// field or key, anything else as a whole.
+    /// field or key, anything else as a whole. When the template records
+    /// where the parts of the value were written, the contribution of
+    /// each field or key is placed at the entry that wrote it.
     pub(crate) fn decompose(
         &self,
         path: Vec<Seg>,
@@ -541,6 +602,8 @@ impl<'c> Eval<'c> {
                     }
                     let mut sub = path.clone();
                     sub.push(Seg::Field(u32::try_from(i).unwrap_or(u32::MAX)));
+                    let part = template.parts.as_ref().map(|_| template.part(&field.name));
+                    let template = part.as_ref().unwrap_or(template);
                     self.decompose(sub, field.ty, val.clone(), template, out);
                 }
             }
@@ -550,8 +613,11 @@ impl<'c> Eval<'c> {
                     contrib: template.with(Kind::Present),
                 });
                 for (key, val) in &m.entries {
+                    let text = key.text(types);
+                    let part = template.parts.as_ref().map(|_| template.part(&text));
+                    let template = part.as_ref().unwrap_or(template);
                     let mut sub = path.clone();
-                    sub.push(Seg::Key(key.text(types).into()));
+                    sub.push(Seg::Key(text.into()));
                     self.decompose(sub, *value_ty, val.clone(), template, out);
                 }
             }
