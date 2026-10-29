@@ -83,7 +83,7 @@ These properties define Stav. A change that breaks one is a bug, even when every
 
 ## Documentation
 
-The documentation site lives in `docs/`. It is built with VitePress and bun, and deployed to GitHub Pages from `main`.
+The documentation site lives in `docs/`. It is built with VitePress and bun. CI builds it on every change, and the owner publishes the built site by hand.
 
 - When anything in `docs/` changes, run `bun install` and `bun run build` in `docs/` before committing. The build must succeed, and it fails on dead links. Commit `docs/bun.lock` whenever dependencies change, and keep VitePress pinned to an exact version.
 - Every example must be verified with the `stav` binary. Mark each program with `<!-- file: NAME -->` and each command with `<!-- run: ARGS -->`, followed directly by the exact output, then run `bun run verify` in `docs/` with `stav` on the `PATH` or named by the `STAV` variable. Every other `stav` code block must parse and be laid out as `stav fmt` lays it out. Never write an output by hand. Generate it with the binary.
