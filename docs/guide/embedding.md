@@ -166,7 +166,34 @@ error[E0803]: value violates a refinement
   label: config/base.stav:6:11: constraint declared here
 ```
 
-Warnings do not stop a program. `Checked::warnings` returns them after a successful check. [Diagnostics](../reference/diagnostics) describes the parts of a diagnostic, and [Error codes](../reference/error-codes) lists every code.
+Warnings do not stop a program. `Checked::warnings` returns them after a successful check. Evaluation can still fail after that, and its errors come without the warnings. `Checked::diagnostics` builds one `Diagnostics` from any list of diagnostics of the program, so a host can report every warning together with the errors of evaluation or of its own validation:
+
+```rust
+let checked = stav::check(&host, &root)?;
+let evaluated = match checked.eval(&Limits::default()) {
+    Ok(evaluated) => evaluated,
+    Err(errors) => {
+        let all = checked.warnings().iter().chain(errors.iter()).cloned();
+        return Err(checked.diagnostics(all));
+    }
+};
+```
+
+A host can report problems of its own the same way. `Diagnostic::error` and `Diagnostic::warning` take any code, and `with_label`, `with_note` and `with_help` add the rest. A `FileDiagnostic` pairs a diagnostic with the file its span points into, as given by `Checked::files`, `Diagnostics::files` or the `file` of a `SourceSpan`. `Checked::diagnostics`, `Evaluated::diagnostics` and `Diagnostics::with_items` turn such lists into `Diagnostics` that render exactly like those of Stav.
+
+`Diagnostics::with_items` also replaces diagnostics of Stav. A host that wants its own code and wording for an import that leaves its import root, [`E0702`](../reference/error-codes#e0702), maps the errors of a failed check:
+
+```rust
+let errors = stav::check(&host, &root).unwrap_err();
+let ours = errors.with_items(errors.iter().map(|item| match item.diagnostic.code {
+    "E0702" => FileDiagnostic {
+        file: item.file,
+        diagnostic: Diagnostic::error("H0002", item.diagnostic.span, "imports stay inside the project")
+            .with_help("move the file into the project"),
+    },
+    _ => item.clone(),
+}));
+``` [Diagnostics](../reference/diagnostics) describes the parts of a diagnostic, and [Error codes](../reference/error-codes) lists every code.
 
 ## Reading files from disk
 

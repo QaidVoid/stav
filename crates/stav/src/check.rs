@@ -72,6 +72,41 @@ impl Checked {
         &self.warnings
     }
 
+    /// Returns diagnostics about this program that render like the
+    /// diagnostics of the checker and the evaluator, with the names and
+    /// texts of its files.
+    ///
+    /// A host uses this to report the warnings of [`Checked::warnings`]
+    /// together with the errors of a failed [`Checked::eval`], or together
+    /// with the errors of its own validation, in one list.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stav::{Host, ImportRoot, Limits, MemoryLoader, RootSpec};
+    ///
+    /// let source = "type Level = debug | info\nstruct Root { n: Int = 0 }\n\
+    ///               let info: Level = Level.debug\nfn level() -> Level = info\nn = 1 / 0\n";
+    /// let host = Host::new(MemoryLoader::new().with_file("app/main.stav", source));
+    /// let root = RootSpec {
+    ///     root_struct: "Root".to_owned(),
+    ///     entries: vec!["app/main.stav".into()],
+    ///     import_roots: vec![ImportRoot::new("app")],
+    /// };
+    /// let checked = stav::check(&host, &root)?;
+    /// let errors = checked.eval(&Limits::default()).unwrap_err();
+    /// let all = checked.diagnostics(checked.warnings().iter().chain(errors.iter()).cloned());
+    /// let codes: Vec<&str> = all.iter().map(|d| d.diagnostic.code).collect();
+    /// assert_eq!(codes, ["W0302", "E0603"]);
+    /// # Ok::<(), stav::Diagnostics>(())
+    /// ```
+    pub fn diagnostics(&self, items: impl IntoIterator<Item = FileDiagnostic>) -> Diagnostics {
+        Diagnostics {
+            files: self.named_sources(),
+            items: items.into_iter().collect(),
+        }
+    }
+
     /// Returns every file of the program with its display name, in the order
     /// the files were loaded.
     pub fn files(&self) -> impl Iterator<Item = (FileId, &str)> {

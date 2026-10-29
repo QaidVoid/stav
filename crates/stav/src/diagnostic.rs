@@ -157,6 +157,59 @@ impl Diagnostics {
             .any(|item| item.diagnostic.severity == Severity::Error)
     }
 
+    /// Returns diagnostics with the files of these, and `items` in place
+    /// of their diagnostics.
+    ///
+    /// A host uses this to add diagnostics of its own, with codes of its
+    /// own, or to replace a diagnostic of Stav with its own version. The
+    /// result renders exactly like the diagnostics of Stav. The file of
+    /// each item must be one of [`Diagnostics::files`].
+    ///
+    /// # Examples
+    ///
+    /// A host that reports leaving an import root under a code of its own:
+    ///
+    /// ```
+    /// use stav::{Diagnostic, FileDiagnostic, Host, ImportRoot, MemoryLoader, RootSpec};
+    ///
+    /// let loader = MemoryLoader::new()
+    ///     .with_file("app/main.stav", "import \"../secret.stav\" as s\nstruct Root {}\n");
+    /// let root = RootSpec {
+    ///     root_struct: "Root".to_owned(),
+    ///     entries: vec!["app/main.stav".into()],
+    ///     import_roots: vec![ImportRoot::new("app")],
+    /// };
+    /// let errors = stav::check(&Host::new(loader), &root).unwrap_err();
+    /// let ours = errors.with_items(errors.iter().map(|item| match item.diagnostic.code {
+    ///     "E0702" => FileDiagnostic {
+    ///         file: item.file,
+    ///         diagnostic: Diagnostic::error("H0002", item.diagnostic.span, "imports stay inside the project")
+    ///             .with_help("move the file into the project"),
+    ///     },
+    ///     _ => item.clone(),
+    /// }));
+    /// assert_eq!(
+    ///     ours.to_string(),
+    ///     "error[H0002]: imports stay inside the project\n  --> app/main.stav:1:8\n  \
+    ///      help: move the file into the project\n"
+    /// );
+    /// ```
+    pub fn with_items(&self, items: impl IntoIterator<Item = FileDiagnostic>) -> Diagnostics {
+        Diagnostics {
+            files: self.files.clone(),
+            items: items.into_iter().collect(),
+        }
+    }
+
+    /// Returns every file that diagnostics can refer to, with its display
+    /// name, so that a host can point its own diagnostics at them.
+    pub fn files(&self) -> impl Iterator<Item = (FileId, &str)> {
+        self.files
+            .iter()
+            .enumerate()
+            .map(|(i, f)| (FileId::new(i), f.name.as_str()))
+    }
+
     /// Returns the display name of a file, for example `lib/net.stav` or
     /// `std/desktop`.
     pub fn file_name(&self, file: FileId) -> Option<&str> {
