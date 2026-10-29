@@ -104,12 +104,25 @@ pub(crate) struct Contrib {
     /// The order of the contribution: contributions to one attribute
     /// concatenate and are reported in this order.
     pub(crate) seq: u32,
+    /// The elements of a list literal that the contribution's value was
+    /// built from, each with its span, for the spans of list and set
+    /// elements.
+    pub(crate) elements: Option<Rc<Vec<(Val, Span)>>>,
 }
 
 impl Contrib {
     pub(crate) fn with(&self, kind: Kind) -> Self {
         Self {
             kind,
+            ..self.clone()
+        }
+    }
+
+    /// Returns a copy for the contributions of one entry of a literal at
+    /// `span`.
+    fn spanning(&self, span: Span) -> Self {
+        Self {
+            span,
             ..self.clone()
         }
     }
@@ -202,6 +215,7 @@ impl Body {
             span,
             via: self.via.clone(),
             seq: 0,
+            elements: None,
         }
     }
 }
@@ -458,7 +472,8 @@ impl<'c> Eval<'c> {
                     let field_ty = field.ty;
                     let mut sub = path.clone();
                     sub.push(Seg::Field(u32::try_from(index).unwrap_or(u32::MAX)));
-                    self.contribute(cx, sub, field_ty, value, template, out)?;
+                    let template = template.spanning(entry.syntax().span());
+                    self.contribute(cx, sub, field_ty, value, &template, out)?;
                 }
                 Ok(())
             }
@@ -474,8 +489,16 @@ impl<'c> Eval<'c> {
                     let name = self.key_text(cx, key)?;
                     let mut sub = path.clone();
                     sub.push(Seg::Key(name.into()));
-                    self.contribute(cx, sub, value_ty, value, template, out)?;
+                    let template = template.spanning(entry.syntax().span());
+                    self.contribute(cx, sub, value_ty, value, &template, out)?;
                 }
+                Ok(())
+            }
+            (Expr::List(list), Type::List(_) | Type::Set(_)) => {
+                let (value, elements) = self.list_elements(cx, list)?;
+                let mut contrib = template.with(Kind::Value(value));
+                contrib.elements = Some(Rc::new(elements));
+                out.push(Pending { path, contrib });
                 Ok(())
             }
             _ => {

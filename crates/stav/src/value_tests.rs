@@ -33,6 +33,20 @@ fn paths_step_through_fields_keys_and_variants() {
 }
 
 #[test]
+fn paths_step_into_list_elements_by_position() {
+    let root = Value::Map(vec![("finder".to_owned(), job())]);
+    let path = |keys: &[&str]| {
+        let mut all = vec!["finder", "build", "native", "features"];
+        all.extend(keys);
+        AttrPath::new(all)
+    };
+    assert_eq!(root.at(&path(&["0"])), Some(&Value::Str("simd".to_owned())));
+    for missing in ["1", "00", "+0", "-1", "x"] {
+        assert!(root.at(&path(&[missing])).is_none(), "{missing}");
+    }
+}
+
+#[test]
 fn paths_display_like_attribute_statements() {
     let path = AttrPath::new(["tunables", "mem.reclaim"]).join("x");
     assert_eq!(path.to_string(), "tunables.\"mem.reclaim\".x");

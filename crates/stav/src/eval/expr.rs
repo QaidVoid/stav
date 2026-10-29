@@ -148,6 +148,39 @@ impl<'c> Eval<'c> {
         self.sequence(items, ty, at)
     }
 
+    /// Evaluates a list literal like [`Eval::expr`], and also returns the
+    /// value and the span of each of its elements.
+    pub(crate) fn list_elements(
+        &mut self,
+        cx: &Cx<'_>,
+        list: ast::List<'c>,
+    ) -> R<(Val, Vec<(Val, Span)>)> {
+        let at = cx.at(list.syntax().span());
+        let Fact::Expr(fact) = self.fact(cx.unit, list.syntax().index()) else {
+            return Err(self.bug(cx.file, at.span, "an expression has no facts"));
+        };
+        let ty = fact.ty;
+        self.step(at)?;
+        self.enter(at)?;
+        let mut elements = Vec::new();
+        let mut result = Ok(());
+        for item in list.items() {
+            match self.expr(cx, item) {
+                Ok(value) => elements.push((value, item.syntax().span())),
+                Err(stop) => {
+                    result = Err(stop);
+                    break;
+                }
+            }
+        }
+        let value = result.and_then(|()| {
+            let items = elements.iter().map(|(v, _)| v.clone()).collect();
+            self.sequence(items, ty, at)
+        });
+        self.leave();
+        Ok((value?, elements))
+    }
+
     /// Returns the elements as a set when `ty` is a set type, and as a
     /// list otherwise.
     fn sequence(&mut self, items: Vec<Val>, ty: TypeId, at: SourceSpan) -> R<Val> {

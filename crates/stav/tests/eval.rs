@@ -461,6 +461,52 @@ fn spans_and_symbols_point_at_the_source() {
     assert_eq!(symbols, ["editor"]);
 }
 
+/// Returns the source text of every span of the attribute at `path`.
+fn span_texts(evaluated: &stav::Evaluated, path: &str) -> Vec<String> {
+    let path: stav::AttrPath = path.parse().expect("the path parses");
+    let sources = evaluated.diagnostics([]);
+    evaluated
+        .spans(&path)
+        .iter()
+        .map(|s| {
+            let source = sources.source(s.file).expect("the file of a span exists");
+            source[s.span.range()].to_owned()
+        })
+        .collect()
+}
+
+#[test]
+fn spans_point_at_list_elements_and_literal_entries() {
+    let text = "#! entries a.stav b.stav\n#- file a.stav\n\
+                struct Server { host: Str, port: Int = 80 }\n\
+                struct Root {\n  ports: List<Int> = []\n  zones: Set<Str> = []\n  \
+                env: Map<Str, Str> = {}\n  servers: List<Server> = []\n  \
+                server: Server = { host = \"a\" }\n  d: Data = none\n}\n\
+                fn more() -> List<Int> = [8080]\n\
+                ports = [80, 443]\nports = more()\nzones = [\"west\", \"east\"]\n\
+                env = { LANG = \"C\", TZ = \"UTC\" }\nservers = [{ host = \"x\" }]\n\
+                server = { host = \"b\", port = 8 }\nd = { a = [1] }\n\
+                #- file b.stav\nzones = [\"east\"]\n";
+    let evaluated = evaluate(text);
+    let cases: &[(&str, &[&str])] = &[
+        ("ports.0", &["80"]),
+        ("ports.1", &["443"]),
+        ("ports.2", &["more()"]),
+        ("ports.3", &[]),
+        ("zones.0", &["\"east\"", "\"east\""]),
+        ("zones.1", &["\"west\""]),
+        ("env.TZ", &["TZ = \"UTC\""]),
+        ("servers.0", &["{ host = \"x\" }"]),
+        ("servers.0.host", &["{ host = \"x\" }"]),
+        ("servers.0.nothing", &[]),
+        ("server.port", &["port = 8", "80"]),
+        ("d.a.0", &["{ a = [1] }", "none"]),
+    ];
+    for (path, expected) in cases {
+        assert_eq!(&span_texts(&evaluated, path), expected, "{path}");
+    }
+}
+
 /// Asserts that a program evaluates within a few seconds, far above what
 /// its size needs when no step is quadratic.
 fn evaluates_quickly(text: &str) {

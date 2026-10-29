@@ -69,8 +69,17 @@ fn run(checked: &Checked, limits: &Limits) -> String {
                     }
                 }
             }
-            for key in ["n", "items", "list", "opt"] {
-                let path = AttrPath::new([key]);
+            for key in [
+                "n",
+                "items",
+                "list",
+                "opt",
+                "list.0",
+                "pkgs.1",
+                "d.a.0",
+                "items.a.tags.0",
+            ] {
+                let path: AttrPath = key.parse().expect("the path parses");
                 let _ = evaluated.spans(&path);
                 let _ = evaluated.value().at(&path);
             }

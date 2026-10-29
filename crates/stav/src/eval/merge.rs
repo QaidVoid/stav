@@ -549,6 +549,7 @@ impl<'c> Eval<'c> {
                 span,
                 via: None,
                 seq: 0,
+                elements: None,
             };
             let reads = self.default_reads(s, i);
             if reads.is_empty() {
@@ -728,6 +729,7 @@ impl<'c> Eval<'c> {
                     span: def.span,
                     via: None,
                     seq: 0,
+                    elements: None,
                 };
                 let mut out = Vec::new();
                 self.decompose(Vec::new(), ty, value, &template, &mut out);
@@ -970,15 +972,17 @@ impl<'c> Eval<'c> {
                 continue;
             };
             let out = self.run_deferred(deferred, &contrib)?;
-            let value = out
+            let (value, elements) = out
                 .into_iter()
                 .find(|p| p.path.is_empty())
                 .and_then(|p| match p.contrib.kind {
-                    Kind::Value(v) => Some(v),
+                    Kind::Value(v) => Some((v, p.contrib.elements)),
                     _ => None,
                 })
-                .unwrap_or(Val::None);
-            self.merge.contribs[id as usize].kind = Kind::Value(value);
+                .unwrap_or((Val::None, None));
+            let slot = &mut self.merge.contribs[id as usize];
+            slot.kind = Kind::Value(value);
+            slot.elements = elements;
         }
         let values: Vec<(Val, u32)> = winners
             .iter()
@@ -1480,6 +1484,13 @@ impl<'c> Eval<'c> {
                 children.push((key, index));
                 stack.push((c, index));
             }
+            for (i, spans) in self.element_spans(n).into_iter().enumerate() {
+                children.push((i.to_string(), tree.nodes.len()));
+                tree.nodes.push(SpanNode {
+                    spans,
+                    ..SpanNode::default()
+                });
+            }
             if let Shape::Tagged(Some(_)) = node.shape {
                 tree.nodes[slot].transparent = true;
             }
@@ -1487,6 +1498,60 @@ impl<'c> Eval<'c> {
             tree.nodes[slot].children = children;
         }
         tree
+    }
+}
+
+impl Eval<'_> {
+    /// Returns the spans of each element of the list or set at `n`: the
+    /// element of a list literal that wrote it, or else the contribution
+    /// it came from. An element of a set has the spans of every element
+    /// equal to it.
+    fn element_spans(&self, n: NodeId) -> Vec<Vec<SourceSpan>> {
+        let (set, items) = match self.final_value(n) {
+            Some(Val::List(s)) => (false, s),
+            Some(Val::Set(s)) => (true, s),
+            _ => return Vec::new(),
+        };
+        let mut written: Vec<(Val, SourceSpan)> = Vec::new();
+        for &id in &self.merge.node(n).winners {
+            let c = self.merge.contrib(id);
+            let Kind::Value(value) = &c.kind else {
+                continue;
+            };
+            match &c.elements {
+                Some(elements) if set || elements.len() == value.items().len() => {
+                    written.extend(elements.iter().map(|(v, span)| {
+                        let at = SourceSpan {
+                            file: c.file,
+                            span: *span,
+                        };
+                        (v.clone(), at)
+                    }));
+                }
+                _ => written.extend(value.items().iter().map(|v| (v.clone(), c.at()))),
+            }
+        }
+        if !set {
+            if written.len() != items.items.len() {
+                return Vec::new();
+            }
+            return written.into_iter().map(|(_, at)| vec![at]).collect();
+        }
+        written.sort_by(|a, b| a.0.order(&b.0));
+        items
+            .items
+            .iter()
+            .map(|item| {
+                let start = written.partition_point(|(v, _)| v.order(item).is_lt());
+                let mut spans: Vec<SourceSpan> = Vec::new();
+                for (_, at) in written[start..].iter().take_while(|(v, _)| v.equals(item)) {
+                    if !spans.contains(at) {
+                        spans.push(*at);
+                    }
+                }
+                spans
+            })
+            .collect()
     }
 }
 
@@ -1509,7 +1574,11 @@ struct SpanNode {
 }
 
 impl SpanTree {
-    pub(crate) fn spans(&self, path: &AttrPath) -> Vec<SourceSpan> {
+    /// Returns the spans of the attribute at `path`. When the tree ends
+    /// before the path does, `inside` says whether the path still names a
+    /// part of the value, which then gets the spans of the deepest
+    /// attribute on the path.
+    pub(crate) fn spans(&self, path: &AttrPath, inside: bool) -> Vec<SourceSpan> {
         let Some(mut current) = (!self.nodes.is_empty()).then_some(0) else {
             return Vec::new();
         };
@@ -1517,6 +1586,7 @@ impl SpanTree {
             let node = &self.nodes[current];
             match node.children.binary_search_by(|(k, _)| k.as_str().cmp(key)) {
                 Ok(i) => current = node.children[i].1,
+                Err(_) if inside => break,
                 Err(_) => return Vec::new(),
             }
         }

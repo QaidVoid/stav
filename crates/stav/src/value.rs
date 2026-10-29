@@ -86,7 +86,9 @@ impl Value {
     ///
     /// Each key names a struct field or a map key. A key that names the
     /// variant of a value with payload steps into its payload fields, the
-    /// way the variant is rendered: `build.native.features`.
+    /// way the variant is rendered: `build.native.features`. In a list or
+    /// a set, a key is the position of an element, counted from zero and
+    /// written in decimal without leading zeros: `packages.3`.
     pub fn at(&self, path: &AttrPath) -> Option<&Value> {
         let mut current = self;
         let mut keys = path.keys().iter();
@@ -101,6 +103,7 @@ impl Value {
                     None => return Some(current),
                 },
                 Value::Variant { .. } => return None,
+                Value::List(items) | Value::Set(items) => items.get(index(key)?)?,
                 _ => current.get(key)?,
             };
         }
@@ -175,6 +178,12 @@ impl Value {
     }
 }
 
+/// Returns the position a key names in a list or a set.
+fn index(key: &str) -> Option<usize> {
+    let position: usize = key.parse().ok()?;
+    (position.to_string() == key).then_some(position)
+}
+
 fn describe(value: &Value, out: &mut String) {
     if out.len() > 60 {
         return;
@@ -233,8 +242,12 @@ fn describe(value: &Value, out: &mut String) {
     }
 }
 
-/// A path to an attribute of a value: struct field names, map keys and
-/// variant names, from the root down.
+/// A path to an attribute of a value: struct field names, map keys,
+/// variant names and the positions of list and set elements, from the root
+/// down.
+///
+/// A position is written as a key in decimal, counted from zero, so the
+/// fourth element of `packages` is `packages.3`.
 ///
 /// The [`Display`](fmt::Display) form separates keys with dots and writes
 /// a key bare when it is not empty and consists of ASCII letters, digits,

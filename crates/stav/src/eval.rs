@@ -166,11 +166,44 @@ impl Evaluated {
 
     /// Returns the source locations of every contribution to `path`, the
     /// winners of the merge first, each group in the order of the
-    /// contributions. A block contributes the span of its statement, and a
+    /// contributions. A block contributes the span of its statement, an
+    /// entry of a struct or map literal the span of the entry, and a
     /// declared default the span of its expression. An attribute without
     /// contributions of its own returns those of the attributes inside it.
+    ///
+    /// An element of a list or set, named by its position as in
+    /// `packages.3`, returns the span of the element of the list literal
+    /// that wrote it, or else of the contribution it came from. An element
+    /// of a set returns the spans of every element equal to it. A path
+    /// further inside a value, such as a field of a struct in a list or a
+    /// key of a `Data` map, returns the spans of the deepest attribute or
+    /// element on the path. A path that names nothing in the value returns
+    /// no spans.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stav::{AttrPath, Host, ImportRoot, Limits, MemoryLoader, RootSpec};
+    ///
+    /// let source = "struct Root { ports: List<Int> = [], env: Map<Str, Str> = {} }\n\
+    ///               ports = [80, 443]\nenv = { LANG = \"C\", TZ = \"UTC\" }\n";
+    /// let host = Host::new(MemoryLoader::new().with_file("app/main.stav", source));
+    /// let root = RootSpec {
+    ///     root_struct: "Root".to_owned(),
+    ///     entries: vec!["app/main.stav".into()],
+    ///     import_roots: vec![ImportRoot::new("app")],
+    /// };
+    /// let evaluated = stav::check(&host, &root)?.eval(&Limits::default())?;
+    /// let text = |path: &str| -> Vec<&str> {
+    ///     let path: AttrPath = path.parse().unwrap();
+    ///     evaluated.spans(&path).iter().map(|s| &source[s.span.range()]).collect()
+    /// };
+    /// assert_eq!(text("ports.1"), ["443"]);
+    /// assert_eq!(text("env.TZ"), ["TZ = \"UTC\""]);
+    /// # Ok::<(), stav::Diagnostics>(())
+    /// ```
     pub fn spans(&self, path: &AttrPath) -> Vec<SourceSpan> {
-        self.spans.spans(path)
+        self.spans.spans(path, self.value.at(path).is_some())
     }
 
     /// Returns every value of the symbol type named `ty` in the final

@@ -190,7 +190,7 @@ Canonical JSON sorts keys and has no whitespace, so equal values always print th
 
 ### Selecting an attribute
 
-`--path` takes an attribute path written the way diagnostics print paths. Keys are separated by dots. A key that contains anything other than ASCII letters, digits, `_` and `-` goes in double quotes, with the escapes of a string literal. Quote the whole argument for the shell.
+`--path` takes an attribute path written the way diagnostics print paths. Keys are separated by dots. A key that contains anything other than ASCII letters, digits, `_` and `-` goes in double quotes, with the escapes of a string literal. An element of a list or set is named by its position, counted from zero, as in `--path servers.0`. Quote the whole argument for the shell.
 
 <!-- run: eval --path 'labels."app.tier"' service.stav -->
 

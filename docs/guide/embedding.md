@@ -151,7 +151,7 @@ primary: https://a.example.org (weight 90)
 | `Ref<T>`, `Path`, symbol types | `String`, or a type of your own that deserializes from a string |
 | `Data` | any type that matches its shape |
 
-`AttrPath::root()` names the whole value, and `AttrPath::new(["upstreams", "primary"])` names an attribute inside it. A path that names no attribute, or a value that does not convert, is the error `E0805`.
+`AttrPath::root()` names the whole value, and `AttrPath::new(["upstreams", "primary"])` names an attribute inside it. An element of a list or set is named by its position, counted from zero, so `AttrPath::new(["servers", "0"])` is the first element of `servers`. A path that names no attribute, or a value that does not convert, is the error `E0805`.
 
 `Evaluated` can also render the value with `render(Format::Json)`, `Format::Toml` or `Format::Yaml`, give its canonical JSON with `to_canonical_json`, or hand out the `Value` tree itself with `value()`.
 
@@ -392,7 +392,7 @@ A few details are worth knowing:
 
 - **Symbol types.** `words` allows symbol words such as `name@1.2:variant`, and `strings` allows string literals. The `parse` function checks the text of every literal when it is evaluated and returns its canonical text, or a message that becomes the error `E0613`. Stav never checks whether a symbol exists. `Evaluated::symbols` returns every symbol of a type with the place that wrote it, for the host to validate.
 - **Host modules** keep evaluation pure. Their source is an input of the evaluation exactly like a file, so the same files with the same host module sources always give the same value. A host that evaluates one program for several targets passes different sources each time.
-- **Host validation.** Rules that relate several fields, or that need outside knowledge such as a package index, belong to the host. `Evaluated::spans` returns where each attribute was written, and `Evaluated::diagnostics` wraps the host's own diagnostics so that they render exactly like those of Stav. Choose codes that cannot be confused with the `E` and `W` codes of the language.
+- **Host validation.** Rules that relate several fields, or that need outside knowledge such as a package index, belong to the host. `Evaluated::spans` returns where each attribute was written, down to the entry of a struct or map literal and the element of a list, and `Evaluated::diagnostics` wraps the host's own diagnostics so that they render exactly like those of Stav. Choose codes that cannot be confused with the `E` and `W` codes of the language.
 - **Caching.** `Checked::inputs` lists every source text the program was read from. A host can key a cache of evaluations by hashing them.
 - **Limits.** `Limits::default()` allows 50 000 000 evaluation steps and 512 MiB of values. A host can raise or lower them for each evaluation. [Totality and limits](../reference/totality) explains how they are counted.
 
