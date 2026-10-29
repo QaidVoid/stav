@@ -18,16 +18,12 @@ use crate::value::{AttrPath, Value};
 impl<'c> Eval<'c> {
     /// Checks the merged value of the root, and returns it in its public
     /// form with the span index and the symbols it holds.
-    #[allow(clippy::type_complexity, reason = "the parts of an evaluation result")]
-    pub(crate) fn finish(
-        &mut self,
-        root: &Val,
-    ) -> R<(Value, SpanTree, Vec<(String, String, SourceSpan)>)> {
+    pub(crate) fn finish(&mut self, root: &Val) -> R<(Value, SpanTree, Vec<Symbol>)> {
         self.final_refinements(NodeId::ROOT)?;
         let value = root.to_value(&self.c.types, &self.c.import_roots);
         self.check_refs(root, &value);
         let mut symbols = Vec::new();
-        self.collect_symbols(root, &mut symbols);
+        self.collect_symbols(root, &mut Vec::new(), &mut symbols);
         Ok((value, self.walk_spans(), symbols))
     }
 
@@ -402,7 +398,14 @@ impl<'c> Eval<'c> {
         }
     }
 
-    fn collect_symbols(&self, value: &Val, out: &mut Vec<(String, String, SourceSpan)>) {
+    /// Collects the symbols inside `value` with the path of the value
+    /// that holds each, where `path` is the path of `value`.
+    fn collect_symbols(&self, value: &Val, path: &mut Vec<String>, out: &mut Vec<Symbol>) {
+        let mut nested = |key: String, item: &Val, path: &mut Vec<String>| {
+            path.push(key);
+            self.collect_symbols(item, path, out);
+            path.pop();
+        };
         match value {
             Val::Symbol(s) => {
                 let ty = self
@@ -411,38 +414,55 @@ impl<'c> Eval<'c> {
                     .symbols
                     .get(s.ty.index())
                     .map_or_else(String::new, |d| d.name.clone());
-                out.push((
+                out.push(Symbol {
                     ty,
-                    s.text.clone(),
-                    SourceSpan {
+                    text: s.text.clone(),
+                    path: AttrPath::new(path.iter().cloned()),
+                    at: SourceSpan {
                         file: s.file,
                         span: s.span,
                     },
-                ));
+                });
             }
             Val::List(s) | Val::Set(s) => {
-                for item in &s.items {
-                    self.collect_symbols(item, out);
+                for (i, item) in s.items.iter().enumerate() {
+                    nested(i.to_string(), item, path);
                 }
             }
             Val::Map(m) => {
-                for (_, item) in &m.entries {
-                    self.collect_symbols(item, out);
+                for (key, item) in &m.entries {
+                    nested(key.text(&self.c.types), item, path);
                 }
             }
             Val::Struct(s) => {
-                for item in &s.fields {
-                    self.collect_symbols(item, out);
+                let def = self.c.types.structure(s.id);
+                for (f, item) in def.fields.iter().zip(&s.fields) {
+                    nested(f.name.clone(), item, path);
                 }
             }
             Val::Variant(v) => {
-                for item in &v.fields {
-                    self.collect_symbols(item, out);
+                let Some(variant) = self.c.types.sum(v.sum).variants.get(v.index as usize) else {
+                    return;
+                };
+                path.push(variant.name.clone());
+                for (p, item) in variant.fields.iter().flatten().zip(&v.fields) {
+                    nested(p.name.clone(), item, path);
                 }
+                path.pop();
             }
             _ => {}
         }
     }
+}
+
+/// A symbol of the final value: the name of its symbol type, its text,
+/// the path of the value that holds it and the place that wrote it.
+#[derive(Debug, Clone)]
+pub(crate) struct Symbol {
+    pub(crate) ty: String,
+    pub(crate) text: String,
+    pub(crate) path: AttrPath,
+    pub(crate) at: SourceSpan,
 }
 
 /// How far into a value refinements are checked.

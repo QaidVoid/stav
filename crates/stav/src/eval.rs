@@ -108,7 +108,7 @@ pub struct Evaluated {
     value: Value,
     diagnostics: Diagnostics,
     spans: SpanTree,
-    symbols: Vec<(String, String, SourceSpan)>,
+    symbols: Vec<finish::Symbol>,
 }
 
 impl Evaluated {
@@ -210,10 +210,48 @@ impl Evaluated {
     /// value, with the place that wrote it, in the order of the value.
     /// Hosts validate these, for example against a package index.
     pub fn symbols(&self, ty: &str) -> impl Iterator<Item = (&str, SourceSpan)> {
+        self.symbol_paths(ty).map(|(text, _, at)| (text, at))
+    }
+
+    /// Returns every value of the symbol type named `ty` in the final
+    /// value, like [`Evaluated::symbols`], together with the path of the
+    /// value that holds it, so that a host can name it in a diagnostic.
+    /// An element of a list or set is named by its position, as in
+    /// `packages.3`, and a payload field of a variant through the name of
+    /// the variant, as [`Value::at`] describes.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stav::{Host, ImportRoot, Limits, MemoryLoader, RootSpec, SymbolType};
+    ///
+    /// let source = "struct Root { packages: List<Pkg> = [] }\npackages = [bash, vim]\n";
+    /// let mut host = Host::new(MemoryLoader::new().with_file("app/main.stav", source));
+    /// host.symbols.push(SymbolType {
+    ///     name: "Pkg".to_owned(),
+    ///     words: false,
+    ///     strings: true,
+    ///     constructor: "pkg".to_owned(),
+    ///     parse: |text| Ok(text.to_owned()),
+    /// });
+    /// let root = RootSpec {
+    ///     root_struct: "Root".to_owned(),
+    ///     entries: vec!["app/main.stav".into()],
+    ///     import_roots: vec![ImportRoot::new("app")],
+    /// };
+    /// let evaluated = stav::check(&host, &root)?.eval(&Limits::default())?;
+    /// let found: Vec<String> = evaluated
+    ///     .symbol_paths("Pkg")
+    ///     .map(|(text, path, _)| format!("{path}: {text}"))
+    ///     .collect();
+    /// assert_eq!(found, ["packages.0: bash", "packages.1: vim"]);
+    /// # Ok::<(), stav::Diagnostics>(())
+    /// ```
+    pub fn symbol_paths(&self, ty: &str) -> impl Iterator<Item = (&str, &AttrPath, SourceSpan)> {
         self.symbols
             .iter()
-            .filter(move |(t, ..)| t == ty)
-            .map(|(_, text, span)| (text.as_str(), *span))
+            .filter(move |s| s.ty == ty)
+            .map(|s| (s.text.as_str(), &s.path, s.at))
     }
 
     /// Renders the value in `format`, as [`Value::render`] describes.
@@ -413,8 +451,7 @@ impl<'c> Eval<'c> {
         }
     }
 
-    #[allow(clippy::type_complexity, reason = "the parts of an evaluation result")]
-    fn run(&mut self) -> R<(Value, SpanTree, Vec<(String, String, SourceSpan)>)> {
+    fn run(&mut self) -> R<(Value, SpanTree, Vec<finish::Symbol>)> {
         self.globals_in_order()?;
         let pending = self.bodies()?;
         let root = self.merge_all(pending)?;

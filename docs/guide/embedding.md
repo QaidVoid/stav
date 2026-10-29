@@ -337,11 +337,11 @@ fn build(arch: &str) -> Result<String, Diagnostics> {
     let evaluated = stav::check(&host, &root)?.eval(&Limits::default())?;
 
     let unknown: Vec<FileDiagnostic> = evaluated
-        .symbols("Pkg")
-        .filter(|(name, _)| !KNOWN.contains(name))
-        .map(|(name, at)| FileDiagnostic {
+        .symbol_paths("Pkg")
+        .filter(|(name, _, _)| !KNOWN.contains(name))
+        .map(|(name, path, at)| FileDiagnostic {
             file: Some(at.file),
-            diagnostic: Diagnostic::error("H0001", at.span, format!("unknown package `{name}`")),
+            diagnostic: Diagnostic::error("H0001", at.span, format!("`{path}`: unknown package `{name}`")),
         })
         .collect();
     if !unknown.is_empty() {
@@ -367,7 +367,7 @@ fn main() -> ExitCode {
 It prints:
 
 ```text
-error[H0001]: unknown package `ripgrep`
+error[H0001]: `image.packages.4`: unknown package `ripgrep`
   --> image/main.stav:7:57
 ```
 
@@ -390,7 +390,7 @@ Without `ripgrep`, it prints the image:
 
 A few details are worth knowing:
 
-- **Symbol types.** `words` allows symbol words such as `name@1.2:variant`, and `strings` allows string literals. The `parse` function checks the text of every literal when it is evaluated and returns its canonical text, or a message that becomes the error `E0613`. Stav never checks whether a symbol exists. `Evaluated::symbols` returns every symbol of a type with the place that wrote it, for the host to validate.
+- **Symbol types.** `words` allows symbol words such as `name@1.2:variant`, and `strings` allows string literals. The `parse` function checks the text of every literal when it is evaluated and returns its canonical text, or a message that becomes the error `E0613`. Stav never checks whether a symbol exists. `Evaluated::symbols` returns every symbol of a type with the place that wrote it, for the host to validate, and `Evaluated::symbol_paths` adds the path of the value that holds it, such as `image.packages.4`, for the host's messages.
 - **Host modules** keep evaluation pure. Their source is an input of the evaluation exactly like a file, so the same files with the same host module sources always give the same value. A host that evaluates one program for several targets passes different sources each time.
 - **Host validation.** Rules that relate several fields, or that need outside knowledge such as a package index, belong to the host. `Evaluated::spans` returns where each attribute was written, down to the entry of a struct or map literal and the element of a list, and `Evaluated::diagnostics` wraps the host's own diagnostics so that they render exactly like those of Stav. Choose codes that cannot be confused with the `E` and `W` codes of the language.
 - **Caching.** `Checked::inputs` lists every source text the program was read from. A host can key a cache of evaluations by hashing them.

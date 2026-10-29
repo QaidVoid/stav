@@ -507,6 +507,40 @@ fn spans_point_at_list_elements_and_literal_entries() {
     }
 }
 
+#[test]
+fn symbol_paths_name_the_value_that_holds_each_symbol() {
+    let text = "#! symbol Pkg pkg words\n\
+                type Build = make(deps: List<Pkg> = []) | script\n\
+                struct Job { build: Build = script, tool: Option<Pkg> }\n\
+                struct Root {\n  packages: List<Pkg> = []\n  extra: Set<Pkg> = []\n  \
+                jobs: Map<Str, Job> = {} block job\n}\n\
+                packages = [bash, vim]\nextra = [zsh]\n\
+                job web { build = make(deps = [gcc]), tool = make }\n";
+    let evaluated = evaluate(text);
+    let found: Vec<String> = evaluated
+        .symbol_paths("Pkg")
+        .map(|(text, path, _)| format!("{path} {text}"))
+        .collect();
+    assert_eq!(
+        found,
+        [
+            "packages.0 bash",
+            "packages.1 vim",
+            "extra.0 zsh",
+            "jobs.web.build.make.deps.0 gcc",
+            "jobs.web.tool make",
+        ]
+    );
+    for (_, path, at) in evaluated.symbol_paths("Pkg") {
+        assert!(evaluated.value().at(path).is_some(), "{path}");
+        let spans = evaluated.spans(path);
+        assert!(!spans.is_empty(), "{path}");
+        if path.keys()[0] != "jobs" {
+            assert_eq!(spans, [at], "{path}");
+        }
+    }
+}
+
 /// Asserts that a program evaluates within a few seconds, far above what
 /// its size needs when no step is quadratic.
 fn evaluates_quickly(text: &str) {

@@ -586,6 +586,6 @@ error[E0803]: value violates a refinement
 
 A host program that embeds Stav can register symbol types: domain values, such as package references, that Stav carries without understanding them. A symbol type has a name, a constructor builtin that converts a `Str`, and a check that the host runs on every literal. Where a symbol type is expected, an identifier is a literal of it, and symbol words such as `name@1.2:static` and string literals are literals of it when the host allows them.
 
-A symbol value is its type and its canonical text. It renders as that text and interpolates as that text. Stav does not check that a symbol names anything real. The host receives every symbol of the final value, with the place that wrote it, and validates them itself.
+A symbol value is its type and its canonical text. It renders as that text and interpolates as that text. Stav does not check that a symbol names anything real. The host receives every symbol of the final value, with the place that wrote it and the path of the value that holds it, and validates them itself.
 
 The `stav` command registers no symbol types. See [Embedding in Rust](/guide/embedding) for how a host declares them.

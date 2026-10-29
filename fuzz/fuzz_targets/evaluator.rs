@@ -83,7 +83,10 @@ fn run(checked: &Checked, limits: &Limits) -> String {
                 let _ = evaluated.spans(&path);
                 let _ = evaluated.value().at(&path);
             }
-            out.extend(evaluated.symbols("Pkg").map(|(text, _)| text.to_owned()));
+            for (text, path, _) in evaluated.symbol_paths("Pkg") {
+                assert!(evaluated.value().at(path).is_some());
+                out.push_str(&format!("{path} {text}"));
+            }
             out
         }
         Err(errors) => {
