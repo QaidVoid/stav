@@ -81,6 +81,15 @@ These properties define Stav. A change that breaks one is a bug, even when every
 - Public standards and formats that the code implements may be named, for example an RFC, POSIX, ELF or the JSON and TOML formats, because naming them tells the reader exactly what behavior to expect.
 - Do not use em-dashes in any prose, and do not substitute them with `--`, a spaced hyphen or a semicolon. Write complete sentences.
 
+## Documentation
+
+The documentation site lives in `docs/`. It is built with VitePress and bun, and deployed to GitHub Pages from `main`.
+
+- When anything in `docs/` changes, run `bun install` and `bun run build` in `docs/` before committing. The build must succeed, and it fails on dead links. Commit `docs/bun.lock` whenever dependencies change, and keep VitePress pinned to an exact version.
+- Every example must be verified with the `stav` binary. Mark each program with `<!-- file: NAME -->` and each command with `<!-- run: ARGS -->`, followed directly by the exact output, then run `bun run verify` in `docs/` with `stav` on the `PATH` or named by the `STAV` variable. Every other `stav` code block must parse and be laid out as `stav fmt` lays it out. Never write an output by hand. Generate it with the binary.
+- Every Stav code block uses the `stav` language, which the site highlights with its own grammar in `docs/.vitepress/stav.tmLanguage.json`. Extend the grammar when the language gains syntax.
+- The prose rules of this file apply to the documentation too. No em-dashes, and no `--`, spaced hyphen or semicolon as a substitute. Write complete sentences. Never reference other projects, languages or design documents.
+
 ## Tests
 
 - Unit tests live in a sibling `<module>_tests.rs` file, never inline in the implementation file. Wire it at the bottom of the module:
