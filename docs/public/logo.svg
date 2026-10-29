@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Stav">
+  <path d="M4.5 13.5 16 3.5l11.5 10" fill="none" stroke="#b5482c" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="8" y="15" width="4" height="11" rx=".9" fill="#d3962f"/>
+  <rect x="14" y="10.5" width="4" height="15.5" rx=".9" fill="#d3962f"/>
+  <rect x="20" y="15" width="4" height="11" rx=".9" fill="#d3962f"/>
+  <rect x="5" y="25.4" width="22" height="3.6" rx="1.2" fill="#8f5a17"/>
+</svg>
