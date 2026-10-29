@@ -1,0 +1,50 @@
+#- file main.stav
+struct Service { exec: List<Str> = [], after: List<Str> = [] }
+struct Root {
+  packages: List<Str> = []
+  services: Map<Str, Service> = {} block service
+  ports:    List<Int> = []
+}
+
+fn dbus() -> Part<Root> = part { packages = ["dbus"] }
+fn audio() -> Part<Root> = part {
+  include dbus()
+  packages = ["pipewire"]
+}
+fn bluetooth() -> Part<Root> = part {
+  include dbus()
+  include "./firmware.stav"
+  packages = ["bluez"]
+}
+fn sshd(port: Int = 22) -> Part<Root> = part { ports = [port] }
+fn wrap(p: Part<Root>) -> Part<Root> = part { include p }
+fn unit(name: Str) -> Part<Service> = part { after = [name] }
+fn ported(f: Fn(Int) -> Int) -> Part<Root> = part { ports = [f(4000)] }
+fn offset(by: Int) -> Fn(Int) -> Int = fn(x: Int) = x + by
+let shared: Part<Root> = part { packages = ["shared"] }
+
+include audio()
+include bluetooth()
+include dbus()
+include "./firmware.stav"
+include sshd()
+include sshd(port = 22)
+include sshd(port = 2222)
+include wrap(sshd(port = 2222))
+include wrap(sshd(port = 8022))
+include ported(offset(1))
+include ported(offset(1))
+include ported(offset(2))
+include shared
+include shared
+for i in [1, 2] {
+  include shared
+}
+service a {
+  include unit("network")
+  include unit("network")
+  include unit("dbus")
+}
+service b { include unit("network") }
+#- file firmware.stav
+packages = ["firmware"]

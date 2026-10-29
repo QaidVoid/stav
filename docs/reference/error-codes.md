@@ -2366,7 +2366,7 @@ Remove the arm, or move it before the arms that cover it.
 
 ### W0703
 
-The same part file is included twice into one body. Its contributions would be added twice, which concatenates lists twice.
+The same part file is included twice into one body. A part is [merged once](/reference/merging#a-part-merges-once-per-block) into a block, so the second `include` has no effect.
 
 `w0703.stav`:
 

@@ -261,6 +261,41 @@ Set single values with `default(...)`, so that the user's plain assignments win.
 
 A part does not see the final value it contributes to. Everything it depends on arrives as a parameter. If two parts need the same input, pass it to both, usually from a top-level `let`.
 
+### A part merges once
+
+Parts often build on each other, and two parts may include the same third one. A part is merged into a block only once, however often and through however many other parts it is included there:
+
+<!-- file: once.stav -->
+
+```stav
+struct Root { packages: List<Str> = [] }
+
+fn dbus() -> Part<Root> = part {
+  packages = ["dbus"]
+}
+
+fn audio() -> Part<Root> = part {
+  include dbus()
+  packages = ["pipewire"]
+}
+
+fn bluetooth() -> Part<Root> = part {
+  include dbus()
+  packages = ["bluez"]
+}
+
+include audio()
+include bluetooth()
+```
+
+<!-- run: eval -o toml once.stav -->
+
+```toml
+packages = ["dbus", "pipewire", "bluez"]
+```
+
+Both `audio()` and `bluetooth()` include `dbus()`, and `"dbus"` is still in the list once. Calling the same function with equal arguments gives the same part, so `dbus()` counts once. A function called with different arguments gives a different part, and each of them is merged. The same holds for part files. [Merging rules](/reference/merging#a-part-merges-once-per-block) state the exact rule.
+
 ## Part files
 
 A part can also be a file. A **part file** contains statements, `let` bindings and `import` declarations, but no `struct`, `type` or `fn` declarations. `include` with a string literal that names the file adds it where it stands:
@@ -314,7 +349,7 @@ pool = 40
 
 The part file is typed as a body of the struct of the block that includes it. Included at the top level, it is a body of `Root`. Included inside `database { }`, it would be a body of `Database`. Paths in `include` are relative to the including file and cannot leave the directory of the entry file.
 
-A part file can be included more than once, from different places. Part files cannot include each other in a cycle.
+A part file can be included from different places. Included into blocks of different attributes, it contributes to each of them. Included into the same block again, it adds nothing, like any other part. Part files cannot include each other in a cycle.
 
 ## Several entry files
 

@@ -531,6 +531,21 @@ fn deeply_nested_evaluation_stops_without_overflowing_the_stack() {
     }
 }
 
+#[test]
+fn long_chains_of_equal_parts_merge_once_without_overflowing_the_stack() {
+    let text = "struct Root { tags: List<Str> = [] }\n\
+                fn chain(n: Int) -> Part<Root> = fold(range(0, n), part { tags = [\"x\"] },\n\
+                  fn(acc: Part<Root>, i: Int) -> Part<Root> = part { include acc })\n\
+                include chain(2000)\ninclude chain(2000)\n";
+    let json = std::thread::Builder::new()
+        .stack_size(2 * 1024 * 1024)
+        .spawn(move || evaluate(text).to_canonical_json())
+        .expect("the thread starts")
+        .join()
+        .expect("evaluation does not overflow the stack");
+    assert_eq!(json, r#"{"tags":["x"]}"#);
+}
+
 mod random {
     use proptest::prelude::*;
     use proptest::sample::select;

@@ -1,0 +1,36 @@
+---
+source: crates/stav/tests/eval.rs
+expression: output
+---
+--- JSON
+{
+  "packages": [
+    "dbus",
+    "pipewire",
+    "firmware",
+    "bluez",
+    "shared"
+  ],
+  "services": {
+    "a": {
+      "exec": [],
+      "after": [
+        "network",
+        "dbus"
+      ]
+    },
+    "b": {
+      "exec": [],
+      "after": [
+        "network"
+      ]
+    }
+  },
+  "ports": [
+    22,
+    2222,
+    8022,
+    4001,
+    4002
+  ]
+}

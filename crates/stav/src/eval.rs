@@ -23,7 +23,7 @@ mod merge;
 mod pattern;
 mod val;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 
 use serde::de::DeserializeOwned;
@@ -329,6 +329,15 @@ pub(crate) struct Eval<'c> {
     pub(crate) caches: merge::Caches,
     pub(crate) regexes: BTreeMap<String, Option<Rc<regex::Regex>>>,
     pub(crate) merge: merge::Merge,
+    /// The `part { }` bodies being evaluated, innermost last.
+    pub(crate) parts: Vec<body::PartFrame>,
+    /// The parts included into the blocks of the root so far, by the path
+    /// of the block.
+    pub(crate) included: BTreeSet<(Vec<merge::Seg>, val::PartId)>,
+    /// The identity of every part value evaluated so far.
+    pub(crate) part_ids: BTreeMap<body::PartKey, u32>,
+    /// The steps taken comparing the keys of `part_ids`, not counted yet.
+    pub(crate) work: Rc<std::cell::Cell<u64>>,
     /// Errors that do not stop evaluation, such as merge conflicts.
     pub(crate) errors: Vec<FileDiagnostic>,
 }
@@ -363,6 +372,10 @@ impl<'c> Eval<'c> {
             caches: merge::Caches::default(),
             regexes: BTreeMap::new(),
             merge: merge::Merge::default(),
+            parts: Vec::new(),
+            included: BTreeSet::new(),
+            part_ids: BTreeMap::new(),
+            work: Rc::default(),
             errors: Vec::new(),
         }
     }

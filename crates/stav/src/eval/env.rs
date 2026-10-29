@@ -1,8 +1,10 @@
 //! The local bindings in scope while an expression is evaluated.
 
+use std::cell::Cell;
+use std::cmp::Ordering;
 use std::rc::Rc;
 
-use super::val::Val;
+use super::val::{FnVal, Val};
 use crate::check::model::{LocalId, UnitId};
 use crate::check::types::TypeId;
 
@@ -104,6 +106,149 @@ pub(crate) fn lookup(env: &Env, id: LocalId) -> Option<&Slot> {
             }
             Node::Leaf(slot) => return Some(slot),
         }
+    }
+}
+
+/// Two things whose order [`identity`] compares.
+enum Pair<'a> {
+    Env(&'a Env, &'a Env),
+    Node(&'a Rc<Node>, &'a Rc<Node>),
+    Val(&'a Val, &'a Val),
+}
+
+/// Returns a total order of environments that holds two of them equal
+/// exactly when they bind the same locals to equal values, and adds the
+/// number of steps it took to `work`.
+///
+/// Values compare as [`Val::order`] compares them, functions by where they
+/// were created and by the environments they captured, and parts by their
+/// identities. Bindings that read `self` compare by their expression and
+/// environment. The walk keeps its own stack, because functions can
+/// capture functions to any depth.
+pub(crate) fn identity(a: &Env, b: &Env, work: &Cell<u64>) -> Ordering {
+    let mut stack = vec![Pair::Env(a, b)];
+    while let Some(pair) = stack.pop() {
+        work.set(work.get().saturating_add(1));
+        let found = match pair {
+            Pair::Env(x, y) => match (&x.0, &y.0) {
+                (Some(x), Some(y)) => {
+                    stack.push(Pair::Node(x, y));
+                    Ordering::Equal
+                }
+                (x, y) => x.is_some().cmp(&y.is_some()),
+            },
+            Pair::Node(x, y) if Rc::ptr_eq(x, y) => Ordering::Equal,
+            Pair::Node(x, y) => match (x.as_ref(), y.as_ref()) {
+                (
+                    Node::Branch {
+                        shift: s,
+                        children: xs,
+                    },
+                    Node::Branch {
+                        shift: t,
+                        children: ys,
+                    },
+                ) => {
+                    let mut order = s.cmp(t);
+                    for (x, y) in xs.iter().zip(ys) {
+                        if order != Ordering::Equal {
+                            break;
+                        }
+                        order = x.is_some().cmp(&y.is_some());
+                    }
+                    if order == Ordering::Equal {
+                        let pairs = xs.iter().zip(ys).rev();
+                        stack.extend(
+                            pairs.filter_map(|(x, y)| Some(Pair::Node(x.as_ref()?, y.as_ref()?))),
+                        );
+                    }
+                    order
+                }
+                (Node::Leaf(x), Node::Leaf(y)) => match (x, y) {
+                    (Slot::Ready(x), Slot::Ready(y)) => {
+                        stack.push(Pair::Val(x, y));
+                        Ordering::Equal
+                    }
+                    (Slot::Late(x), Slot::Late(y)) => {
+                        let order = (x.unit, x.node).cmp(&(y.unit, y.node));
+                        if order == Ordering::Equal {
+                            stack.push(Pair::Env(&x.env, &y.env));
+                        }
+                        order
+                    }
+                    (x, y) => matches!(x, Slot::Late(_)).cmp(&matches!(y, Slot::Late(_))),
+                },
+                (x, y) => matches!(x, Node::Leaf(_)).cmp(&matches!(y, Node::Leaf(_))),
+            },
+            Pair::Val(x, y) => compare_val(x, y, &mut stack),
+        };
+        if found != Ordering::Equal {
+            return found;
+        }
+    }
+    Ordering::Equal
+}
+
+/// Compares two values as far as they can be without looking inside them,
+/// and pushes the pairs of their parts that decide the rest.
+fn compare_val<'a>(x: &'a Val, y: &'a Val, stack: &mut Vec<Pair<'a>>) -> Ordering {
+    let mut pairs = |xs: &'a [Val], ys: &'a [Val]| {
+        let order = xs.len().cmp(&ys.len());
+        if order == Ordering::Equal {
+            stack.extend(xs.iter().zip(ys).rev().map(|(x, y)| Pair::Val(x, y)));
+        }
+        order
+    };
+    match (x, y) {
+        (Val::List(a), Val::List(b)) | (Val::Set(a), Val::Set(b)) => {
+            if Rc::ptr_eq(a, b) {
+                return Ordering::Equal;
+            }
+            pairs(&a.items, &b.items)
+        }
+        (Val::Struct(a), Val::Struct(b)) => {
+            a.id.cmp(&b.id).then_with(|| pairs(&a.fields, &b.fields))
+        }
+        (Val::Variant(a), Val::Variant(b)) => (a.sum, a.index)
+            .cmp(&(b.sum, b.index))
+            .then_with(|| pairs(&a.fields, &b.fields)),
+        (Val::Map(a), Val::Map(b)) => {
+            let order = a.entries.len().cmp(&b.entries.len());
+            if order == Ordering::Equal && !Rc::ptr_eq(a, b) {
+                for ((k1, v1), (k2, v2)) in a.entries.iter().zip(&b.entries).rev() {
+                    stack.push(Pair::Val(v1, v2));
+                    stack.push(Pair::Val(k1, k2));
+                }
+            }
+            order
+        }
+        (Val::Fn(a), Val::Fn(b)) => match (a.as_ref(), b.as_ref()) {
+            _ if Rc::ptr_eq(a, b) => Ordering::Equal,
+            (FnVal::Global(g), FnVal::Global(h)) => g.cmp(h),
+            (
+                FnVal::Lambda { unit, node, env },
+                FnVal::Lambda {
+                    unit: u,
+                    node: n,
+                    env: e,
+                },
+            ) => {
+                let order = (unit, node).cmp(&(u, n));
+                if order == Ordering::Equal {
+                    stack.push(Pair::Env(env, e));
+                }
+                order
+            }
+            (a, _) => {
+                if matches!(a, FnVal::Global(_)) {
+                    Ordering::Less
+                } else {
+                    Ordering::Greater
+                }
+            }
+        },
+        (Val::Part(a), Val::Part(b)) => a.id.cmp(&b.id),
+        _ => x.order(y),
     }
 }
 

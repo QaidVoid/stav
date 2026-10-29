@@ -6,10 +6,12 @@
 //! converted to the public [`Value`] once merging is done.
 
 use std::cmp::Ordering;
+use std::ops::Range;
 use std::rc::Rc;
 
 use super::body::Pending;
 use super::env::Env;
+use super::merge::Seg;
 use crate::check::model::UnitId;
 use crate::check::types::{GlobalId, StructId, SumId, SymbolId, Types};
 use crate::check::{FileId, ImportRoot};
@@ -114,10 +116,39 @@ pub(crate) enum FnVal {
 }
 
 /// A part value: the contributions of a `part { }` body, with paths
-/// relative to the part's struct.
+/// relative to the part's struct, and the parts included into it.
 #[derive(Debug)]
 pub(crate) struct PartVal {
+    /// The identity of the part. Evaluation is pure, so the `part { }`
+    /// expression that made a part and the environment it was evaluated in
+    /// decide its contributions. Every evaluation with an equal
+    /// environment gives the same identity.
+    pub(crate) id: u32,
     pub(crate) contributions: Vec<Pending>,
+    /// The parts included into the body, outer ones before the ones
+    /// included into them.
+    pub(crate) nested: Vec<Nested>,
+}
+
+/// The identity of an included part.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum PartId {
+    /// A part file.
+    File(FileId),
+    /// A part value, by [`PartVal::id`].
+    Value(u32),
+}
+
+/// A part included into the body of another part.
+#[derive(Debug, Clone)]
+pub(crate) struct Nested {
+    /// The path of the including block, relative to the outer part.
+    pub(crate) base: Vec<Seg>,
+    pub(crate) part: PartId,
+    /// The index of the nested part this one was included into, if any.
+    pub(crate) parent: Option<usize>,
+    /// The contributions of the outer part that this include made.
+    pub(crate) range: Range<usize>,
 }
 
 /// Returns the depth of a collection holding `items`.

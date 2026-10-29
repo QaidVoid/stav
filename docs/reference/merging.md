@@ -17,7 +17,7 @@ Every statement form produces contributions:
 |---|---|
 | `a.b.c = e` | `e` to the attribute at `a.b.c` |
 | `kind label { ... }` | the statements of the body, below the attribute the block maps to |
-| `include e` | the statements of the part `e`, at the place of the `include` |
+| `include e` | the statements of the part `e`, at the place of the `include`, unless the part is [already included](#a-part-merges-once-per-block) into the same block |
 | `if c { ... } else { ... }` | the statements of the branch that `c` selects |
 | `for x in e { ... }` | the statements of the body, once per element of `e` |
 
@@ -482,7 +482,7 @@ Every contribution carries an order key, a sequence of numbers compared from lef
 
 1. Each entry file gets the next number, in the order the host lists them. A host's implicit parts come before every entry file.
 2. The n-th statement of a body appends n.
-3. The contributions of an `include` are numbered below the `include` statement, in the part's own statement order.
+3. The contributions of an `include` are numbered below the `include` statement, in the part's own statement order. A part that is [merged once](#a-part-merges-once-per-block) keeps the place of its first `include`.
 4. The i-th iteration of a `for` statement appends i.
 
 List concatenation follows the order keys, and so does the order of diagnostics. Nothing depends on hashing or memory addresses, so the same program always gives the same value.
@@ -514,6 +514,68 @@ steps = ["first", "included-1", "included-2", "loop-1", "loop-2", "last"]
 ```
 
 The `stav` command evaluates a single entry file, so the examples on this page spread contributions over files with part files and `include`. A program that embeds Stav can list several entry files in the `entries` field of `RootSpec`, and they merge in the order given. See [embedding in Rust](/guide/embedding).
+
+## A part merges once per block
+
+An `include` adds the contributions of a part only if the same part has not been included into the same block before. A later `include` of that part into that block adds nothing. The rule applies to everything that is evaluated for one root: the host's implicit parts, every entry file, and every part and part file included from them, however deeply.
+
+Two parts are the same part when
+
+- both are the same part file, or
+- both come from the same `part { }` expression, evaluated with equal values for every local binding in scope at it: the parameters of the function around it, `let` bindings, loop variables, pattern bindings and the bindings a lambda captured.
+
+Evaluation is pure, so this is what makes a call of the same function with equal arguments give the same part, whether an argument is written out or left to its default. Values compare as `==` compares them. Functions, which `==` cannot compare, are equal when they are the same top-level function, or come from the same lambda expression with equal captured bindings. Parts compare by the rule above. A part bound once with `let` and included twice is the same part both times.
+
+The block of an `include` is the attribute its statement contributes to: the root for a statement at the top level of an entry file, and the attribute of the enclosing block otherwise. An `include` inside a part counts at the block where the part itself is included, so a part that two other parts include is merged once when both land in the same block. Included into two different blocks, such as two named blocks with different labels, a part contributes to each of them.
+
+<!-- file: once.stav -->
+
+```stav
+struct Service { after: List<Str> = [] }
+
+struct Root {
+  ports:    List<Int> = []
+  services: Map<Str, Service> = {} block service
+}
+
+fn sshd(port: Int = 22) -> Part<Root> = part {
+  ports = [port]
+}
+
+fn after(name: Str) -> Part<Service> = part {
+  after = [name]
+}
+
+include sshd()
+include sshd(port = 22)
+include sshd(port = 2222)
+
+service web {
+  include after("network")
+  include after("network")
+  include after("database")
+}
+
+service worker {
+  include after("network")
+}
+```
+
+<!-- run: eval -o toml once.stav -->
+
+```toml
+ports = [22, 2222]
+
+[services.web]
+after = ["network", "database"]
+
+[services.worker]
+after = ["network"]
+```
+
+`sshd()` and `sshd(port = 22)` are the same part, `sshd(port = 2222)` is another one. `after("network")` is merged once into `service web` and once into `service worker`.
+
+Including the same part file twice in a row into the same body is warning [W0703](/reference/error-codes#w0703), because the second `include` has no effect.
 
 ## Writing shared parts
 

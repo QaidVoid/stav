@@ -396,7 +396,7 @@ A body is a sequence of statements checked against a struct. The top level of an
 | `a.b.c = e` | contributes `e` to the attribute at that path |
 | `kind label { ... }` | a block, which contributes its statements to the attribute it maps to |
 | `let x = e` | binds `x` for the rest of the body and every body inside it |
-| `include e` | contributes the statements of a part here |
+| `include e` | contributes the statements of a part here, unless the same part is already included into the same block |
 | `if c { ... } else { ... }` | contributes the statements of the branch that `c` selects |
 | `for x in e { ... }` | contributes its statements once for every element of `e` |
 

@@ -8,12 +8,14 @@
 //! deferred contribution, evaluated once the merge knows the values it
 //! reads.
 
+use std::cell::Cell;
+use std::cmp::Ordering;
 use std::rc::Rc;
 
-use super::env::{Env, LateLet, Slot, bind};
+use super::env::{Env, LateLet, Slot, bind, identity};
 use super::expr::Cx;
 use super::merge::{Frame, Seg};
-use super::val::{PartVal, Val};
+use super::val::{Nested, PartId, PartVal, Val};
 use super::{Eval, R};
 use crate::ast::{self, Expr, Key, Stmt};
 use crate::check::FileId;
@@ -126,6 +128,49 @@ pub(crate) struct Pending {
     pub(crate) path: Vec<Seg>,
     pub(crate) contrib: Contrib,
 }
+
+/// A `part { }` body being evaluated.
+#[derive(Debug, Default)]
+pub(crate) struct PartFrame {
+    /// The parts included into the body so far.
+    nested: Vec<Nested>,
+    /// The part files being evaluated, innermost last, by their index in
+    /// `nested`.
+    open: Vec<usize>,
+}
+
+/// The `part { }` expression and the environment of an evaluated part,
+/// which decide its contributions.
+#[derive(Debug)]
+pub(crate) struct PartKey {
+    unit: UnitId,
+    node: usize,
+    env: Env,
+    /// Counts the steps of comparing keys.
+    work: Rc<Cell<u64>>,
+}
+
+impl Ord for PartKey {
+    fn cmp(&self, other: &Self) -> Ordering {
+        (self.unit, self.node)
+            .cmp(&(other.unit, other.node))
+            .then_with(|| identity(&self.env, &other.env, &self.work))
+    }
+}
+
+impl PartialOrd for PartKey {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for PartKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other) == Ordering::Equal
+    }
+}
+
+impl Eq for PartKey {}
 
 /// The place a body is evaluated in.
 pub(crate) struct Body {
@@ -559,8 +604,32 @@ impl<'c> Eval<'c> {
         let mut chain = body.via.as_deref().cloned().unwrap_or_default();
         match self.fact(body.unit, node.index()) {
             Fact::Include(IncludeFact::File(unit)) => {
+                let unit = *unit;
+                let id = PartId::File(self.unit_file(unit));
                 chain.insert(0, site);
-                self.part_file(*unit, body.base.clone(), Some(Rc::new(chain)), out)
+                let via = Some(Rc::new(chain));
+                let Some(frame) = self.parts.last_mut() else {
+                    if !self.first_include(&body.base, id) {
+                        return Ok(());
+                    }
+                    return self.part_file(unit, body.base.clone(), via, out);
+                };
+                let index = frame.nested.len();
+                frame.nested.push(Nested {
+                    base: body.base.clone(),
+                    part: id,
+                    parent: frame.open.last().copied(),
+                    range: out.len()..out.len(),
+                });
+                frame.open.push(index);
+                self.part_file(unit, body.base.clone(), via, out)?;
+                if let Some(frame) = self.parts.last_mut() {
+                    frame.open.pop();
+                    if let Some(nested) = frame.nested.get_mut(index) {
+                        nested.range.end = out.len();
+                    }
+                }
+                Ok(())
             }
             Fact::Include(IncludeFact::Value) => {
                 let Some(value) = include.value() else {
@@ -573,39 +642,109 @@ impl<'c> Eval<'c> {
                         "an included value is not a part",
                     ));
                 };
-                for pending in &part.contributions {
-                    let mut path = body.base.clone();
-                    path.extend(pending.path.iter().cloned());
-                    let mut contrib = pending.contrib.clone();
-                    let mut inner = contrib.via.as_deref().cloned().unwrap_or_default();
-                    inner.push(site);
-                    inner.extend(chain.iter().copied());
-                    contrib.via = Some(Rc::new(inner));
-                    if let Kind::Deferred(d) = &contrib.kind {
-                        let frames = d
-                            .frames
-                            .iter()
-                            .map(|f| {
-                                let mut full = body.base.clone();
-                                full.extend(f.iter().cloned());
-                                full.into()
-                            })
-                            .collect();
-                        contrib.kind = Kind::Deferred(Rc::new(Deferred {
-                            unit: d.unit,
-                            node: d.node,
-                            env: d.env.clone(),
-                            frames,
-                            ty: d.ty,
-                            reads: d.reads.clone(),
+                let size = part.contributions.len() + part.nested.len();
+                self.charge(u64::try_from(size).unwrap_or(u64::MAX), site)?;
+                let keep = match self.parts.last_mut() {
+                    Some(frame) => {
+                        let own = frame.nested.len();
+                        let start = out.len();
+                        frame.nested.push(Nested {
+                            base: body.base.clone(),
+                            part: PartId::Value(part.id),
+                            parent: frame.open.last().copied(),
+                            range: start..start + part.contributions.len(),
+                        });
+                        frame.nested.extend(part.nested.iter().map(|n| {
+                            let mut base = body.base.clone();
+                            base.extend(n.base.iter().cloned());
+                            Nested {
+                                base,
+                                part: n.part,
+                                parent: Some(n.parent.map_or(own, |p| p + own + 1)),
+                                range: start + n.range.start..start + n.range.end,
+                            }
                         }));
+                        vec![true; part.contributions.len()]
                     }
-                    out.push(Pending { path, contrib });
+                    None => {
+                        if !self.first_include(&body.base, PartId::Value(part.id)) {
+                            return Ok(());
+                        }
+                        self.unseen(&body.base, &part)
+                    }
+                };
+                chain.insert(0, site);
+                let kept = part.contributions.iter().zip(keep).filter(|(_, k)| *k);
+                for (pending, _) in kept {
+                    out.push(self.relocate(&body.base, pending, &chain));
                 }
                 Ok(())
             }
             _ => Ok(()),
         }
+    }
+
+    /// Records that the part `id` is included into the block at `base` of
+    /// the root, and returns whether it was not included there before.
+    fn first_include(&mut self, base: &[Seg], id: PartId) -> bool {
+        self.included.insert((base.to_vec(), id))
+    }
+
+    /// Records the parts included into `part`, which is included into the
+    /// block at `base` of the root, and returns which of its contributions
+    /// come from parts not included into their blocks before.
+    fn unseen(&mut self, base: &[Seg], part: &PartVal) -> Vec<bool> {
+        let mut keep = vec![true; part.contributions.len()];
+        let mut skipped = vec![false; part.nested.len()];
+        for (i, nested) in part.nested.iter().enumerate() {
+            if nested
+                .parent
+                .is_some_and(|p| skipped.get(p).copied().unwrap_or(false))
+            {
+                skipped[i] = true;
+                continue;
+            }
+            let mut full = base.to_vec();
+            full.extend(nested.base.iter().cloned());
+            if !self.first_include(&full, nested.part) {
+                skipped[i] = true;
+                if let Some(range) = keep.get_mut(nested.range.clone()) {
+                    range.fill(false);
+                }
+            }
+        }
+        keep
+    }
+
+    /// Returns a contribution of a part, included into the block at `base`
+    /// by the `include` statements of `chain`, innermost first.
+    fn relocate(&self, base: &[Seg], pending: &Pending, chain: &[SourceSpan]) -> Pending {
+        let mut path = base.to_vec();
+        path.extend(pending.path.iter().cloned());
+        let mut contrib = pending.contrib.clone();
+        let mut inner = contrib.via.as_deref().cloned().unwrap_or_default();
+        inner.extend(chain.iter().copied());
+        contrib.via = Some(Rc::new(inner));
+        if let Kind::Deferred(d) = &contrib.kind {
+            let frames = d
+                .frames
+                .iter()
+                .map(|f| {
+                    let mut full = base.to_vec();
+                    full.extend(f.iter().cloned());
+                    full.into()
+                })
+                .collect();
+            contrib.kind = Kind::Deferred(Rc::new(Deferred {
+                unit: d.unit,
+                node: d.node,
+                env: d.env.clone(),
+                frames,
+                ty: d.ty,
+                reads: d.reads.clone(),
+            }));
+        }
+        Pending { path, contrib }
     }
 
     fn if_statement(
@@ -642,10 +781,25 @@ impl<'c> Eval<'c> {
             via: None,
         };
         let mut out = Vec::new();
+        self.parts.push(PartFrame::default());
         if let Some(inner) = part.body() {
             self.statements(&mut body, inner.statements(), &mut out)?;
         }
-        Ok(Val::Part(Rc::new(PartVal { contributions: out })))
+        let frame = self.parts.pop().unwrap_or_default();
+        let key = PartKey {
+            unit: cx.unit,
+            node: part.syntax().index(),
+            env: cx.env.clone(),
+            work: self.work.clone(),
+        };
+        let next = u32::try_from(self.part_ids.len()).unwrap_or(u32::MAX);
+        let id = *self.part_ids.entry(key).or_insert(next);
+        self.charge(self.work.take(), cx.at(part.syntax().span()))?;
+        Ok(Val::Part(Rc::new(PartVal {
+            id,
+            contributions: out,
+            nested: frame.nested,
+        })))
     }
 
     /// Evaluates a deferred contribution with the blocks it reads, and
