@@ -391,9 +391,19 @@ Without `ripgrep`, it prints the image:
 A few details are worth knowing:
 
 - **Symbol types.** `words` allows symbol words such as `name@1.2:variant`, and `strings` allows string literals. The `parse` function checks the text of every literal when it is evaluated and returns its canonical text, or a message that becomes the error `E0613`. Stav never checks whether a symbol exists. `Evaluated::symbols` returns every symbol of a type with the place that wrote it, for the host to validate, and `Evaluated::symbol_paths` adds the path of the value that holds it, such as `image.packages.4`, for the host's messages.
-- **Host modules** keep evaluation pure. Their source is an input of the evaluation exactly like a file, so the same files with the same host module sources always give the same value. A host that evaluates one program for several targets passes different sources each time.
+- **Host modules** keep evaluation pure. Their source is an input of the evaluation exactly like a file, so the same files with the same host module sources always give the same value.
+- **Host values.** A top-level `let` of a host module with a type annotation, such as `let arch: Arch = x86_64`, is an input of the program. The program is checked once against the annotation, and `Checked::eval_with` takes a `HostValues` that supplies a different `Value` for it in each evaluation. Where an evaluation supplies none, the value written in the module is used. A host that builds for several targets checks once and evaluates once per target. A value that names no such `let`, or does not fit its type, is [`E0614`](../reference/error-codes#e0614), and one that violates a refinement is [`E0803`](../reference/error-codes#e0803). The values are inputs of the evaluation like the source files, so a cache must key on them too.
+
+```rust
+let checked = stav::check(&host, &root)?;
+for arch in ["x86_64", "aarch64"] {
+    let values = HostValues::new().with("build/target", "arch", Value::Str(arch.to_owned()));
+    let evaluated = checked.eval_with(&Limits::default(), &values)?;
+    print!("{}", evaluated.render(Format::Json)?);
+}
+```
 - **Host validation.** Rules that relate several fields, or that need outside knowledge such as a package index, belong to the host. `Evaluated::spans` returns where each attribute was written, down to the entry of a struct or map literal and the element of a list. `Evaluated::priority` says whether the winning value was set with `force(...)`, `default(...)`, a plain assignment or only the declared default, for rules that treat a forced value differently. `Evaluated::diagnostics` wraps the host's own diagnostics so that they render exactly like those of Stav. Choose codes that cannot be confused with the `E` and `W` codes of the language.
-- **Caching.** `Checked::inputs` lists every source text the program was read from. A host can key a cache of evaluations by hashing them.
+- **Caching.** `Checked::inputs` lists every source text the program was read from. A host can key a cache of evaluations by hashing them together with the host values it passes.
 - **Limits.** `Limits::default()` allows 50 000 000 evaluation steps and 512 MiB of values. A host can raise or lower them for each evaluation. [Totality and limits](../reference/totality) explains how they are counted.
 
 ## The API documentation

@@ -80,7 +80,7 @@ pub use check::{
 };
 pub use de::ConvertError;
 pub use diagnostic::{Diagnostic, Diagnostics, FileDiagnostic, Label, Severity};
-pub use eval::{Evaluated, Limits, Priority};
+pub use eval::{Evaluated, HostValues, Limits, Priority};
 pub use format::format;
 pub use lexer::{Lexed, lex};
 pub use parser::{MAX_DEPTH, Parsed, parse};

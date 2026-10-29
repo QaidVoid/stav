@@ -19,11 +19,13 @@ mod call;
 mod env;
 mod expr;
 mod finish;
+mod input;
 mod merge;
 mod pattern;
 mod val;
 
 pub use self::body::Prio as Priority;
+pub use self::input::HostValues;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
@@ -389,7 +391,31 @@ impl Checked {
     /// # Ok::<(), stav::Diagnostics>(())
     /// ```
     pub fn eval(&self, limits: &Limits) -> Result<Evaluated, Diagnostics> {
+        self.eval_with(limits, &HostValues::new())
+    }
+
+    /// Evaluates the program within `limits`, like [`Checked::eval`], with
+    /// `values` for the annotated top-level `let` declarations of host
+    /// modules in place of the values written in the modules.
+    ///
+    /// One checked program can be evaluated with different values, for
+    /// example once for every target a host builds for, without checking
+    /// it again. [`HostValues`] shows how.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of [`Checked::eval`], and `E0614` when a value
+    /// names no annotated `let` of a host module or does not fit the type
+    /// of its declaration. A value that violates a refinement of the type
+    /// is `E0803`.
+    pub fn eval_with(
+        &self,
+        limits: &Limits,
+        values: &HostValues,
+    ) -> Result<Evaluated, Diagnostics> {
         let mut eval = Eval::new(self, *limits);
+        let inputs = eval.host_inputs(values);
+        eval.inputs = inputs;
         let result = eval.run();
         let files = self.named_sources();
         match result {
@@ -439,6 +465,9 @@ pub(crate) struct Eval<'c> {
     pub(crate) caches: merge::Caches,
     pub(crate) regexes: BTreeMap<String, Option<Rc<regex::Regex>>>,
     pub(crate) merge: merge::Merge,
+    /// The values the host supplied for top-level `let` declarations of
+    /// host modules.
+    inputs: BTreeMap<GlobalId, Value>,
     /// The `part { }` bodies being evaluated, innermost last.
     pub(crate) parts: Vec<body::PartFrame>,
     /// The parts included into the blocks of the root so far, by the path
@@ -482,6 +511,7 @@ impl<'c> Eval<'c> {
             caches: merge::Caches::default(),
             regexes: BTreeMap::new(),
             merge: merge::Merge::default(),
+            inputs: BTreeMap::new(),
             parts: Vec::new(),
             included: BTreeSet::new(),
             part_ids: BTreeMap::new(),
@@ -491,6 +521,9 @@ impl<'c> Eval<'c> {
     }
 
     fn run(&mut self) -> R<(Value, SpanTree, Vec<finish::Symbol>)> {
+        if !self.errors.is_empty() {
+            return Ok((Value::None, SpanTree::default(), Vec::new()));
+        }
         self.globals_in_order()?;
         let pending = self.bodies()?;
         let root = self.merge_all(pending)?;
@@ -783,7 +816,10 @@ impl<'c> Eval<'c> {
                 self.globals[g.index()] = GlobalSlot::Late;
                 continue;
             }
-            let value = self.global_let(g, &[])?;
+            let value = match self.inputs.get(&g).cloned() {
+                Some(input) => self.host_input(g, &input)?,
+                None => self.global_let(g, &[])?,
+            };
             self.globals[g.index()] = GlobalSlot::Ready(value);
         }
         Ok(())

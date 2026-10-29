@@ -64,6 +64,8 @@ pub struct Checked {
     pub(crate) symbols: Vec<SymbolType>,
     pub(crate) implicit_refs: Vec<ImplicitRefs>,
     pub(crate) import_roots: Vec<ImportRoot>,
+    /// The import paths of the host modules.
+    pub(crate) host_modules: Vec<String>,
 }
 
 impl Checked {
@@ -163,6 +165,18 @@ impl Checked {
             decls::GlobalKind::Let(l) => l.annotation,
             decls::GlobalKind::Fn(_) => None,
         }
+    }
+
+    /// Returns the files loaded from the host module with the import path
+    /// `path`.
+    pub(crate) fn host_module_files(&self, path: &str) -> Vec<FileId> {
+        self.program
+            .files
+            .iter()
+            .enumerate()
+            .filter(|(_, f)| matches!(&f.origin, Origin::HostModule(p) if p == path))
+            .map(|(i, _)| FileId::new(i))
+            .collect()
     }
 
     /// Returns whether a top-level declaration is a function.
@@ -268,6 +282,7 @@ pub fn check(host: &Host, root: &RootSpec) -> Result<Checked, Diagnostics> {
                 symbols: host.symbols.clone(),
                 implicit_refs: host.implicit_refs.clone(),
                 import_roots: root.import_roots.clone(),
+                host_modules: host.host_modules.iter().map(|m| m.path.clone()).collect(),
             })
         }
         None => Err(diagnostics(&program, found)),

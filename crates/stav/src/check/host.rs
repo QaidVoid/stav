@@ -167,6 +167,10 @@ pub struct SymbolType {
 
 /// A module whose source the host supplies for one evaluation, imported as
 /// `"<namespace>/<module>"`.
+///
+/// Its top-level `let` declarations with a type annotation are inputs:
+/// [`Checked::eval_with`](crate::Checked::eval_with) can give them other
+/// values in every evaluation without checking the program again.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HostModule {
     /// The import path, a namespace and a module name such as `ns/target`.

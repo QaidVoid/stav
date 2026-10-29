@@ -566,6 +566,119 @@ fn symbol_paths_name_the_value_that_holds_each_symbol() {
     }
 }
 
+/// Returns a program that reads the host module `build/target`, checked
+/// once.
+fn target_program() -> stav::Checked {
+    let main = "import \"build/target\" as target\n\
+                struct Root { triple: Str, jobs: Int, features: List<Str> }\n\
+                triple   = \"#{target.arch}-#{target.os}\"\n\
+                jobs     = target.jobs * 2\n\
+                features = target.features\n";
+    let module = "type Os = linux | darwin\n\
+                  let arch: Str = \"x86_64\"\n\
+                  let os: Os = linux\n\
+                  let jobs: Int where 1..=64 = 1\n\
+                  let features: List<Str> = []\n\
+                  let fixed = 1\n";
+    let mut host = Host::new(MemoryLoader::new().with_file("app/main.stav", main));
+    host.host_modules.push(HostModule {
+        path: "build/target".to_owned(),
+        source: module.to_owned(),
+    });
+    let root = RootSpec {
+        root_struct: "Root".to_owned(),
+        entries: vec!["app/main.stav".into()],
+        import_roots: vec![ImportRoot::new(ROOT_DIR)],
+    };
+    check(&host, &root).expect("the program checks")
+}
+
+#[test]
+fn one_check_evaluates_with_different_host_values() {
+    let checked = target_program();
+    let plain = checked
+        .eval(&Limits::default())
+        .expect("the program evaluates");
+    assert_eq!(
+        plain.to_canonical_json(),
+        r#"{"features":[],"jobs":2,"triple":"x86_64-linux"}"#
+    );
+    let targets = [
+        (
+            "aarch64",
+            "darwin",
+            4,
+            r#"{"features":["simd"],"jobs":8,"triple":"aarch64-darwin"}"#,
+        ),
+        (
+            "riscv64",
+            "linux",
+            16,
+            r#"{"features":["simd"],"jobs":32,"triple":"riscv64-linux"}"#,
+        ),
+    ];
+    for (arch, os, jobs, expected) in targets {
+        let values = stav::HostValues::new()
+            .with("build/target", "arch", Value::Str(arch.to_owned()))
+            .with("build/target", "os", Value::Str(os.to_owned()))
+            .with("build/target", "jobs", Value::Int(jobs))
+            .with(
+                "build/target",
+                "features",
+                Value::List(vec![Value::Str("simd".to_owned())]),
+            );
+        let evaluated = checked
+            .eval_with(&Limits::default(), &values)
+            .expect("the program evaluates");
+        assert_eq!(evaluated.to_canonical_json(), expected);
+    }
+}
+
+#[test]
+fn host_values_must_fit_their_declarations() {
+    let checked = target_program();
+    let cases = [
+        (
+            "arch",
+            Value::Int(1),
+            "E0614",
+            "the value given for `arch` is not a `Str`",
+        ),
+        (
+            "os",
+            Value::Str("windows".to_owned()),
+            "E0614",
+            "`windows` is no variant",
+        ),
+        ("jobs", Value::Int(100), "E0803", "violates a refinement"),
+        (
+            "features",
+            Value::List(vec![Value::Bool(true)]),
+            "E0614",
+            "found a `Bool`",
+        ),
+        ("fixed", Value::Int(2), "E0614", "no annotated `let`"),
+        ("missing", Value::Int(2), "E0614", "no annotated `let`"),
+    ];
+    for (name, value, code, message) in cases {
+        let values = stav::HostValues::new().with("build/target", name, value);
+        let errors = checked
+            .eval_with(&Limits::default(), &values)
+            .expect_err("the value is rejected");
+        let error = errors.iter().next().expect("there is an error");
+        assert_eq!(error.diagnostic.code, code, "{name}");
+        assert!(errors.to_string().contains(message), "{name}: {errors}");
+    }
+    let values = stav::HostValues::new().with("build/other", "arch", Value::Int(1));
+    let errors = checked
+        .eval_with(&Limits::default(), &values)
+        .expect_err("an unknown module is rejected");
+    assert!(
+        errors.to_string().contains("which is no host module"),
+        "{errors}"
+    );
+}
+
 /// Asserts that a program evaluates within a few seconds, far above what
 /// its size needs when no step is quadratic.
 fn evaluates_quickly(text: &str) {

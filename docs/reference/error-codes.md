@@ -96,6 +96,7 @@ The first digits of a code name the area it belongs to.
 | [E0611](#e0611) | the step limit or the nesting limit was exceeded |
 | [E0612](#e0612) | a size limit was exceeded |
 | [E0613](#e0613) | a symbol whose text the host rejects |
+| [E0614](#e0614) | a host value that names no input or does not fit its type |
 | [E0701](#e0701) | a file or module that does not exist or cannot be read |
 | [E0702](#e0702) | a path that leaves its import root |
 | [E0703](#e0703) | an import or include cycle |
@@ -1998,6 +1999,12 @@ Make the value smaller. A host can raise the limits through `Limits`.
 A host's symbol type rejects the text of a symbol, for example a package name with a space in it. The message includes the host's reason. The `stav` command has no symbol types, so only programs that a host evaluates can report this.
 
 Write the symbol in a form the host accepts.
+
+### E0614
+
+A host evaluated the program with a value for a host module declaration, and the value cannot be used. Either it names no top-level `let` with a type annotation in a host module of the program, or it does not fit the annotated type, for example a string where an `Int` is declared, or a variant name the sum type does not have. The `stav` command supplies no host values, so only programs that a host evaluates can report this.
+
+The host gives values only for annotated declarations, in the shape of their types.
 
 ## Files, imports and roots
 
