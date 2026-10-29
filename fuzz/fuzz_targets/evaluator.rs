@@ -81,6 +81,7 @@ fn run(checked: &Checked, limits: &Limits) -> String {
             ] {
                 let path: AttrPath = key.parse().expect("the path parses");
                 let _ = evaluated.spans(&path);
+                let _ = evaluated.priority(&path);
                 let _ = evaluated.value().at(&path);
             }
             for (text, path, _) in evaluated.symbol_paths("Pkg") {

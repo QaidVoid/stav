@@ -1476,6 +1476,12 @@ impl<'c> Eval<'c> {
                 }
             }
             tree.nodes[slot].spans = spans;
+            let prio = node
+                .contribs
+                .iter()
+                .map(|&id| self.merge.contrib(id).prio)
+                .max();
+            tree.nodes[slot].prio = prio;
             let mut children = Vec::new();
             for c in self.merge.inside(n) {
                 let key = self.key_name(c);
@@ -1488,6 +1494,7 @@ impl<'c> Eval<'c> {
                 children.push((i.to_string(), tree.nodes.len()));
                 tree.nodes.push(SpanNode {
                     spans,
+                    prio,
                     ..SpanNode::default()
                 });
             }
@@ -1569,41 +1576,72 @@ pub(crate) struct SpanTree {
 struct SpanNode {
     children: Vec<(String, usize)>,
     spans: Vec<SourceSpan>,
+    /// The highest priority of the contributions to the attribute.
+    prio: Option<Prio>,
     /// A tagged sum, whose one child is named by its variant.
     transparent: bool,
 }
 
 impl SpanTree {
-    /// Returns the spans of the attribute at `path`. When the tree ends
+    /// Returns the node of the attribute at `path`. When the tree ends
     /// before the path does, `inside` says whether the path still names a
-    /// part of the value, which then gets the spans of the deepest
-    /// attribute on the path.
-    pub(crate) fn spans(&self, path: &AttrPath, inside: bool) -> Vec<SourceSpan> {
-        let Some(mut current) = (!self.nodes.is_empty()).then_some(0) else {
-            return Vec::new();
-        };
+    /// part of the value, which then gets the deepest attribute on the
+    /// path.
+    fn find(&self, path: &AttrPath, inside: bool) -> Option<&SpanNode> {
+        let mut current = self.nodes.first()?;
         for key in path.keys() {
-            let node = &self.nodes[current];
-            match node.children.binary_search_by(|(k, _)| k.as_str().cmp(key)) {
-                Ok(i) => current = node.children[i].1,
+            match current
+                .children
+                .binary_search_by(|(k, _)| k.as_str().cmp(key))
+            {
+                Ok(i) => current = &self.nodes[current.children[i].1],
                 Err(_) if inside => break,
-                Err(_) => return Vec::new(),
+                Err(_) => return None,
             }
         }
-        let node = &self.nodes[current];
-        if !node.spans.is_empty() && !node.transparent {
-            return node.spans.clone();
-        }
-        let mut out = node.spans.clone();
+        Some(current)
+    }
+
+    /// Returns the nodes inside `node`, in the order of their keys.
+    fn below<'t>(&'t self, node: &'t SpanNode) -> impl Iterator<Item = &'t SpanNode> {
         let mut stack: Vec<usize> = node.children.iter().rev().map(|(_, i)| *i).collect();
-        while let Some(i) = stack.pop() {
-            for span in &self.nodes[i].spans {
+        std::iter::from_fn(move || {
+            let i = stack.pop()?;
+            stack.extend(self.nodes[i].children.iter().rev().map(|(_, c)| *c));
+            Some(&self.nodes[i])
+        })
+    }
+
+    /// Returns the spans of the attribute at `path`, as
+    /// [`Evaluated::spans`](crate::Evaluated::spans) describes.
+    pub(crate) fn spans(&self, path: &AttrPath, inside: bool) -> Vec<SourceSpan> {
+        let Some(node) = self.find(path, inside) else {
+            return Vec::new();
+        };
+        let mut out = node.spans.clone();
+        if !node.spans.is_empty() && !node.transparent {
+            return out;
+        }
+        for inner in self.below(node) {
+            for span in &inner.spans {
                 if !out.contains(span) {
                     out.push(*span);
                 }
             }
-            stack.extend(self.nodes[i].children.iter().rev().map(|(_, c)| *c));
         }
         out
+    }
+
+    /// Returns the winning priority of the attribute at `path`, as
+    /// [`Evaluated::priority`](crate::Evaluated::priority) describes.
+    pub(crate) fn priority(&self, path: &AttrPath, inside: bool) -> Option<Prio> {
+        let node = self.find(path, inside)?;
+        if node.prio > Some(Prio::Declared) && !node.transparent {
+            return node.prio;
+        }
+        self.below(node)
+            .filter_map(|n| n.prio)
+            .chain(node.prio)
+            .max()
     }
 }

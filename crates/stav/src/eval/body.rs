@@ -26,16 +26,19 @@ use crate::check::model::{
 use crate::check::types::{Type, TypeId};
 use crate::span::{SourceSpan, Span};
 
-/// The priority of a contribution, lowest first.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) enum Prio {
-    /// The declared default of a field.
+/// The priority of a contribution, ordered from lowest to highest.
+///
+/// [`Evaluated::priority`](crate::Evaluated::priority) returns the
+/// priority that won the merge of an attribute.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Prio {
+    /// The default declared with the field in its struct.
     Declared,
-    /// `default(...)`.
+    /// A right side written as `default(...)`.
     Default,
-    /// A plain assignment or a block.
+    /// A plain assignment, a block or an entry of a literal.
     Plain,
-    /// `force(...)`.
+    /// A right side written as `force(...)`.
     Force,
 }
 

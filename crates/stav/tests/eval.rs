@@ -508,6 +508,31 @@ fn spans_point_at_list_elements_and_literal_entries() {
 }
 
 #[test]
+fn priorities_report_how_attributes_were_set() {
+    use stav::Priority::{Declared, Default, Force, Plain};
+    let text = "struct Server { host: Str = \"localhost\", port: Int = 80 }\n\
+                struct Root {\n  server: Server\n  tags: List<Str> = []\n  \
+                env: Map<Str, Str> = {}\n}\n\
+                server { port = default(8080) }\nserver.port = force(443)\n\
+                tags = default([\"a\"])\nenv.LANG = default(\"C\")\n";
+    let evaluated = evaluate(text);
+    let cases = [
+        ("server", Some(Plain)),
+        ("server.port", Some(Force)),
+        ("server.host", Some(Declared)),
+        ("tags", Some(Default)),
+        ("tags.0", Some(Default)),
+        ("env", Some(Default)),
+        ("env.LANG", Some(Default)),
+        ("missing", None),
+    ];
+    for (path, expected) in cases {
+        let path: stav::AttrPath = path.parse().expect("the path parses");
+        assert_eq!(evaluated.priority(&path), expected, "{path}");
+    }
+}
+
+#[test]
 fn symbol_paths_name_the_value_that_holds_each_symbol() {
     let text = "#! symbol Pkg pkg words\n\
                 type Build = make(deps: List<Pkg> = []) | script\n\

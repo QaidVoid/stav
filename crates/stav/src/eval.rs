@@ -23,6 +23,8 @@ mod merge;
 mod pattern;
 mod val;
 
+pub use self::body::Prio as Priority;
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 
@@ -204,6 +206,43 @@ impl Evaluated {
     /// ```
     pub fn spans(&self, path: &AttrPath) -> Vec<SourceSpan> {
         self.spans.spans(path, self.value.at(path).is_some())
+    }
+
+    /// Returns the priority that won the merge of the attribute at `path`:
+    /// [`Priority::Force`] when it was set with `force(...)`,
+    /// [`Priority::Default`] with `default(...)`, [`Priority::Declared`]
+    /// when only the declared default of its field set it, and
+    /// [`Priority::Plain`] otherwise. An attribute that nothing but its
+    /// declared default sets directly, such as a map whose keys are set
+    /// one by one, returns the highest priority of the attributes inside
+    /// it. Paths
+    /// resolve as in [`Evaluated::spans`], so an element of a list has
+    /// the priority of the list. A path that names nothing returns `None`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use stav::{AttrPath, Host, ImportRoot, Limits, MemoryLoader, Priority, RootSpec};
+    ///
+    /// let source = "struct Root { a: Int = 0, b: Int = 0, c: Int = 0, d: Int = 0 }\n\
+    ///               a = force(1)\nb = default(2)\nc = 3\n";
+    /// let host = Host::new(MemoryLoader::new().with_file("app/main.stav", source));
+    /// let root = RootSpec {
+    ///     root_struct: "Root".to_owned(),
+    ///     entries: vec!["app/main.stav".into()],
+    ///     import_roots: vec![ImportRoot::new("app")],
+    /// };
+    /// let evaluated = stav::check(&host, &root)?.eval(&Limits::default())?;
+    /// let priority = |key: &str| evaluated.priority(&AttrPath::new([key]));
+    /// assert_eq!(priority("a"), Some(Priority::Force));
+    /// assert_eq!(priority("b"), Some(Priority::Default));
+    /// assert_eq!(priority("c"), Some(Priority::Plain));
+    /// assert_eq!(priority("d"), Some(Priority::Declared));
+    /// assert_eq!(priority("e"), None);
+    /// # Ok::<(), stav::Diagnostics>(())
+    /// ```
+    pub fn priority(&self, path: &AttrPath) -> Option<Priority> {
+        self.spans.priority(path, self.value.at(path).is_some())
     }
 
     /// Returns every value of the symbol type named `ty` in the final
