@@ -270,18 +270,18 @@ Parts often build on each other, and two parts may include the same third one. A
 ```stav
 struct Root { packages: List<Str> = [] }
 
-fn dbus() -> Part<Root> = part {
-  packages = ["dbus"]
+fn bus() -> Part<Root> = part {
+  packages = ["bus"]
 }
 
 fn audio() -> Part<Root> = part {
-  include dbus()
-  packages = ["pipewire"]
+  include bus()
+  packages = ["mixer"]
 }
 
 fn bluetooth() -> Part<Root> = part {
-  include dbus()
-  packages = ["bluez"]
+  include bus()
+  packages = ["radio"]
 }
 
 include audio()
@@ -291,10 +291,10 @@ include bluetooth()
 <!-- run: eval -o toml once.stav -->
 
 ```toml
-packages = ["dbus", "pipewire", "bluez"]
+packages = ["bus", "mixer", "radio"]
 ```
 
-Both `audio()` and `bluetooth()` include `dbus()`, and `"dbus"` is still in the list once. Calling the same function with equal arguments gives the same part, so `dbus()` counts once. A function called with different arguments gives a different part, and each of them is merged. The same holds for part files. [Merging rules](/reference/merging#a-part-merges-once-per-block) state the exact rule.
+Both `audio()` and `bluetooth()` include `bus()`, and `"bus"` is still in the list once. Calling the same function with equal arguments gives the same part, so `bus()` counts once. A function called with different arguments gives a different part, and each of them is merged. The same holds for part files. [Merging rules](/reference/merging#a-part-merges-once-per-block) state the exact rule.
 
 ## Part files
 

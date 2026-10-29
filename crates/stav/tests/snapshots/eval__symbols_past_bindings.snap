@@ -5,24 +5,24 @@ expression: output
 --- JSON
 {
   "packages": [
-    "dbus",
-    "git",
-    "bash",
-    "zsh",
-    "curl",
-    "vim"
+    "bus",
+    "tool",
+    "console",
+    "prompt",
+    "fetcher",
+    "editor"
   ],
-  "primary": "dbus",
+  "primary": "bus",
   "units": {
-    "db": {
+    "bus": {
       "after": []
     },
-    "dbus": {
+    "db": {
       "after": []
     },
     "web": {
       "after": [
-        "dbus",
+        "bus",
         "db"
       ]
     }

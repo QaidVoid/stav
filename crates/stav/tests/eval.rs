@@ -535,12 +535,12 @@ fn priorities_report_how_attributes_were_set() {
 #[test]
 fn symbol_paths_name_the_value_that_holds_each_symbol() {
     let text = "#! symbol Pkg pkg words\n\
-                type Build = make(deps: List<Pkg> = []) | script\n\
+                type Build = native(deps: List<Pkg> = []) | script\n\
                 struct Job { build: Build = script, tool: Option<Pkg> }\n\
                 struct Root {\n  packages: List<Pkg> = []\n  extra: Set<Pkg> = []\n  \
                 jobs: Map<Str, Job> = {} block job\n}\n\
-                packages = [bash, vim]\nextra = [zsh]\n\
-                job web { build = make(deps = [gcc]), tool = make }\n";
+                packages = [shell, editor]\nextra = [prompt]\n\
+                job web { build = native(deps = [compiler]), tool = native }\n";
     let evaluated = evaluate(text);
     let found: Vec<String> = evaluated
         .symbol_paths("Pkg")
@@ -549,11 +549,11 @@ fn symbol_paths_name_the_value_that_holds_each_symbol() {
     assert_eq!(
         found,
         [
-            "packages.0 bash",
-            "packages.1 vim",
-            "extra.0 zsh",
-            "jobs.web.build.make.deps.0 gcc",
-            "jobs.web.tool make",
+            "packages.0 shell",
+            "packages.1 editor",
+            "extra.0 prompt",
+            "jobs.web.build.native.deps.0 compiler",
+            "jobs.web.tool native",
         ]
     );
     for (_, path, at) in evaluated.symbol_paths("Pkg") {

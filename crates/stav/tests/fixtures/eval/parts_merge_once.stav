@@ -6,17 +6,17 @@ struct Root {
   ports:    List<Int> = []
 }
 
-fn dbus() -> Part<Root> = part { packages = ["dbus"] }
+fn bus() -> Part<Root> = part { packages = ["bus"] }
 fn audio() -> Part<Root> = part {
-  include dbus()
-  packages = ["pipewire"]
+  include bus()
+  packages = ["mixer"]
 }
 fn bluetooth() -> Part<Root> = part {
-  include dbus()
+  include bus()
   include "./firmware.stav"
-  packages = ["bluez"]
+  packages = ["radio"]
 }
-fn sshd(port: Int = 22) -> Part<Root> = part { ports = [port] }
+fn remote(port: Int = 22) -> Part<Root> = part { ports = [port] }
 fn wrap(p: Part<Root>) -> Part<Root> = part { include p }
 fn unit(name: Str) -> Part<Service> = part { after = [name] }
 fn ported(f: Fn(Int) -> Int) -> Part<Root> = part { ports = [f(4000)] }
@@ -25,13 +25,13 @@ let shared: Part<Root> = part { packages = ["shared"] }
 
 include audio()
 include bluetooth()
-include dbus()
+include bus()
 include "./firmware.stav"
-include sshd()
-include sshd(port = 22)
-include sshd(port = 2222)
-include wrap(sshd(port = 2222))
-include wrap(sshd(port = 8022))
+include remote()
+include remote(port = 22)
+include remote(port = 2222)
+include wrap(remote(port = 2222))
+include wrap(remote(port = 8022))
 include ported(offset(1))
 include ported(offset(1))
 include ported(offset(2))
@@ -43,7 +43,7 @@ for i in [1, 2] {
 service a {
   include unit("network")
   include unit("network")
-  include unit("dbus")
+  include unit("bus")
 }
 service b { include unit("network") }
 #- file firmware.stav

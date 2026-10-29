@@ -266,7 +266,7 @@ impl Evaluated {
     /// ```
     /// use stav::{Host, ImportRoot, Limits, MemoryLoader, RootSpec, SymbolType};
     ///
-    /// let source = "struct Root { packages: List<Pkg> = [] }\npackages = [bash, vim]\n";
+    /// let source = "struct Root { packages: List<Pkg> = [] }\npackages = [shell, editor]\n";
     /// let mut host = Host::new(MemoryLoader::new().with_file("app/main.stav", source));
     /// host.symbols.push(SymbolType {
     ///     name: "Pkg".to_owned(),
@@ -285,7 +285,7 @@ impl Evaluated {
     ///     .symbol_paths("Pkg")
     ///     .map(|(text, path, _)| format!("{path}: {text}"))
     ///     .collect();
-    /// assert_eq!(found, ["packages.0: bash", "packages.1: vim"]);
+    /// assert_eq!(found, ["packages.0: shell", "packages.1: editor"]);
     /// # Ok::<(), stav::Diagnostics>(())
     /// ```
     pub fn symbol_paths(&self, ty: &str) -> impl Iterator<Item = (&str, &AttrPath, SourceSpan)> {

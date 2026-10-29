@@ -5,10 +5,10 @@ expression: output
 --- JSON
 {
   "packages": [
-    "dbus",
-    "pipewire",
+    "bus",
+    "mixer",
     "firmware",
-    "bluez",
+    "radio",
     "shared"
   ],
   "services": {
@@ -16,7 +16,7 @@ expression: output
       "exec": [],
       "after": [
         "network",
-        "dbus"
+        "bus"
       ]
     },
     "b": {

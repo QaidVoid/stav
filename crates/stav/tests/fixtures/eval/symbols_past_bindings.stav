@@ -1,6 +1,6 @@
 #! symbol Pkg pkg words
 #- file main.stav
-import "./lib.stav" as curl
+import "./lib.stav" as fetcher
 struct Unit { after: List<Ref<Unit>> = [] }
 struct Root {
   packages: List<Pkg> = []
@@ -8,22 +8,22 @@ struct Root {
   units:    Map<Str, Unit> = {} block unit
 }
 
-fn dbus() -> Part<Root> = part { packages = [dbus] }
-fn tools(git: Str) -> Part<Root> = part { packages = [git] }
+fn bus() -> Part<Root> = part { packages = [bus] }
+fn tools(tool: Str) -> Part<Root> = part { packages = [tool] }
 fn wrapped(shell: Pkg) -> Part<Root> = part { packages = [shell] }
-let zsh: Pkg = pkg("Zsh")
+let prompt: Pkg = pkg("Prompt")
 let cache: Ref<Unit> = "db"
 
-include dbus()
+include bus()
 include tools("ignored")
-include wrapped(bash)
-packages = [zsh, curl]
-for vim in [1] {
-  packages = [vim]
+include wrapped(console)
+packages = [prompt, fetcher]
+for editor in [1] {
+  packages = [editor]
 }
-primary = dbus
+primary = bus
 unit db {}
-unit web { after = [dbus, cache] }
-unit dbus {}
+unit web { after = [bus, cache] }
+unit bus {}
 #- file lib.stav
 let version = 8

@@ -538,7 +538,7 @@ struct Root {
   services: Map<Str, Service> = {} block service
 }
 
-fn sshd(port: Int = 22) -> Part<Root> = part {
+fn remote(port: Int = 22) -> Part<Root> = part {
   ports = [port]
 }
 
@@ -546,9 +546,9 @@ fn after(name: Str) -> Part<Service> = part {
   after = [name]
 }
 
-include sshd()
-include sshd(port = 22)
-include sshd(port = 2222)
+include remote()
+include remote(port = 22)
+include remote(port = 2222)
 
 service web {
   include after("network")
@@ -573,7 +573,7 @@ after = ["network", "database"]
 after = ["network"]
 ```
 
-`sshd()` and `sshd(port = 22)` are the same part, `sshd(port = 2222)` is another one. `after("network")` is merged once into `service web` and once into `service worker`.
+`remote()` and `remote(port = 22)` are the same part, `remote(port = 2222)` is another one. `after("network")` is merged once into `service web` and once into `service worker`.
 
 Including the same part file twice in a row into the same body is warning [W0703](/reference/error-codes#w0703), because the second `include` has no effect.
 
