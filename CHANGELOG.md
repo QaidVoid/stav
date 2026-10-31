@@ -1,4 +1,34 @@
 
+## [0.2.0](https://github.com/QaidVoid/stav/compare/v0.1.0...v0.2.0) - 2026-10-29
+
+### ⛰️  Features
+
+- *(check)* Resolve symbols and references past unfit bindings - ([f581799](https://github.com/QaidVoid/stav/commit/f5817994ef83647e50f0a0cfe28a938adf157cf5))
+- *(eval)* Point spans inside variant payloads - ([bdfe2ca](https://github.com/QaidVoid/stav/commit/bdfe2caf39f8f6fce96c5dc7701228e243e4b0aa))
+- *(eval)* Fill declared defaults in host struct values - ([28ff2c0](https://github.com/QaidVoid/stav/commit/28ff2c04e390694bb2ddd6946f8ee94c7207e7d8))
+- *(eval)* Supply host module values at evaluation time - ([6c157cc](https://github.com/QaidVoid/stav/commit/6c157cce009be288d7cca139ccd5572f480f60b3))
+- *(eval)* Report the winning priority of an attribute - ([59d0229](https://github.com/QaidVoid/stav/commit/59d0229a336ef8ad6d257febb699253a1de11084))
+- *(eval)* Return the path of every symbol occurrence - ([ada2561](https://github.com/QaidVoid/stav/commit/ada25611eb1bc5e3f6d5547b267dabeb7de830e4))
+- *(eval)* Point spans at list elements and literal entries - ([19ce480](https://github.com/QaidVoid/stav/commit/19ce480eb41a02268b796075a034f5503611ed48))
+- *(eval)* [**breaking**] Merge each part once into a block - ([b34ea21](https://github.com/QaidVoid/stav/commit/b34ea21f5777b0a6ac9be655310abf1ea5192f38))
+- Let hosts build and replace diagnostics - ([e95e64b](https://github.com/QaidVoid/stav/commit/e95e64b82ab5b0e19ba50005519cd087accc630a))
+
+### 🐛 Bug Fixes
+
+- *(check)* Report a let used too early instead of a symbol - ([ae015f9](https://github.com/QaidVoid/stav/commit/ae015f9bd5acbe833836b3bb68f35ac087a6eb17))
+
+### 🚜 Refactor
+
+- *(eval)* Share the evaluation of list literal elements - ([3ef01ef](https://github.com/QaidVoid/stav/commit/3ef01ef9a275e59350e54b42702afbd8cf2dff5f))
+
+### 📚 Documentation
+
+- *(eval)* State how host values, priorities and keys behave - ([5a14905](https://github.com/QaidVoid/stav/commit/5a149054f10cbd40a606803a75575a0ec9b68259))
+
+### 🧪 Testing
+
+- Replace real program names in new fixtures and docs - ([685e91c](https://github.com/QaidVoid/stav/commit/685e91cb61f32011b2aa9d685a3ca8cae335e6b0))
+
 ## [0.1.0] - 2026-10-29
 
 ### ⛰️  Features
