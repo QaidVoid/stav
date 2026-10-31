@@ -1,4 +1,10 @@
 
+## [0.2.0] - 2026-10-31
+
+### ⚙️ Miscellaneous Tasks
+
+- Release v0.2.0 ([#2](https://github.com/QaidVoid/stav/pull/2)) - ([42bcae7](https://github.com/QaidVoid/stav/commit/42bcae7befcaf634edbd1a9313c7d122a50b669d))
+
 
 ## [0.1.0] - 2026-10-29
 
