@@ -578,3 +578,48 @@ fn missing_parts_are_none_in_broken_code() {
     assert!(decl.name().is_none());
     assert_eq!(decl.fields().count(), 0);
 }
+
+fn with_first_field(source: &str, check: impl FnOnce(crate::ast::Field<'_>)) {
+    let parsed = parse(source);
+    let Some(Item::Struct(decl)) = parsed.file().items().next() else {
+        panic!("expected a struct");
+    };
+    check(decl.fields().next().expect("expected a field"));
+}
+
+#[test]
+fn doc_comment_joins_the_lines_of_one_comment() {
+    with_first_field(
+        "struct S {\n  ## first\n  ## second\n  a: Int\n}\n",
+        |field| {
+            assert_eq!(
+                crate::ast::doc_comment(field.syntax()).as_deref(),
+                Some("first\nsecond")
+            );
+        },
+    );
+}
+
+#[test]
+fn doc_comment_of_the_last_field_reaches_nothing_after_it() {
+    with_first_field("struct S {\n  a: Int\n}\n## later\nlet x = 1\n", |field| {
+        assert_eq!(crate::ast::doc_comment(field.syntax()), None);
+    });
+}
+
+#[test]
+fn an_ordinary_comment_is_no_doc_comment() {
+    with_first_field("struct S {\n  # note\n  ## real\n  a: Int\n}\n", |field| {
+        assert_eq!(
+            crate::ast::doc_comment(field.syntax()).as_deref(),
+            Some("real")
+        );
+    });
+}
+
+#[test]
+fn a_field_without_doc_comment_has_none() {
+    with_first_field("struct S {\n  a: Int\n}\n", |field| {
+        assert_eq!(crate::ast::doc_comment(field.syntax()), None);
+    });
+}

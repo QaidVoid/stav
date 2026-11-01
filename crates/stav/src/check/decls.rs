@@ -16,8 +16,7 @@ use crate::ast::{self, Expr, Item, LiteralKind, Stmt, UnaryOp};
 use crate::diagnostic::Diagnostic;
 use crate::lexer::{parse_float, parse_int};
 use crate::span::Span;
-use crate::syntax::{SyntaxElement, SyntaxNode, SyntaxToken};
-use crate::token::TokenKind;
+use crate::syntax::SyntaxToken;
 
 /// The type names that only built-in types may use.
 const RESERVED: [&str; 13] = [
@@ -139,39 +138,6 @@ pub(crate) struct PredicateArgs<'p> {
     pub(crate) args: Vec<(Expr<'p>, TypeId)>,
 }
 
-/// Returns the doc comment directly before `node`, without the `##`
-/// markers.
-pub(crate) fn doc_comment(node: SyntaxNode<'_>) -> Option<String> {
-    let parent = node.parent()?;
-    let mut lines: Vec<&str> = Vec::new();
-    for element in parent.children_with_tokens() {
-        match element {
-            SyntaxElement::Node(child) if child.index() == node.index() => break,
-            SyntaxElement::Token(token) if token.kind() == TokenKind::DocComment => {
-                lines.push(token.text());
-            }
-            SyntaxElement::Token(token)
-                if matches!(
-                    token.kind(),
-                    TokenKind::Newline | TokenKind::Whitespace | TokenKind::Pipe
-                ) => {}
-            _ => lines.clear(),
-        }
-    }
-    if lines.is_empty() {
-        return None;
-    }
-    let text: Vec<&str> = lines
-        .iter()
-        .map(|line| {
-            let line = line.trim_end();
-            let line = line.strip_prefix("##").unwrap_or(line);
-            line.strip_prefix(' ').unwrap_or(line)
-        })
-        .collect();
-    Some(text.join("\n"))
-}
-
 fn token_name(token: Option<SyntaxToken<'_>>) -> Option<(String, Span)> {
     token.map(|t| (t.text().to_owned(), t.span()))
 }
@@ -249,7 +215,7 @@ impl<'p> Checker<'p> {
                         file: id,
                         span,
                         fields: Vec::new(),
-                        doc: doc_comment(decl.syntax()),
+                        doc: ast::doc_comment(decl.syntax()),
                     });
                     scope.types.insert(name, TypeItem::Struct(sid));
                 }
@@ -267,7 +233,7 @@ impl<'p> Checker<'p> {
                         file: id,
                         span,
                         variants: Vec::new(),
-                        doc: doc_comment(decl.syntax()),
+                        doc: ast::doc_comment(decl.syntax()),
                     });
                     scope.types.insert(name, TypeItem::Sum(sid));
                 }
@@ -501,7 +467,7 @@ impl<'p> Checker<'p> {
                 ty_span: field.ty().map_or(span, |t| t.syntax().span()),
                 default: field.default().map(|d| d.syntax().index()),
                 block: field.block_kind().map(|k| k.text().to_owned()),
-                doc: doc_comment(field.syntax()),
+                doc: ast::doc_comment(field.syntax()),
             });
         }
         self.types.structs[sid.index()].fields = fields;
@@ -550,7 +516,7 @@ impl<'p> Checker<'p> {
             variants.push(VariantDef {
                 name,
                 fields,
-                doc: doc_comment(variant.syntax()),
+                doc: ast::doc_comment(variant.syntax()),
             });
         }
         self.types.sums[sid.index()].variants = variants;

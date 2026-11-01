@@ -13,6 +13,43 @@ use crate::span::Span;
 use crate::syntax::{NodeKind, SyntaxElement, SyntaxNode, SyntaxToken};
 use crate::token::TokenKind;
 
+/// Returns the doc comment directly before `node`, without the `##`
+/// markers and their one leading space, with the lines joined by `\n`.
+///
+/// The doc comments are the `##` tokens between the previous declaration
+/// or field and `node`, so a blank line or an ordinary comment between
+/// them leaves `node` without a doc comment.
+pub fn doc_comment(node: SyntaxNode<'_>) -> Option<String> {
+    let parent = node.parent()?;
+    let mut lines: Vec<&str> = Vec::new();
+    for element in parent.children_with_tokens() {
+        match element {
+            SyntaxElement::Node(child) if child.index() == node.index() => break,
+            SyntaxElement::Token(token) if token.kind() == TokenKind::DocComment => {
+                lines.push(token.text());
+            }
+            SyntaxElement::Token(token)
+                if matches!(
+                    token.kind(),
+                    TokenKind::Newline | TokenKind::Whitespace | TokenKind::Pipe
+                ) => {}
+            _ => lines.clear(),
+        }
+    }
+    if lines.is_empty() {
+        return None;
+    }
+    let text: Vec<&str> = lines
+        .iter()
+        .map(|line| {
+            let line = line.trim_end();
+            let line = line.strip_prefix("##").unwrap_or(line);
+            line.strip_prefix(' ').unwrap_or(line)
+        })
+        .collect();
+    Some(text.join("\n"))
+}
+
 trait AstNode<'a>: Sized {
     fn cast(node: SyntaxNode<'a>) -> Option<Self>;
 }
