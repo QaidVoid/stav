@@ -368,9 +368,10 @@ impl<'a> Lexer<'a> {
                 Some(format!("shorten the identifier to {MAX_IDENT_LEN} bytes")),
             );
         }
-        let kind = if self.eat_symbol_suffix() {
+        let upper = self.bytes[start].is_ascii_uppercase();
+        let kind = if self.eat_symbol_suffix(upper) {
             TokenKind::SymWord
-        } else if self.bytes[start].is_ascii_uppercase() {
+        } else if upper {
             TokenKind::TypeIdent
         } else {
             TokenKind::Ident
@@ -392,7 +393,19 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn eat_symbol_suffix(&mut self) -> bool {
+    /// Eats the `@version`, `:variant` and `{...}` suffixes of a symbol
+    /// word, and returns whether it found one. A brace group follows only
+    /// a lowercase word, so a constructor call written without a space,
+    /// such as `Ci {..}` glued, stays a struct literal.
+    fn eat_symbol_suffix(&mut self, upper: bool) -> bool {
+        let mut ate = self.eat_version_or_variant_suffix();
+        if !upper && self.peek(0) == Some(b'{') && self.eat_brace_group() {
+            ate = true;
+        }
+        ate
+    }
+
+    fn eat_version_or_variant_suffix(&mut self) -> bool {
         let variant_follows =
             |lexer: &Self| lexer.peek(0) == Some(b':') && lexer.peek(1).is_some_and(is_lower);
         if self.peek(0) == Some(b'@') {
@@ -416,6 +429,43 @@ impl<'a> Lexer<'a> {
         } else {
             false
         }
+    }
+
+    /// Eats a flat `{...}` group at the current position and returns
+    /// whether it found one. The group ends at the first `}` and holds
+    /// no `{`, no line break and no `#`, which starts a line comment
+    /// that cannot be closed on the line. A `}` or a line break inside
+    /// a `"..."` literal is content. Anything else is left alone, so
+    /// the parser reports the open brace where it starts.
+    fn eat_brace_group(&mut self) -> bool {
+        let mut pos = self.pos + 1;
+        let mut in_string = false;
+        let mut escaped = false;
+        while let Some(&b) = self.bytes.get(pos) {
+            if in_string {
+                if escaped {
+                    escaped = false;
+                } else if b == b'\\' {
+                    escaped = true;
+                } else if b == b'"' {
+                    in_string = false;
+                } else if b == b'\n' {
+                    return false;
+                }
+            } else {
+                match b {
+                    b'"' => in_string = true,
+                    b'{' | b'#' | b'\n' => return false,
+                    b'}' => {
+                        self.pos = pos + 1;
+                        return true;
+                    }
+                    _ => {}
+                }
+            }
+            pos += 1;
+        }
+        false
     }
 
     fn lex_number(&mut self) {
@@ -458,7 +508,7 @@ impl<'a> Lexer<'a> {
 
         if self.peek(0).is_some_and(is_ident_char) {
             self.eat_word_rest();
-            self.eat_symbol_suffix();
+            self.eat_symbol_suffix(self.bytes[start].is_ascii_uppercase());
             self.push(TokenKind::Error, start);
             let text = self.slice(start, self.pos);
             return self.error(

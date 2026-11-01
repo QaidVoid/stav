@@ -329,7 +329,7 @@
       "patterns": [
         {
           "name": "constant.other.symbol.stav",
-          "match": "\\b[A-Za-z_][A-Za-z0-9_]*(?:-[A-Za-z0-9_]+|\\.[0-9]+)*(?:@[A-Za-z0-9._~]+(?::[a-z][a-z0-9_]*)?|:[a-z][a-z0-9_]*)"
+          "match": "\\b[A-Z_][A-Za-z0-9_]*(?:-[A-Za-z0-9_]+|\\.[0-9]+)*(?:@[A-Za-z0-9._~]+(?::[a-z][a-z0-9_]*)?|:[a-z][a-z0-9_]*)|\\b(?!(?:if|else|match|for|in|let|fn|struct|type|import|include|as|part|where|block|self|true|false|none)\\b)[a-z_][A-Za-z0-9_]*(?:-[A-Za-z0-9_]+|\\.[0-9]+)*(?:(?:@[A-Za-z0-9._~]+)?(?::[a-z][a-z0-9_]*)?)?(?:\\{(?:[^#\"{}\\n]|\"(?:[^\"\\\\\\n]|\\\\.)*\")*\\})|\\b[a-z_][A-Za-z0-9_]*(?:-[A-Za-z0-9_]+|\\.[0-9]+)*(?:@[A-Za-z0-9._~]+(?::[a-z][a-z0-9_]*)?|:[a-z][a-z0-9_]*)"
         }
       ]
     },

@@ -184,6 +184,114 @@ fn identifiers_with_version_or_variant_are_symbol_words() {
 }
 
 #[test]
+fn a_brace_group_extends_a_symbol_word() {
+    assert_snapshot!(
+        render("mesa{vulkan=all,!x11} llvm@19{shlib} ripgrep:static{pcre2} Big{a} odd{a}{} lib{a"),
+        @r#"
+    0..21    "mesa{vulkan=all,!x11}" SymWord
+    21..22   " " Whitespace
+    22..36   "llvm@19{shlib}" SymWord
+    36..37   " " Whitespace
+    37..58   "ripgrep:static{pcre2}" SymWord
+    58..59   " " Whitespace
+    59..62   "Big" TypeIdent
+    62..63   "{" LBrace
+    63..64   "a" Ident
+    64..65   "}" RBrace
+    65..66   " " Whitespace
+    66..72   "odd{a}" SymWord
+    72..73   "{" LBrace
+    73..74   "}" RBrace
+    74..75   " " Whitespace
+    75..78   "lib" Ident
+    78..79   "{" LBrace
+    79..80   "a" Ident
+    80..80   "" Eof
+    "#
+    );
+}
+
+#[test]
+fn a_brace_group_holds_every_version_and_variant_part() {
+    assert_snapshot!(render("lib@19.1:static{g} x:st{a} y@2{b}"), @r#"
+    0..18    "lib@19.1:static{g}" SymWord
+    18..19   " " Whitespace
+    19..26   "x:st{a}" SymWord
+    26..27   " " Whitespace
+    27..33   "y@2{b}" SymWord
+    33..33   "" Eof
+    "#
+    );
+}
+
+#[test]
+fn a_brace_group_holds_strings_but_not_their_line_break() {
+    assert_snapshot!(render("m{a=\"b}c\"} m{a=\"b\\\"c}d\"} m{a=\"b\nc}\""), @r#"
+    0..10    "m{a=\"b}c\"}" SymWord
+    10..11   " " Whitespace
+    11..24   "m{a=\"b\\\"c}d\"}" SymWord
+    24..25   " " Whitespace
+    25..26   "m" Ident
+    26..27   "{" LBrace
+    27..28   "a" Ident
+    28..29   "=" Eq
+    29..30   "\"" StrStart
+    30..31   "b" StrText
+    31..32   "\n" Newline
+    32..33   "c" Ident
+    33..34   "}" RBrace
+    34..35   "\"" StrStart
+    35..35   "" Eof
+    error[E0108] 29..30: unterminated string
+      help: close the string with `"` before the end of the line
+    error[E0108] 34..35: unterminated string
+      help: close the string with `"` before the end of the line
+    "#);
+}
+
+#[test]
+fn a_brace_group_ends_at_the_first_brace_without_nesting() {
+    assert_snapshot!(render("a{b{c}} d{e}"), @r#"
+    0..1     "a" Ident
+    1..2     "{" LBrace
+    2..6     "b{c}" SymWord
+    6..7     "}" RBrace
+    7..8     " " Whitespace
+    8..12    "d{e}" SymWord
+    12..12   "" Eof
+    "#);
+}
+
+#[test]
+fn a_brace_group_bails_on_a_line_break_or_comment() {
+    assert_snapshot!(render("lib{a\n} lib{a#b}"), @r##"
+    0..3     "lib" Ident
+    3..4     "{" LBrace
+    4..5     "a" Ident
+    5..6     "\n" Newline
+    6..7     "}" RBrace
+    7..8     " " Whitespace
+    8..11    "lib" Ident
+    11..12   "{" LBrace
+    12..13   "a" Ident
+    13..16   "#b}" Comment
+    16..16   "" Eof
+    "##);
+}
+
+#[test]
+fn a_brace_group_inside_an_interpolation_is_one_symbol_word() {
+    assert_snapshot!(render(r##""#{mesa{vulkan=amd}}""##), @r##"
+    0..1     "\"" StrStart
+    1..3     "#{" InterpStart
+    3..19    "mesa{vulkan=amd}" SymWord
+    19..20   "}" InterpEnd
+    20..21   "\"" StrEnd
+    21..21   "" Eof
+    "##);
+}
+
+#[test]
 fn at_sign_outside_symbol_word_is_an_error() {
     assert_snapshot!(render("lib @19\nlib@ 19\nlib@"), @r#"
     0..3     "lib" Ident

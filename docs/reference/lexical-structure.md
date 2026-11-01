@@ -155,19 +155,23 @@ The names of the built-in types are not keywords, but they are reserved. Declari
 
 ## Symbol words
 
-A symbol word is an identifier followed directly, without whitespace, by a version, a variant, or both. Symbol words exist so that a host program can offer compact literals for its own [symbol types](/reference/types#symbol-types), such as references to packages.
+A symbol word is an identifier followed directly, without whitespace, by a version, a variant, or an option-constraint group, or by any combination. Symbol words exist so that a host program can offer compact literals for its own [symbol types](/reference/types#symbol-types), such as references to packages.
 
 ```text
-SYMWORD = IDENT ( "@" verpart [ ":" varpart ] | ":" varpart )
+SYMWORD = IDENT [ "@" verpart ] [ ":" varpart ] [ optgroup ]
 verpart = verchar { verchar }
 verchar = "a"..."z" | "A"..."Z" | digit | "." | "_" | "~"
 varpart = "a"..."z" { "a"..."z" | digit | "_" }
+optgroup = "{" { anychar - ( "{" | "}" | linefeed | "#" | "\"" ) } "}"
 ```
+
+The group is a flat `{...}` on the same line: it ends at the first `}` that is not inside a `"..."` literal and holds no `{`, no line break and no `#`. Only a lowercase identifier takes the group, so a constructor call written without a space, such as `Ci{..}`, stays a struct literal. Because a lowercase word takes the group, a block body glued to it on one line, such as `if c{a=1}`, is not a block; write a space before the brace.
 
 | Source | Tokens |
 |---|---|
 | `llvm@19.1:static` | one symbol word with name `llvm`, version `19.1` and variant `static` |
 | `ripgrep:static` | one symbol word with name `ripgrep` and variant `static` |
+| `mesa{vulkan=amd,!x11}` | one symbol word with name `mesa` and the constraint group `{vulkan=amd,!x11}` |
 | `openssl1.1` | one identifier |
 | `port: Int` | the identifier `port`, the punctuation `:` and the type name `Int` |
 

@@ -56,13 +56,16 @@ pub enum TokenKind {
     /// An identifier that starts with an uppercase ASCII letter, such as
     /// `Str` or `Apache-2.0`.
     TypeIdent,
-    /// An identifier directly followed by a version part, a variant part or
-    /// both, such as `name@1.2`, `name:static` or `name@1.2:static`.
+    /// An identifier directly followed by a version part, a variant part
+    /// or an option-constraint group, or by any combination, such as
+    /// `name@1.2`, `name:static`, `name@1.2:static` or `name{a,!b=c}`.
     ///
     /// The version part is `@` followed by letters, digits, `.`, `_` and `~`.
     /// The variant part is `:` followed by a lowercase letter and then
     /// lowercase letters, digits and `_`. A `:` followed by anything else,
-    /// for example a space, is a [`TokenKind::Colon`].
+    /// for example a space, is a [`TokenKind::Colon`]. The constraint
+    /// group is a flat `{...}` on the same line whose braces and `#`
+    /// stay unquoted and whose `"` literals may hold either.
     SymWord,
     /// An integer such as `42`, `0x1f`, `0o755`, `0b1010` or `1_000`.
     ///

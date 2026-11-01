@@ -279,12 +279,14 @@ impl Parser<'_> {
 
     /// Bumps the name of a field, parameter, binding or import alias, and
     /// reports it if it is a symbol word. When `annotated` says that a type
-    /// may follow the name, a symbol word with a `:` is almost always a name
-    /// and type written without the space after `:`, and the help says so.
+    /// may follow the name, a symbol word with a `:` before its `{` group
+    /// is almost always a name and type written without the space after
+    /// `:`, and the help says so.
     fn binding_name(&mut self, annotated: bool) {
         if self.at(T::SymWord) {
             let text = self.current_text();
-            let help = text
+            let head = text.split('{').next().unwrap_or(text);
+            let help = head
                 .split_once(':')
                 .filter(|_| annotated)
                 .map(|(name, ty)| format!("write `{name}: {ty}` with a space after `:`"));

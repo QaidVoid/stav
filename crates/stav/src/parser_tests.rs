@@ -2046,6 +2046,27 @@ fn nesting_below_the_limit_is_accepted() {
     assert!(parse(&source).diagnostics.is_empty());
 }
 
+#[test]
+fn a_glued_block_after_a_lowercase_word_is_not_a_block() {
+    assert_snapshot!(errors("if c{a=1}\n"), @r##"
+    error[E0210] 9..10: expected `{`, found a line break
+    "##);
+}
+
+#[test]
+fn a_symbol_word_with_a_group_is_one_symbol() {
+    assert_snapshot!(render("let p = mesa{vulkan=amd}\n"), @r##"
+    File@0..25
+      Let@0..24
+        LetKw "let"
+        Ident "p"
+        Eq "="
+        Symbol@8..24
+          SymWord "mesa{vulkan=amd}"
+      Newline "\n"
+    "##);
+}
+
 const FRAGMENTS: &[&str] = &[
     " ", "\n", "#c\n", "\"", "\"\"\"\n", "r\"", "#{", "}", "{", "[", "]", "(", ")", ",", "=", ".",
     "?.", "??", ":", "->", "=>", "..", "..=", "|", "+", "-", "*", "<", ">", "==", "&&", "!", "a",
