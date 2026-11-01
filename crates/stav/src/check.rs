@@ -25,6 +25,7 @@ pub(crate) mod types;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
+pub use decls::is_builtin_type_name;
 pub use host::{
     Host, HostModule, ImplicitRefs, ImportRoot, LoadError, Loader, MemoryLoader, RelPath, RootSpec,
     Source, SymbolType,

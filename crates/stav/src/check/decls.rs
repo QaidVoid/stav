@@ -19,10 +19,21 @@ use crate::span::Span;
 use crate::syntax::SyntaxToken;
 
 /// The type names that only built-in types may use.
-const RESERVED: [&str; 13] = [
+pub(crate) const BUILTIN_TYPE_NAMES: [&str; 13] = [
     "Bool", "Int", "Float", "Str", "Path", "Data", "List", "Set", "Map", "Option", "Ref", "Part",
     "Fn",
 ];
+
+/// Whether `name` is the name of a built-in type, which a file cannot
+/// declare.
+///
+/// ```
+/// assert!(stav::is_builtin_type_name("Bool"));
+/// assert!(!stav::is_builtin_type_name("Drivers"));
+/// ```
+pub fn is_builtin_type_name(name: &str) -> bool {
+    BUILTIN_TYPE_NAMES.contains(&name)
+}
 
 /// A name in the value namespace of a file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -296,7 +307,7 @@ impl<'p> Checker<'p> {
         span: Span,
         seen: &BTreeMap<String, Span>,
     ) -> bool {
-        if RESERVED.contains(&name) {
+        if BUILTIN_TYPE_NAMES.contains(&name) {
             self.error(
                 file,
                 Diagnostic::error(
@@ -643,7 +654,7 @@ impl<'p> Checker<'p> {
         let item = match segments.as_slice() {
             [name] => {
                 let name = name.text();
-                if RESERVED.contains(&name) {
+                if BUILTIN_TYPE_NAMES.contains(&name) {
                     return self.builtin_type(file, name, &args, named.syntax().span(), owner);
                 }
                 self.lookup_type(file, name)
@@ -721,7 +732,7 @@ impl<'p> Checker<'p> {
                 .keys()
                 .chain(self.prelude.types.keys())
                 .map(String::as_str)
-                .chain(RESERVED)
+                .chain(BUILTIN_TYPE_NAMES)
                 .collect()
         };
         did_you_mean(name, candidates)
