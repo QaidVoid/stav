@@ -10,8 +10,11 @@ error[E0302]: unknown name `cont`
   --> app/main.stav:6:16
   help: did you mean `cuont`?
 error[E0302]: unknown name `supervisr`, which is not a variant of `Init`
-  --> app/main.stav:9:8
+  --> app/main.stav:10:8
   help: did you mean `supervisor`?
+error[E0302]: unknown name `flase`
+  --> app/main.stav:11:6
+  help: did you mean `false`?
 error[E0302]: `Server` has no field `nmae`
-  --> app/main.stav:10:19
+  --> app/main.stav:12:19
   help: did you mean `name`?

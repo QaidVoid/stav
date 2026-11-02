@@ -4,8 +4,10 @@ struct Root {
   init: Init = supervisor
   server: Servr
   count: Int = cont
+  ok: Bool = false
 }
 let cuont = 1
 init = supervisr
+ok = flase
 server = Server { nmae = "x" }
 server.prot = 8

@@ -505,6 +505,9 @@ impl<'p> Checker<'p> {
         let mut candidates: Vec<String> = cx.scope.names().map(str::to_owned).collect();
         candidates.extend(self.value_names(cx.file));
         let mut message = format!("unknown name `{name}`");
+        if want.is_some_and(|w| self.types.same(w, TypeId::BOOL)) {
+            candidates.extend(["true".to_owned(), "false".to_owned()]);
+        }
         if let Some(s) = want.and_then(|w| self.types.as_sum(w)) {
             let sum = self.types.sum(s);
             candidates.extend(sum.variants.iter().map(|v| v.name.clone()));
